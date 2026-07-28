@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+/*
+ * iOS Human Interface–flavoured tokens: system greys, system blue accent,
+ * and the standard semantic colours for positive/negative price deltas.
+ */
+@theme {
+  --color-ios-bg: #f2f2f7;
+  --color-ios-surface: #ffffff;
+  --color-ios-surface-2: #f9f9fb;
+  --color-ios-separator: #e5e5ea;
+  --color-ios-label: #1c1c1e;
+  --color-ios-label-2: #6c6c70;
+  --color-ios-label-3: #a1a1a6;
+  --color-ios-blue: #007aff;
+  --color-ios-blue-soft: #e8f1ff;
+  --color-ios-green: #34c759;
+  --color-ios-red: #ff3b30;
+  --color-ios-orange: #ff9500;
+
+  --radius-ios: 0.875rem;
+  --radius-ios-lg: 1.25rem;
+
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto,
+    Inter, "Helvetica Neue", "Noto Sans Tamil", sans-serif;
+
+  --shadow-ios: 0 1px 2px rgb(0 0 0 / 0.04), 0 6px 16px -8px rgb(0 0 0 / 0.12);
+  --shadow-ios-lg: 0 -1px 0 rgb(0 0 0 / 0.04), 0 -12px 40px -12px rgb(0 0 0 / 0.25);
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--color-ios-bg);
+  color: var(--color-ios-label);
+  font-family: var(--font-sans);
+  /* Keeps content clear of the iPhone notch. */
+  padding-top: env(safe-area-inset-top);
+  overscroll-behavior-y: none;
+}
+
+/* Native-feeling taps: no blue flash on press. */
+button,
+a,
+label,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+input,
+select,
+textarea {
+  /* 16px minimum stops iOS Safari zooming in on focus. */
+  font-size: max(16px, 1rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@utility ios-card {
+  background-color: var(--color-ios-surface);
+  border-radius: var(--radius-ios-lg);
+  box-shadow: var(--shadow-ios);
+}
+
+@utility ios-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 3.25rem;
+  padding: 0.625rem 1rem;
+}
+
+@keyframes ios-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes ios-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-sheet-in {
+  animation: ios-sheet-in 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.animate-fade-in {
+  animation: ios-fade-in 0.2s ease-out;
+}

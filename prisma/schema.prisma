@@ -1,0 +1,158 @@
+// Monthly Grocery Planner — Prisma schema
+//
+// Mirrors the master data exported from "Grocery database.xlsx":
+//   Grocery    -> Item.nameTa   (Tamil name)
+//   Grocery.1  -> Item.nameEn   (English name)
+//   Type       -> Category      (e.g. பருப்பு வகை / Dals)
+//   Qty Type   -> Item.unitType (kg, g, L, ml, Rs, or blank = countable)
+//   From       -> Shop          (e.g. D Mart, Balamurugan, Jio Mart)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Unit of measure for an item. Drives the +/- stepper increments in the UI.
+///   G, ML  -> step 50
+///   KG, L  -> step 0.5
+///   RS     -> step 10
+///   COUNT  -> step 1 (blank "Qty Type" in the spreadsheet)
+enum UnitType {
+  KG
+  G
+  L
+  ML
+  RS
+  COUNT
+}
+
+enum ListStatus {
+  DRAFT
+  FINALIZED
+  COMPLETED
+}
+
+/// "Type" column — e.g. பருப்பு வகை / Dals
+model Category {
+  id        Int      @id @default(autoincrement())
+  nameTa    String?
+  nameEn    String   @unique
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  items Item[]
+
+  @@index([sortOrder])
+}
+
+/// "From" column — the shop an item is normally bought from.
+model Shop {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  items          Item[]
+  groceryItems   GroceryListItem[]
+  priceHistories PriceHistory[]
+}
+
+/// A master-data grocery item.
+model Item {
+  id         Int      @id @default(autoincrement())
+  nameTa     String
+  nameEn     String
+  unitType   UnitType @default(COUNT)
+  /// Quantity pre-filled when the item is added to a list.
+  defaultQty Decimal  @default(1) @db.Decimal(10, 2)
+  categoryId Int
+  /// Default shop ("From"); can be overridden per list item.
+  shopId     Int?
+  isActive   Boolean  @default(true)
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category       Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  shop           Shop?             @relation(fields: [shopId], references: [id], onDelete: SetNull)
+  listItems      GroceryListItem[]
+  priceHistories PriceHistory[]
+
+  @@unique([nameEn, categoryId])
+  @@index([nameTa])
+  @@index([categoryId])
+  @@index([shopId])
+}
+
+/// A monthly list, e.g. "Jul 2026".
+model GroceryList {
+  id          Int        @id @default(autoincrement())
+  name        String
+  /// Sortable month key, "YYYY-MM". Unique so one list per month is the norm.
+  monthKey    String     @unique
+  status      ListStatus @default(DRAFT)
+  finalizedAt DateTime?
+  completedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  items          GroceryListItem[]
+  priceHistories PriceHistory[]
+
+  @@index([monthKey])
+}
+
+/// One row of a monthly list.
+model GroceryListItem {
+  id       Int      @id @default(autoincrement())
+  listId   Int
+  itemId   Int
+  quantity Decimal  @db.Decimal(10, 2)
+  /// Snapshot of the item's unit at the time it was added.
+  unitType UnitType
+  /// Shop this row must be bought from (overrides Item.shopId).
+  shopId   Int?
+
+  isPurchased   Boolean   @default(false)
+  /// Price actually paid, entered while shopping.
+  purchasePrice Decimal?  @db.Decimal(10, 2)
+  /// Snapshot of the previous month's price, kept for the up/down indicator.
+  previousPrice Decimal?  @db.Decimal(10, 2)
+  purchasedAt   DateTime?
+
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  list GroceryList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  item Item        @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  shop Shop?       @relation(fields: [shopId], references: [id], onDelete: SetNull)
+
+  @@unique([listId, itemId, shopId])
+  @@index([listId, shopId])
+  @@index([itemId])
+}
+
+/// Append-only record of what an item actually cost, used for
+/// "cheaper / dearer than last month" comparisons.
+model PriceHistory {
+  id          Int      @id @default(autoincrement())
+  itemId      Int
+  listId      Int?
+  shopId      Int?
+  price       Decimal  @db.Decimal(10, 2)
+  quantity    Decimal  @db.Decimal(10, 2)
+  unitType    UnitType
+  purchasedAt DateTime @default(now())
+
+  item Item         @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  list GroceryList? @relation(fields: [listId], references: [id], onDelete: SetNull)
+  shop Shop?        @relation(fields: [shopId], references: [id], onDelete: SetNull)
+
+  @@index([itemId, purchasedAt])
+  @@index([listId])
+}
