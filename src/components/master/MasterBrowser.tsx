@@ -7,7 +7,7 @@ import { useMemo, useState, useTransition } from "react";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { Sheet } from "@/components/Sheet";
 import { Stepper } from "@/components/Stepper";
-import { deleteMasterItem, setMasterItemActive, upsertMasterItem } from "@/lib/actions";
+import { deleteMasterItem, setMasterItemActive, updateCategory, upsertMasterItem } from "@/lib/actions";
 import { bilingualName, useLanguage } from "@/lib/language";
 import {
   UNIT_TYPES,
@@ -44,6 +44,12 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [categoryDrafts, setCategoryDrafts] = useState<
+    Record<number, { nameEn: string; nameTa: string }>
+  >({});
+  const [categoryError, setCategoryError] = useState<string | null>(null);
 
   const groups = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -132,6 +138,37 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
     });
   };
 
+  const openCategories = () => {
+    setCategoryError(null);
+    setCategoryDrafts(
+      Object.fromEntries(
+        categories.map((category) => [
+          category.id,
+          { nameEn: category.nameEn, nameTa: category.nameTa ?? "" },
+        ]),
+      ),
+    );
+    setCategoriesOpen(true);
+  };
+
+  const saveCategory = (categoryId: number) => {
+    const categoryDraft = categoryDrafts[categoryId];
+    if (!categoryDraft) return;
+    setCategoryError(null);
+    startTransition(async () => {
+      const result = await updateCategory({
+        id: categoryId,
+        nameEn: categoryDraft.nameEn,
+        nameTa: categoryDraft.nameTa,
+      });
+      if (!result.ok) {
+        setCategoryError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  };
+
   return (
     <div className="space-y-5">
       <header className="flex items-end justify-between gap-3 pt-2">
@@ -141,7 +178,25 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
             {items.length} items · {categories.length} categories
           </p>
         </div>
-        <LanguageToggle />
+        <div className="flex flex-none items-center gap-2">
+          <button
+            type="button"
+            onClick={openCategories}
+            aria-label="Manage categories"
+            title="Manage categories"
+            className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-ios-surface text-ios-blue shadow-ios transition active:scale-95"
+          >
+            <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+              <path
+                d="M4 6h16M4 12h10M4 18h6"
+                stroke="currentColor"
+                strokeWidth="2.25"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+          <LanguageToggle />
+        </div>
       </header>
 
       <div className="space-y-3">
@@ -385,6 +440,63 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
             {error ? <p className="text-[14px] text-ios-red">{error}</p> : null}
           </div>
         ) : null}
+      </Sheet>
+
+      <Sheet
+        open={categoriesOpen}
+        onClose={() => setCategoriesOpen(false)}
+        title="Categories"
+        subtitle="Tamil and English names shown in filter chips, group headers and PDFs. A blank Tamil name is why a category won't switch when you toggle the language."
+      >
+        <div className="space-y-3 pb-2">
+          {categories.map((category) => {
+            const categoryDraft = categoryDrafts[category.id] ?? {
+              nameEn: category.nameEn,
+              nameTa: category.nameTa ?? "",
+            };
+            return (
+              <div key={category.id} className="flex items-end gap-2">
+                <label className="min-w-0 flex-1 block">
+                  <span className="text-[12px] font-medium text-ios-label-2">Tamil</span>
+                  <input
+                    value={categoryDraft.nameTa}
+                    onChange={(event) =>
+                      setCategoryDrafts((prev) => ({
+                        ...prev,
+                        [category.id]: { ...categoryDraft, nameTa: event.target.value },
+                      }))
+                    }
+                    placeholder="—"
+                    className="mt-1 h-10 w-full rounded-ios bg-ios-surface-2 px-3 text-[15px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
+                  />
+                </label>
+                <label className="min-w-0 flex-1 block">
+                  <span className="text-[12px] font-medium text-ios-label-2">English</span>
+                  <input
+                    value={categoryDraft.nameEn}
+                    onChange={(event) =>
+                      setCategoryDrafts((prev) => ({
+                        ...prev,
+                        [category.id]: { ...categoryDraft, nameEn: event.target.value },
+                      }))
+                    }
+                    className="mt-1 h-10 w-full rounded-ios bg-ios-surface-2 px-3 text-[15px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => saveCategory(category.id)}
+                  disabled={pending}
+                  className="h-10 flex-none rounded-full bg-ios-blue px-3 text-[13px] font-semibold text-white transition active:scale-95 disabled:opacity-50"
+                >
+                  Save
+                </button>
+              </div>
+            );
+          })}
+
+          {categoryError ? <p className="text-[14px] text-ios-red">{categoryError}</p> : null}
+        </div>
       </Sheet>
     </div>
   );

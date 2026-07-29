@@ -372,6 +372,26 @@ export async function createCategory(input: {
   return { ok: true, data: { id: category.id } };
 }
 
+export async function updateCategory(input: {
+  id: number;
+  nameEn: string;
+  nameTa?: string | null;
+}): Promise<ActionResult> {
+  const nameEn = input.nameEn.trim();
+  if (!nameEn) return fail("English name is required.");
+  const nameTa = input.nameTa?.trim() || null;
+
+  const clash = await prisma.category.findFirst({
+    where: { nameEn, NOT: { id: input.id } },
+    select: { id: true },
+  });
+  if (clash) return fail(`"${nameEn}" already exists.`);
+
+  await prisma.category.update({ where: { id: input.id }, data: { nameEn, nameTa } });
+  revalidatePath("/master");
+  return { ok: true };
+}
+
 /** Powers the search field in the "add item" sheet. */
 export async function searchMasterItems(query: string) {
   const { getMasterItems } = await import("./queries");
