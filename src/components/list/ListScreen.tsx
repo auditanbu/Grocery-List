@@ -11,11 +11,10 @@ import { ShopFilter } from "@/components/list/ShopFilter";
 import { ShoppingView } from "@/components/list/ShoppingView";
 import { reopenList } from "@/lib/actions";
 import { monthKeyToLabel } from "@/lib/dates";
-import type { ListDetailDTO, MasterItemDTO } from "@/lib/types";
+import type { ListDetailDTO } from "@/lib/types";
 
 type ListScreenProps = {
   list: ListDetailDTO;
-  masterItems: MasterItemDTO[];
 };
 
 type Mode = "list" | "shopping";
@@ -26,7 +25,7 @@ const STATUS_LABEL = {
   COMPLETED: "Completed",
 } as const;
 
-export function ListScreen({ list, masterItems }: ListScreenProps) {
+export function ListScreen({ list }: ListScreenProps) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>(list.status === "COMPLETED" ? "shopping" : "list");
   const [shopId, setShopId] = useState<number | null | undefined>(undefined);
@@ -105,7 +104,7 @@ export function ListScreen({ list, masterItems }: ListScreenProps) {
       </header>
 
       {isDraft ? (
-        <DraftEditor list={list} masterItems={masterItems} />
+        <DraftEditor list={list} />
       ) : (
         <>
           <SegmentedControl

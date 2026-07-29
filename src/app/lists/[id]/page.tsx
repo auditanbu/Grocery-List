@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { ListScreen } from "@/components/list/ListScreen";
-import { getList, getMasterItems } from "@/lib/queries";
+import { getList } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -13,8 +13,5 @@ export default async function ListPage({ params }: { params: Promise<{ id: strin
   const list = await getList(listId);
   if (!list) notFound();
 
-  // Only the draft screen needs the master catalogue for its search sheet.
-  const masterItems = list.status === "DRAFT" ? await getMasterItems() : [];
-
-  return <ListScreen list={list} masterItems={masterItems} />;
+  return <ListScreen list={list} />;
 }

@@ -1,22 +1,20 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { AddItemSheet } from "@/components/list/AddItemSheet";
 import { Sheet } from "@/components/Sheet";
 import { Stepper } from "@/components/Stepper";
 import { finalizeList, removeListItem, updateListItem } from "@/lib/actions";
-import type { ListDetailDTO, ListItemDTO, MasterItemDTO, ShopDTO } from "@/lib/types";
+import type { ListDetailDTO, ListItemDTO, ShopDTO } from "@/lib/types";
 
 type DraftEditorProps = {
   list: ListDetailDTO;
-  masterItems: MasterItemDTO[];
 };
 
-export function DraftEditor({ list, masterItems }: DraftEditorProps) {
+export function DraftEditor({ list }: DraftEditorProps) {
   const router = useRouter();
-  const [adding, setAdding] = useState(false);
   const [shopPickerFor, setShopPickerFor] = useState<ListItemDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -67,9 +65,8 @@ export function DraftEditor({ list, masterItems }: DraftEditorProps) {
 
   return (
     <div className="space-y-5">
-      <button
-        type="button"
-        onClick={() => setAdding(true)}
+      <Link
+        href={`/lists/${list.id}/add`}
         className="flex h-12 w-full items-center justify-center gap-2 rounded-ios bg-ios-blue text-[17px] font-semibold text-white transition active:scale-[0.98]"
       >
         <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
@@ -81,7 +78,7 @@ export function DraftEditor({ list, masterItems }: DraftEditorProps) {
           />
         </svg>
         Add item
-      </button>
+      </Link>
 
       {error ? (
         <p className="rounded-ios bg-red-50 px-4 py-3 text-[14px] text-ios-red">{error}</p>
@@ -153,14 +150,6 @@ export function DraftEditor({ list, masterItems }: DraftEditorProps) {
           Finalize list
         </button>
       ) : null}
-
-      <AddItemSheet
-        open={adding}
-        onClose={() => setAdding(false)}
-        listId={list.id}
-        items={masterItems}
-        shops={list.shops}
-      />
 
       <ShopPickerSheet
         item={shopPickerFor}
