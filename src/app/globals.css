@@ -15,7 +15,9 @@
   --color-ios-blue: #007aff;
   --color-ios-blue-soft: #e8f1ff;
   --color-ios-green: #34c759;
+  --color-ios-green-soft: #f0fdf4;
   --color-ios-red: #ff3b30;
+  --color-ios-red-soft: #fef2f2;
   --color-ios-orange: #ff9500;
 
   --radius-ios: 0.875rem;
@@ -31,6 +33,34 @@
 
 :root {
   color-scheme: light;
+}
+
+/*
+ * Dark mode: ThemeProvider stamps data-theme on <html> (persisted via
+ * localStorage, applied pre-hydration by an inline script to avoid a
+ * flash). Overriding the same custom properties Tailwind bound the
+ * ios-* utilities to is enough — no `dark:` variants needed anywhere.
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-ios-bg: #000000;
+  --color-ios-surface: #1c1c1e;
+  --color-ios-surface-2: #2c2c2e;
+  --color-ios-separator: #38383a;
+  --color-ios-label: #ffffff;
+  --color-ios-label-2: #98989d;
+  --color-ios-label-3: #636366;
+  --color-ios-blue: #0a84ff;
+  --color-ios-blue-soft: #142a44;
+  --color-ios-green: #30d158;
+  --color-ios-green-soft: #12281a;
+  --color-ios-red: #ff453a;
+  --color-ios-red-soft: #3a1414;
+  --color-ios-orange: #ff9f0a;
+
+  --shadow-ios: 0 1px 2px rgb(0 0 0 / 0.5), 0 6px 16px -8px rgb(0 0 0 / 0.6);
+  --shadow-ios-lg: 0 -1px 0 rgb(0 0 0 / 0.5), 0 -12px 40px -12px rgb(0 0 0 / 0.7);
 }
 
 html {

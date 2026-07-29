@@ -164,7 +164,16 @@ export async function finalizeList(listId: number): Promise<ActionResult> {
   return { ok: true };
 }
 
+/**
+ * Only a list still being shopped (FINALIZED) can be reopened for edits.
+ * A COMPLETED list is a closed historical record — its spend and price
+ * history are already final, so editing it back open is not allowed.
+ */
 export async function reopenList(listId: number): Promise<ActionResult> {
+  const list = await prisma.groceryList.findUnique({ where: { id: listId }, select: { status: true } });
+  if (!list) return fail("List not found.");
+  if (list.status !== "FINALIZED") return fail("Completed lists can't be edited.");
+
   await prisma.groceryList.update({
     where: { id: listId },
     data: { status: "DRAFT", finalizedAt: null, completedAt: null },

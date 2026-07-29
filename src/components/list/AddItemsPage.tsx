@@ -189,7 +189,7 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
       />
 
       {error ? (
-        <p className="rounded-ios bg-red-50 px-4 py-3 text-[14px] text-ios-red">{error}</p>
+        <p className="rounded-ios bg-ios-red-soft px-4 py-3 text-[14px] text-ios-red">{error}</p>
       ) : null}
 
       {results.length === 0 ? (

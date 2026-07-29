@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { CreateListButton } from "@/components/CreateListButton";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { listNameFor, monthKeyOf, monthKeyToLabel } from "@/lib/dates";
 import { getLists } from "@/lib/queries";
 import { formatPrice } from "@/lib/units";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 const STATUS_STYLES: Record<ListSummaryDTO["status"], string> = {
   DRAFT: "bg-ios-surface-2 text-ios-label-2",
   FINALIZED: "bg-ios-blue-soft text-ios-blue",
-  COMPLETED: "bg-green-50 text-ios-green",
+  COMPLETED: "bg-ios-green-soft text-ios-green",
 };
 
 const STATUS_LABELS: Record<ListSummaryDTO["status"], string> = {
@@ -28,11 +29,21 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6">
-      <header className="pt-2">
-        <p className="text-[13px] font-medium uppercase tracking-wide text-ios-label-2">
-          {listNameFor()}
-        </p>
-        <h1 className="text-[34px] font-bold leading-tight tracking-tight">Grocery</h1>
+      <header className="flex items-end justify-between gap-3 pt-2">
+        <div>
+          <p className="text-[13px] font-medium uppercase tracking-wide text-ios-label-2">
+            {listNameFor()}
+          </p>
+          <h1 className="text-[34px] font-bold leading-tight tracking-tight">Grocery</h1>
+        </div>
+        <div className="flex flex-none items-center gap-2">
+          <ThemeToggle />
+          <CreateListButton
+            suggestedName={listNameFor()}
+            monthKey={currentMonthKey}
+            variant="icon"
+          />
+        </div>
       </header>
 
       <section className="ios-card overflow-hidden">
@@ -71,27 +82,6 @@ export default async function HomePage() {
           </div>
         )}
       </section>
-
-      {currentList ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Link
-            href={`/lists/${currentList.id}`}
-            className="ios-card flex items-center justify-between p-4 active:opacity-70"
-          >
-            <span className="text-[15px] font-medium">
-              {currentList.status === "DRAFT" ? "Continue drafting" : "Open list"}
-            </span>
-            <Chevron />
-          </Link>
-          <Link
-            href="/master"
-            className="ios-card flex items-center justify-between p-4 active:opacity-70"
-          >
-            <span className="text-[15px] font-medium">Browse master list</span>
-            <Chevron />
-          </Link>
-        </div>
-      ) : null}
 
       <section>
         <div className="flex items-baseline justify-between px-1 pb-2">

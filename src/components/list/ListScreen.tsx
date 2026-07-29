@@ -93,7 +93,7 @@ export function ListScreen({ list }: ListScreenProps) {
           </div>
           <div className="flex flex-none items-center gap-2">
             <LanguageToggle />
-            {!isDraft ? (
+            {list.status === "FINALIZED" ? (
               <button
                 type="button"
                 onClick={reopen}

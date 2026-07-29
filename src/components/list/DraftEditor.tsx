@@ -85,7 +85,7 @@ export function DraftEditor({ list }: DraftEditorProps) {
       </Link>
 
       {error ? (
-        <p className="rounded-ios bg-red-50 px-4 py-3 text-[14px] text-ios-red">{error}</p>
+        <p className="rounded-ios bg-ios-red-soft px-4 py-3 text-[14px] text-ios-red">{error}</p>
       ) : null}
 
       {list.items.length === 0 ? (

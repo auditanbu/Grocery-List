@@ -35,7 +35,7 @@ export function PriceDelta({ current, previous, variant = "badge" }: PriceDeltaP
   }
 
   const cheaper = diff < 0;
-  const tone = cheaper ? "bg-green-50 text-ios-green" : "bg-red-50 text-ios-red";
+  const tone = cheaper ? "bg-ios-green-soft text-ios-green" : "bg-ios-red-soft text-ios-red";
   const label = cheaper ? "cheaper" : "dearer";
 
   return (

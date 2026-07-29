@@ -11,7 +11,7 @@ type CreateListButtonProps = {
   suggestedName: string;
   /** "YYYY-MM" for the month being created. */
   monthKey: string;
-  variant?: "primary" | "plain";
+  variant?: "primary" | "plain" | "icon";
 };
 
 export function CreateListButton({
@@ -45,13 +45,28 @@ export function CreateListButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
+        aria-label={variant === "icon" ? "New list" : undefined}
+        title={variant === "icon" ? "New list" : undefined}
         className={
           variant === "primary"
             ? "flex h-12 w-full items-center justify-center rounded-ios bg-ios-blue text-[17px] font-semibold text-white transition active:scale-[0.98] active:opacity-90"
-            : "text-[17px] font-medium text-ios-blue active:opacity-60"
+            : variant === "icon"
+              ? "flex h-9 w-9 flex-none items-center justify-center rounded-full bg-ios-blue text-white shadow-ios transition active:scale-95"
+              : "text-[17px] font-medium text-ios-blue active:opacity-60"
         }
       >
-        New list
+        {variant === "icon" ? (
+          <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+            <path
+              d="M12 6v12M6 12h12"
+              stroke="currentColor"
+              strokeWidth="2.25"
+              strokeLinecap="round"
+            />
+          </svg>
+        ) : (
+          "New list"
+        )}
       </button>
 
       <Sheet
