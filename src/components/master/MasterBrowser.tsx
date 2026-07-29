@@ -7,7 +7,13 @@ import { useMemo, useState, useTransition } from "react";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { Sheet } from "@/components/Sheet";
 import { Stepper } from "@/components/Stepper";
-import { deleteMasterItem, setMasterItemActive, updateCategory, upsertMasterItem } from "@/lib/actions";
+import {
+  deleteCategory,
+  deleteMasterItem,
+  setMasterItemActive,
+  updateCategory,
+  upsertMasterItem,
+} from "@/lib/actions";
 import { bilingualName, useLanguage } from "@/lib/language";
 import {
   UNIT_TYPES,
@@ -78,6 +84,14 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
     return [...grouped.entries()];
   }, [items, query, categoryId, language]);
 
+  const categoryItemCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const item of items) {
+      counts.set(item.categoryId, (counts.get(item.categoryId) ?? 0) + 1);
+    }
+    return counts;
+  }, [items]);
+
   const startNew = () =>
     setDraft({
       nameEn: "",
@@ -133,6 +147,21 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
         window.alert(
           `"${item.nameEn}" is used in a past list, so it was hidden from search instead of permanently deleted.`,
         );
+      }
+      router.refresh();
+    });
+  };
+
+  const removeCategory = (category: CategoryDTO) => {
+    if (!window.confirm(`Delete the "${category.nameEn}" category? This can't be undone.`)) {
+      return;
+    }
+    setCategoryError(null);
+    startTransition(async () => {
+      const result = await deleteCategory(category.id);
+      if (!result.ok) {
+        setCategoryError(result.error);
+        return;
       }
       router.refresh();
     });
@@ -454,43 +483,60 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
               nameEn: category.nameEn,
               nameTa: category.nameTa ?? "",
             };
+            const itemCount = categoryItemCounts.get(category.id) ?? 0;
             return (
-              <div key={category.id} className="flex items-end gap-2">
-                <label className="min-w-0 flex-1 block">
-                  <span className="text-[12px] font-medium text-ios-label-2">Tamil</span>
-                  <input
-                    value={categoryDraft.nameTa}
-                    onChange={(event) =>
-                      setCategoryDrafts((prev) => ({
-                        ...prev,
-                        [category.id]: { ...categoryDraft, nameTa: event.target.value },
-                      }))
-                    }
-                    placeholder="—"
-                    className="mt-1 h-10 w-full rounded-ios bg-ios-surface-2 px-3 text-[15px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
-                  />
-                </label>
-                <label className="min-w-0 flex-1 block">
-                  <span className="text-[12px] font-medium text-ios-label-2">English</span>
-                  <input
-                    value={categoryDraft.nameEn}
-                    onChange={(event) =>
-                      setCategoryDrafts((prev) => ({
-                        ...prev,
-                        [category.id]: { ...categoryDraft, nameEn: event.target.value },
-                      }))
-                    }
-                    className="mt-1 h-10 w-full rounded-ios bg-ios-surface-2 px-3 text-[15px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => saveCategory(category.id)}
-                  disabled={pending}
-                  className="h-10 flex-none rounded-full bg-ios-blue px-3 text-[13px] font-semibold text-white transition active:scale-95 disabled:opacity-50"
-                >
-                  Save
-                </button>
+              <div key={category.id} className="space-y-2 border-b border-ios-separator pb-3">
+                <div className="flex items-end gap-2">
+                  <label className="min-w-0 flex-1 block">
+                    <span className="text-[12px] font-medium text-ios-label-2">Tamil</span>
+                    <input
+                      value={categoryDraft.nameTa}
+                      onChange={(event) =>
+                        setCategoryDrafts((prev) => ({
+                          ...prev,
+                          [category.id]: { ...categoryDraft, nameTa: event.target.value },
+                        }))
+                      }
+                      placeholder="—"
+                      className="mt-1 h-10 w-full rounded-ios bg-ios-surface-2 px-3 text-[15px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
+                    />
+                  </label>
+                  <label className="min-w-0 flex-1 block">
+                    <span className="text-[12px] font-medium text-ios-label-2">English</span>
+                    <input
+                      value={categoryDraft.nameEn}
+                      onChange={(event) =>
+                        setCategoryDrafts((prev) => ({
+                          ...prev,
+                          [category.id]: { ...categoryDraft, nameEn: event.target.value },
+                        }))
+                      }
+                      className="mt-1 h-10 w-full rounded-ios bg-ios-surface-2 px-3 text-[15px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => saveCategory(category.id)}
+                    disabled={pending}
+                    className="h-10 flex-none rounded-full bg-ios-blue px-3 text-[13px] font-semibold text-white transition active:scale-95 disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] text-ios-label-2">
+                    {itemCount} item{itemCount === 1 ? "" : "s"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeCategory(category)}
+                    disabled={pending || itemCount > 0}
+                    title={itemCount > 0 ? "Move or delete its items first" : undefined}
+                    className="text-[13px] font-medium text-ios-red active:opacity-60 disabled:opacity-40"
+                  >
+                    Delete category
+                  </button>
+                </div>
               </div>
             );
           })}

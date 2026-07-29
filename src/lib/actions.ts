@@ -341,6 +341,16 @@ export async function deleteMasterItem(itemId: number): Promise<ActionResult<{ d
   }
 }
 
+/** Only removable when empty — Item→Category is onDelete: Restrict. */
+export async function deleteCategory(categoryId: number): Promise<ActionResult> {
+  const count = await prisma.item.count({ where: { categoryId } });
+  if (count > 0) return fail("This category still has items — move or delete them first.");
+
+  await prisma.category.delete({ where: { id: categoryId } });
+  revalidatePath("/master");
+  return { ok: true };
+}
+
 export async function createShop(name: string): Promise<ActionResult<{ id: number }>> {
   const trimmed = name.trim();
   if (!trimmed) return fail("Shop name is required.");
