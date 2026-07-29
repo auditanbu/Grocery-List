@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { PrismaClientKnownRequestError } from "@/generated/prisma/internal/prismaNamespace";
 import { prisma } from "./prisma";
 import { listNameFor, monthKeyOf } from "./dates";
 import { normalizeQty, type UnitType } from "./units";
@@ -317,6 +318,27 @@ export async function setMasterItemActive(
   await prisma.item.update({ where: { id: itemId }, data: { isActive } });
   revalidatePath("/master");
   return { ok: true };
+}
+
+/**
+ * Permanently removes a master item. If it's referenced by a past list
+ * (Item→GroceryListItem is onDelete: Restrict), the hard delete is
+ * rejected by the database — fall back to deactivating it so it at
+ * least disappears from search and stays out of new lists.
+ */
+export async function deleteMasterItem(itemId: number): Promise<ActionResult<{ deleted: boolean }>> {
+  try {
+    await prisma.item.delete({ where: { id: itemId } });
+    revalidatePath("/master");
+    return { ok: true, data: { deleted: true } };
+  } catch (err) {
+    if (err instanceof PrismaClientKnownRequestError && err.code === "P2003") {
+      await prisma.item.update({ where: { id: itemId }, data: { isActive: false } });
+      revalidatePath("/master");
+      return { ok: true, data: { deleted: false } };
+    }
+    throw err;
+  }
 }
 
 export async function createShop(name: string): Promise<ActionResult<{ id: number }>> {

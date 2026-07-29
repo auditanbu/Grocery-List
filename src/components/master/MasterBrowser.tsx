@@ -7,7 +7,7 @@ import { useMemo, useState, useTransition } from "react";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { Sheet } from "@/components/Sheet";
 import { Stepper } from "@/components/Stepper";
-import { setMasterItemActive, upsertMasterItem } from "@/lib/actions";
+import { deleteMasterItem, setMasterItemActive, upsertMasterItem } from "@/lib/actions";
 import { bilingualName, useLanguage } from "@/lib/language";
 import {
   UNIT_TYPES,
@@ -112,6 +112,22 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
   const toggleActive = (item: MasterItemDTO) => {
     startTransition(async () => {
       await setMasterItemActive(item.id, !item.isActive);
+      router.refresh();
+    });
+  };
+
+  const remove = (item: MasterItemDTO) => {
+    if (!window.confirm(`Delete "${item.nameEn}" from the master list? This can't be undone.`)) {
+      return;
+    }
+    startTransition(async () => {
+      const result = await deleteMasterItem(item.id);
+      setDraft(null);
+      if (result.ok && !result.data.deleted) {
+        window.alert(
+          `"${item.nameEn}" is used in a past list, so it was hidden from search instead of permanently deleted.`,
+        );
+      }
       router.refresh();
     });
   };
@@ -341,17 +357,29 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
             </Field>
 
             {draft.id ? (
-              <button
-                type="button"
-                onClick={() => {
-                  const item = items.find((candidate) => candidate.id === draft.id);
-                  if (item) toggleActive(item);
-                  setDraft(null);
-                }}
-                className="h-11 text-[16px] font-medium text-ios-red active:opacity-60"
-              >
-                {draft.isActive ? "Hide from search" : "Restore to search"}
-              </button>
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const item = items.find((candidate) => candidate.id === draft.id);
+                    if (item) toggleActive(item);
+                    setDraft(null);
+                  }}
+                  className="h-11 text-[16px] font-medium text-ios-blue active:opacity-60"
+                >
+                  {draft.isActive ? "Hide from search" : "Restore to search"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const item = items.find((candidate) => candidate.id === draft.id);
+                    if (item) remove(item);
+                  }}
+                  className="h-11 text-[16px] font-medium text-ios-red active:opacity-60"
+                >
+                  Delete item
+                </button>
+              </div>
             ) : null}
 
             {error ? <p className="text-[14px] text-ios-red">{error}</p> : null}
