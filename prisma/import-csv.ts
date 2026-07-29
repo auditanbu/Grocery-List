@@ -7,6 +7,7 @@
  * Expected headers (extra columns are ignored, order does not matter):
  *   Grocery | Grocery.1 | Type | Qty Type | From
  */
+import "dotenv/config";
 import { readFile } from "node:fs/promises";
 import { createScriptClient, importMasterData, type MasterRow } from "./master-import.js";
 

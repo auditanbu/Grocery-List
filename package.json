@@ -13,6 +13,7 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:import": "tsx prisma/import-csv.ts",
+    "db:resync": "tsx prisma/resync.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {

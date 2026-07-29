@@ -96,7 +96,11 @@ export async function importMasterData(prisma: PrismaClient, data: MasterData) {
 
     await prisma.item.upsert({
       where: { nameEn_categoryId: { nameEn, categoryId } },
-      update: { nameTa: nameTa || nameEn, unitType, shopId },
+      // Reactivates an item that was previously deactivated (e.g. by
+      // resync.ts, when it dropped out of the spreadsheet) and has since
+      // come back — the spreadsheet is the source of truth for what's
+      // current.
+      update: { nameTa: nameTa || nameEn, unitType, shopId, isActive: true },
       create: {
         nameEn,
         nameTa: nameTa || nameEn,
