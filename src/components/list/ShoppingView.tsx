@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
+import { CategoryFilter } from "@/components/list/CategoryFilter";
 import { PriceDelta } from "@/components/PriceDelta";
 import { PurchaseSheet } from "@/components/list/PurchaseSheet";
 import { groupByShop } from "@/components/list/DraftEditor";
@@ -22,10 +23,40 @@ export function ShoppingView({ list, items }: ShoppingViewProps) {
   const [active, setActive] = useState<ListItemDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [categoryId, setCategoryId] = useState<number | undefined>(undefined);
 
-  const purchased = items.filter((item) => item.isPurchased);
+  const categoryOptions = useMemo(() => {
+    const counts = new Map<number, { name: string; count: number }>();
+    for (const item of items) {
+      const name = language === "ta" ? (item.categoryNameTa ?? item.categoryName) : item.categoryName;
+      const entry = counts.get(item.categoryId) ?? { name, count: 0 };
+      entry.count += 1;
+      counts.set(item.categoryId, entry);
+    }
+    return [...counts.entries()]
+      .map(([id, value]) => ({ id, name: value.name, count: value.count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [items, language]);
+
+  const visibleItems = useMemo(
+    () => (categoryId === undefined ? items : items.filter((item) => item.categoryId === categoryId)),
+    [items, categoryId],
+  );
+
+  // Checked-off items sink to the bottom of their shop's section so the
+  // remaining to-buy items stay at the top while shopping.
+  const groupedByShop = useMemo(() => {
+    return groupByShop(visibleItems).map(
+      ([shopName, shopItems]) =>
+        [shopName, [...shopItems].sort((a, b) => Number(a.isPurchased) - Number(b.isPurchased))] as const,
+    );
+  }, [visibleItems]);
+
+  const purchased = visibleItems.filter((item) => item.isPurchased);
   const spent = purchased.reduce((sum, item) => sum + (item.purchasePrice ?? 0), 0);
-  const allDone = items.length > 0 && purchased.length === items.length;
+  // "Finish shopping" completes the whole list, so it must reflect the
+  // list's true completion — not just what the shop/category filters show.
+  const allDone = list.items.length > 0 && list.items.every((item) => item.isPurchased);
 
   const complete = () => {
     startTransition(async () => {
@@ -45,7 +76,7 @@ export function ShoppingView({ list, items }: ShoppingViewProps) {
           <p className="text-[13px] text-ios-label-2">Bought</p>
           <p className="text-[22px] font-semibold tabular-nums">
             {purchased.length}
-            <span className="text-ios-label-3"> / {items.length}</span>
+            <span className="text-ios-label-3"> / {visibleItems.length}</span>
           </p>
         </div>
         <div className="text-right">
@@ -54,16 +85,23 @@ export function ShoppingView({ list, items }: ShoppingViewProps) {
         </div>
       </div>
 
+      <CategoryFilter
+        options={categoryOptions}
+        value={categoryId}
+        onChange={setCategoryId}
+        total={items.length}
+      />
+
       {error ? (
         <p className="rounded-ios bg-red-50 px-4 py-3 text-[14px] text-ios-red">{error}</p>
       ) : null}
 
-      {items.length === 0 ? (
+      {visibleItems.length === 0 ? (
         <p className="ios-card p-6 text-center text-[15px] text-ios-label-2">
           No items for this shop.
         </p>
       ) : (
-        groupByShop(items).map(([shopName, shopItems]) => (
+        groupedByShop.map(([shopName, shopItems]) => (
           <section key={shopName}>
             <p className="px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-ios-label-3">
               {shopName} · {shopItems.filter((item) => item.isPurchased).length}/{shopItems.length}

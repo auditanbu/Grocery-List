@@ -41,7 +41,9 @@ export type ListItemDTO = {
   itemId: number;
   nameEn: string;
   nameTa: string;
+  categoryId: number;
   categoryName: string;
+  categoryNameTa: string | null;
   unitType: UnitType;
   quantity: number;
   shopId: number | null;

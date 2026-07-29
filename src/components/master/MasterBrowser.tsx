@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { Sheet } from "@/components/Sheet";
 import { Stepper } from "@/components/Stepper";
 import { setMasterItemActive, upsertMasterItem } from "@/lib/actions";
+import { bilingualName, useLanguage } from "@/lib/language";
 import {
   UNIT_TYPES,
   formatPrice,
@@ -36,6 +38,7 @@ type Draft = {
 
 export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) {
   const router = useRouter();
+  const { language } = useLanguage();
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -44,23 +47,30 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
 
   const groups = useMemo(() => {
     const needle = query.trim().toLowerCase();
+    const trimmed = query.trim();
     const matches = items.filter((item) => {
       if (categoryId && item.categoryId !== categoryId) return false;
       if (!needle) return true;
       return (
         item.nameEn.toLowerCase().includes(needle) ||
-        item.nameTa.includes(query.trim()) ||
+        item.nameTa.includes(trimmed) ||
         item.categoryName.toLowerCase().includes(needle) ||
+        (item.categoryNameTa ?? "").includes(trimmed) ||
         (item.shopName ?? "").toLowerCase().includes(needle)
       );
     });
 
-    const grouped = new Map<string, MasterItemDTO[]>();
+    // Grouped by category id (stable across a language switch), labeled in
+    // whichever language is currently selected.
+    const grouped = new Map<number, { label: string; items: MasterItemDTO[] }>();
     for (const item of matches) {
-      grouped.set(item.categoryName, [...(grouped.get(item.categoryName) ?? []), item]);
+      const label = language === "ta" ? (item.categoryNameTa ?? item.categoryName) : item.categoryName;
+      const existing = grouped.get(item.categoryId);
+      if (existing) existing.items.push(item);
+      else grouped.set(item.categoryId, { label, items: [item] });
     }
     return [...grouped.entries()];
-  }, [items, query, categoryId]);
+  }, [items, query, categoryId, language]);
 
   const startNew = () =>
     setDraft({
@@ -108,11 +118,14 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
 
   return (
     <div className="space-y-5">
-      <header className="pt-2">
-        <h1 className="text-[34px] font-bold leading-tight tracking-tight">Master List</h1>
-        <p className="text-[15px] text-ios-label-2">
-          {items.length} items · {categories.length} categories
-        </p>
+      <header className="flex items-end justify-between gap-3 pt-2">
+        <div>
+          <h1 className="text-[34px] font-bold leading-tight tracking-tight">Master List</h1>
+          <p className="text-[15px] text-ios-label-2">
+            {items.length} items · {categories.length} categories
+          </p>
+        </div>
+        <LanguageToggle />
       </header>
 
       <div className="space-y-3">
@@ -134,7 +147,7 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
                 active={categoryId === category.id}
                 onClick={() => setCategoryId(category.id)}
               >
-                {category.nameTa ?? category.nameEn}
+                {language === "ta" ? (category.nameTa ?? category.nameEn) : category.nameEn}
               </FilterChip>
             ))}
           </div>
@@ -155,13 +168,15 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
       {groups.length === 0 ? (
         <p className="ios-card p-6 text-center text-[15px] text-ios-label-2">No items matched.</p>
       ) : (
-        groups.map(([category, categoryItems]) => (
-          <section key={category}>
+        groups.map(([categoryId, group]) => (
+          <section key={categoryId}>
             <p className="px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-ios-label-3">
-              {category} · {categoryItems.length}
+              {group.label} · {group.items.length}
             </p>
             <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
-              {categoryItems.map((item) => (
+              {group.items.map((item) => {
+                const name = bilingualName(item.nameTa, item.nameEn, language);
+                return (
                 <li key={item.id} className="flex items-center">
                   <button
                     type="button"
@@ -174,10 +189,10 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
                           item.isActive ? "" : "text-ios-label-3 line-through"
                         }`}
                       >
-                        {item.nameTa}
+                        {name.primary}
                       </span>
                       <span className="block truncate text-[13px] text-ios-label-2">
-                        {item.nameEn} · {unitOptionLabel(item.unitType)}
+                        {name.secondary} · {unitOptionLabel(item.unitType)}
                         {item.shopName ? ` · ${item.shopName}` : ""}
                       </span>
                     </span>
@@ -204,7 +219,8 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
                     </svg>
                   </Link>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </section>
         ))
