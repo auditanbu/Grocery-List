@@ -7,6 +7,7 @@ import { useState, useTransition } from "react";
 import { Sheet } from "@/components/Sheet";
 import { Stepper } from "@/components/Stepper";
 import { finalizeList, removeListItem, updateListItem } from "@/lib/actions";
+import type { UnitType } from "@/lib/units";
 import type { ListDetailDTO, ListItemDTO, ShopDTO } from "@/lib/types";
 
 type DraftEditorProps = {
@@ -19,14 +20,15 @@ export function DraftEditor({ list }: DraftEditorProps) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // Optimistic quantities keep the stepper responsive while the action runs.
-  const [quantities, setQuantities] = useState<Record<number, number>>({});
-  const quantityOf = (item: ListItemDTO) => quantities[item.id] ?? item.quantity;
+  // Optimistic quantity/unit keep the stepper responsive while the action runs.
+  const [overrides, setOverrides] = useState<Record<number, { quantity: number; unitType: UnitType }>>({});
+  const stateOf = (item: ListItemDTO) =>
+    overrides[item.id] ?? { quantity: item.quantity, unitType: item.unitType };
 
-  const changeQuantity = (item: ListItemDTO, quantity: number) => {
-    setQuantities((current) => ({ ...current, [item.id]: quantity }));
+  const changeQuantity = (item: ListItemDTO, quantity: number, unitType: UnitType) => {
+    setOverrides((current) => ({ ...current, [item.id]: { quantity, unitType } }));
     startTransition(async () => {
-      const result = await updateListItem({ listItemId: item.id, quantity });
+      const result = await updateListItem({ listItemId: item.id, quantity, unitType });
       if (!result.ok) setError(result.error);
       router.refresh();
     });
@@ -107,10 +109,10 @@ export function DraftEditor({ list }: DraftEditorProps) {
                         <p className="truncate text-[13px] text-ios-label-2">{item.nameEn}</p>
                       </div>
                       <Stepper
-                        value={quantityOf(item)}
-                        unit={item.unitType}
+                        value={stateOf(item).quantity}
+                        unit={stateOf(item).unitType}
                         size="compact"
-                        onChange={(quantity) => changeQuantity(item, quantity)}
+                        onChange={(quantity, unitType) => changeQuantity(item, quantity, unitType)}
                         aria-label={`Quantity for ${item.nameEn}`}
                       />
                     </div>

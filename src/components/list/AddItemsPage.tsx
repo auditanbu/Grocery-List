@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 
 import { Stepper } from "@/components/Stepper";
 import { addListItem, removeListItem, updateListItem } from "@/lib/actions";
-import { formatPrice } from "@/lib/units";
+import { formatPrice, type UnitType } from "@/lib/units";
 import type { ListDetailDTO, MasterItemDTO } from "@/lib/types";
 
 type AddItemsPageProps = {
@@ -14,13 +14,18 @@ type AddItemsPageProps = {
   items: MasterItemDTO[];
 };
 
-/** A row's live state on this list: which list row it is, and its quantity. */
-type Entry = { listItemId: number; quantity: number };
+/**
+ * A row's live state on this list.
+ *   listItemId: null -> "Add" was tapped but nothing is saved yet; the
+ *   stepper shows 0 and the row only becomes a real list row on the
+ *   first +/- tap (or typed amount).
+ */
+type Entry = { listItemId: number | null; quantity: number; unitType: UnitType };
 
 /**
  * Full-page item picker for a draft list. Each row carries its own
- * unit-aware stepper and last-paid price inline — tapping "Add" creates
- * the list row immediately, no separate configure step.
+ * unit-aware stepper and last-paid price inline — tapping "Add" reveals
+ * the stepper starting at 0, no separate configure step.
  */
 export function AddItemsPage({ list, items }: AddItemsPageProps) {
   const router = useRouter();
@@ -32,13 +37,22 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
     const map: Record<number, Entry> = {};
     for (const row of list.items) {
       if (!(row.itemId in map)) {
-        map[row.itemId] = { listItemId: row.id, quantity: row.quantity };
+        map[row.itemId] = { listItemId: row.id, quantity: row.quantity, unitType: row.unitType };
       }
     }
     return map;
   }, [list.items]);
 
   const [entries, setEntries] = useState<Record<number, Entry>>(initialEntries);
+  // Mirrors `entries` so async callbacks can read the latest value instead
+  // of the one captured when they started (matters for rapid +/- taps).
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
+
+  // Guards against a second "create" firing while the first is still in
+  // flight — held taps can fire several quantity changes before the row
+  // that creates it has come back with a listItemId.
+  const creating = useRef<Set<number>>(new Set());
 
   const results = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -58,28 +72,50 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
     return [...grouped.entries()];
   }, [items, query]);
 
+  /** Reveals the stepper at 0 — nothing is saved until the first real change. */
   const add = (item: MasterItemDTO) => {
     setError(null);
-    startTransition(async () => {
-      const result = await addListItem({ listId: list.id, itemId: item.id });
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      setEntries((current) => ({
-        ...current,
-        [item.id]: { listItemId: result.data.listItemId, quantity: item.defaultQty || 1 },
-      }));
-      router.refresh();
-    });
+    setEntries((current) => ({
+      ...current,
+      [item.id]: { listItemId: null, quantity: 0, unitType: item.unitType },
+    }));
   };
 
-  const changeQuantity = (item: MasterItemDTO, quantity: number) => {
+  const changeQuantity = (item: MasterItemDTO, quantity: number, unitType: UnitType) => {
     const entry = entries[item.id];
     if (!entry) return;
-    setEntries((current) => ({ ...current, [item.id]: { ...entry, quantity } }));
+    setEntries((current) => ({ ...current, [item.id]: { ...entry, quantity, unitType } }));
+
+    if (entry.listItemId === null) {
+      if (creating.current.has(item.id)) return; // a create is already in flight
+      creating.current.add(item.id);
+      startTransition(async () => {
+        const result = await addListItem({ listId: list.id, itemId: item.id, quantity, unitType });
+        creating.current.delete(item.id);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        // Pick up whatever the user has dialed in since this call started.
+        const latest = entriesRef.current[item.id] ?? { quantity, unitType };
+        setEntries((current) => ({
+          ...current,
+          [item.id]: { listItemId: result.data.listItemId, quantity: latest.quantity, unitType: latest.unitType },
+        }));
+        if (latest.quantity !== quantity || latest.unitType !== unitType) {
+          await updateListItem({
+            listItemId: result.data.listItemId,
+            quantity: latest.quantity,
+            unitType: latest.unitType,
+          });
+        }
+        router.refresh();
+      });
+      return;
+    }
+
     startTransition(async () => {
-      const result = await updateListItem({ listItemId: entry.listItemId, quantity });
+      const result = await updateListItem({ listItemId: entry.listItemId as number, quantity, unitType });
       if (!result.ok) setError(result.error);
       router.refresh();
     });
@@ -93,14 +129,16 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
       delete next[item.id];
       return next;
     });
+    if (entry.listItemId === null) return; // never persisted — nothing to delete server-side
+
     startTransition(async () => {
-      const result = await removeListItem(entry.listItemId);
+      const result = await removeListItem(entry.listItemId as number);
       if (!result.ok) setError(result.error);
       router.refresh();
     });
   };
 
-  const addedCount = Object.keys(entries).length;
+  const addedCount = Object.values(entries).filter((entry) => entry.listItemId !== null).length;
 
   return (
     <div className="space-y-5 pb-6">
@@ -175,9 +213,9 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
                           <div className="flex flex-none items-center gap-1.5">
                             <Stepper
                               value={entry.quantity}
-                              unit={item.unitType}
+                              unit={entry.unitType}
                               size="compact"
-                              onChange={(quantity) => changeQuantity(item, quantity)}
+                              onChange={(quantity, unitType) => changeQuantity(item, quantity, unitType)}
                               aria-label={`Quantity for ${item.nameEn}`}
                             />
                             <button

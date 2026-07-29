@@ -65,6 +65,8 @@ export async function addListItem(input: {
   listId: number;
   itemId: number;
   quantity?: number;
+  /** Overrides the master item's unit — used when a stepper promoted g/ml to kg/L. */
+  unitType?: UnitType;
   shopId?: number | null;
 }): Promise<ActionResult<{ listItemId: number }>> {
   const list = await prisma.groceryList.findUnique({ where: { id: input.listId } });
@@ -74,7 +76,7 @@ export async function addListItem(input: {
   const item = await prisma.item.findUnique({ where: { id: input.itemId } });
   if (!item) return fail("Item not found.");
 
-  const unitType = item.unitType as UnitType;
+  const unitType = input.unitType ?? (item.unitType as UnitType);
   const quantity = normalizeQty(input.quantity ?? Number(item.defaultQty), unitType);
   const shopId = input.shopId === undefined ? item.shopId : input.shopId;
 
@@ -112,6 +114,8 @@ export async function addListItem(input: {
 export async function updateListItem(input: {
   listItemId: number;
   quantity?: number;
+  /** Set alongside quantity when a stepper promoted g/ml to kg/L. */
+  unitType?: UnitType;
   shopId?: number | null;
 }): Promise<ActionResult> {
   const row = await prisma.groceryListItem.findUnique({
@@ -121,10 +125,12 @@ export async function updateListItem(input: {
   if (!row) return fail("Item not found on this list.");
   if (row.list.status === "COMPLETED") return fail("This list is closed.");
 
-  const data: { quantity?: number; shopId?: number | null } = {};
+  const unitType = input.unitType ?? (row.unitType as UnitType);
+  const data: { quantity?: number; unitType?: UnitType; shopId?: number | null } = {};
   if (input.quantity !== undefined) {
-    data.quantity = normalizeQty(input.quantity, row.unitType as UnitType);
+    data.quantity = normalizeQty(input.quantity, unitType);
   }
+  if (input.unitType !== undefined) data.unitType = input.unitType;
   if (input.shopId !== undefined) data.shopId = input.shopId;
 
   await prisma.groceryListItem.update({ where: { id: input.listItemId }, data });

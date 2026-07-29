@@ -80,6 +80,40 @@ export function decrement(value: number, unit: UnitType): number {
   return roundQty(Math.max(value - stepFor(unit), minFor(unit)), unit);
 }
 
+/** The larger unit a small unit promotes to once it reaches 1000 (g/ml -> kg/L). */
+const UNIT_PROMOTE_TO: Partial<Record<UnitType, UnitType>> = {
+  G: "KG",
+  ML: "L",
+};
+
+/** How many small units (g/ml) make one big unit (kg/L). */
+const UNIT_PROMOTE_FACTOR = 1000;
+
+/**
+ * Snaps a quantity onto its unit's step grid and, for g/ml, promotes to
+ * kg/L once the amount reaches 1000 (e.g. 1000 g -> 1.0 kg) so large
+ * quantities read the way people actually write them.
+ */
+export function normalizeWithUnit(
+  value: number,
+  unit: UnitType,
+): { quantity: number; unit: UnitType } {
+  const normalized = normalizeQty(value, unit);
+  const bigUnit = UNIT_PROMOTE_TO[unit];
+  if (bigUnit && normalized >= UNIT_PROMOTE_FACTOR) {
+    return { quantity: roundQty(normalized / UNIT_PROMOTE_FACTOR, bigUnit), unit: bigUnit };
+  }
+  return { quantity: normalized, unit };
+}
+
+/** One step up, promoting g/ml to kg/L at the 1000 boundary. */
+export function incrementWithUnit(
+  value: number,
+  unit: UnitType,
+): { quantity: number; unit: UnitType } {
+  return normalizeWithUnit(increment(value, unit), unit);
+}
+
 /** "0.5", "150", "10", "3" — no unit suffix. */
 export function formatQtyValue(value: number, unit: UnitType): string {
   return value.toFixed(UNIT_PRECISION[unit]);

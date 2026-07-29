@@ -6,9 +6,9 @@ import {
   UNIT_LABEL,
   decrement,
   formatQtyValue,
-  increment,
+  incrementWithUnit,
   minFor,
-  normalizeQty,
+  normalizeWithUnit,
   stepFor,
   type UnitType,
 } from "@/lib/units";
@@ -16,7 +16,8 @@ import {
 type StepperProps = {
   value: number;
   unit: UnitType;
-  onChange: (value: number) => void;
+  /** Fires with the new amount and, for g/ml crossing 1000, the promoted unit (kg/L). */
+  onChange: (value: number, unit: UnitType) => void;
   disabled?: boolean;
   /** Compact fits inside a list row; regular is used inside sheets. */
   size?: "compact" | "regular";
@@ -31,7 +32,7 @@ const HOLD_FAST_INTERVAL_MS = 45;
 /**
  * iOS-style +/- stepper whose increment follows the item's unit:
  *
- *   g, ml  -> 50   (50 → 100 → 150)
+ *   g, ml  -> 50   (50 → 100 → 150, promotes to kg/L at 1000)
  *   kg, L  -> 0.5  (0.5 → 1 → 1.5)
  *   Rs     -> 10   (₹10 → ₹20)
  *   blank  -> 1    (1 → 2 → 3)
@@ -50,8 +51,10 @@ export function Stepper({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const timers = useRef<{ timeout?: ReturnType<typeof setTimeout>; interval?: ReturnType<typeof setInterval> }>({});
-  const latest = useRef(value);
-  latest.current = value;
+  const latestValue = useRef(value);
+  const latestUnit = useRef(unit);
+  latestValue.current = value;
+  latestUnit.current = unit;
 
   const stopHold = useCallback(() => {
     if (timers.current.timeout) clearTimeout(timers.current.timeout);
@@ -63,16 +66,22 @@ export function Stepper({
 
   const apply = useCallback(
     (direction: 1 | -1) => {
-      const next =
-        direction === 1
-          ? increment(latest.current, unit)
-          : decrement(latest.current, unit);
-      if (next !== latest.current) {
-        latest.current = next;
-        onChange(next);
+      if (direction === 1) {
+        const result = incrementWithUnit(latestValue.current, latestUnit.current);
+        if (result.quantity !== latestValue.current || result.unit !== latestUnit.current) {
+          latestValue.current = result.quantity;
+          latestUnit.current = result.unit;
+          onChange(result.quantity, result.unit);
+        }
+      } else {
+        const next = decrement(latestValue.current, latestUnit.current);
+        if (next !== latestValue.current) {
+          latestValue.current = next;
+          onChange(next, latestUnit.current);
+        }
       }
     },
-    [onChange, unit],
+    [onChange],
   );
 
   const startHold = useCallback(
@@ -103,8 +112,10 @@ export function Stepper({
     const parsed = Number.parseFloat(draft.replace(",", "."));
     setEditing(false);
     if (Number.isFinite(parsed)) {
-      const next = normalizeQty(parsed, unit);
-      if (next !== value) onChange(next);
+      const result = normalizeWithUnit(parsed, unit);
+      if (result.quantity !== value || result.unit !== unit) {
+        onChange(result.quantity, result.unit);
+      }
     }
   };
 

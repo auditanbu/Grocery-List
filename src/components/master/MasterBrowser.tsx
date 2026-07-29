@@ -290,7 +290,7 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
               <Stepper
                 value={draft.defaultQty}
                 unit={draft.unitType}
-                onChange={(defaultQty) => setDraft({ ...draft, defaultQty })}
+                onChange={(defaultQty, unitType) => setDraft({ ...draft, defaultQty, unitType })}
               />
             </Field>
 
