@@ -42,8 +42,12 @@ export async function importMasterData(prisma: PrismaClient, data: MasterData) {
   const shopIds = new Map<string, number>();
 
   const declaredCategories = data.categories ?? [];
+  // An item's "type" is matched against a declared category by nameEn OR
+  // nameTa — declared categories here use Tamil "type" text as nameTa with
+  // a translated nameEn, so matching nameEn alone would treat every row as
+  // undeclared and spawn duplicate Tamil-named categories.
   const derivedCategories = [...new Set(data.items.map((i) => i.type.trim()).filter(Boolean))]
-    .filter((name) => !declaredCategories.some((c) => c.nameEn === name))
+    .filter((name) => !declaredCategories.some((c) => c.nameEn === name || c.nameTa === name))
     .map((name) => ({ nameEn: name, nameTa: null }));
 
   const categories = [...declaredCategories, ...derivedCategories];

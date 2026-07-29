@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { DraftEditor } from "@/components/list/DraftEditor";
 import { FinalizedList } from "@/components/list/FinalizedList";
@@ -90,16 +91,19 @@ export function ListScreen({ list }: ListScreenProps) {
               items
             </p>
           </div>
-          {!isDraft ? (
-            <button
-              type="button"
-              onClick={reopen}
-              disabled={pending}
-              className="h-9 flex-none rounded-full bg-ios-surface px-4 text-[14px] font-medium text-ios-blue shadow-ios active:scale-95 disabled:opacity-50"
-            >
-              Edit list
-            </button>
-          ) : null}
+          <div className="flex flex-none items-center gap-2">
+            <LanguageToggle />
+            {!isDraft ? (
+              <button
+                type="button"
+                onClick={reopen}
+                disabled={pending}
+                className="h-9 flex-none rounded-full bg-ios-surface px-4 text-[14px] font-medium text-ios-blue shadow-ios active:scale-95 disabled:opacity-50"
+              >
+                Edit list
+              </button>
+            ) : null}
+          </div>
         </div>
       </header>
 

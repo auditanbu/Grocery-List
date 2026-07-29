@@ -2,6 +2,7 @@
 
 import { ExportPdfButton } from "@/components/list/ExportPdfButton";
 import { groupByShop } from "@/components/list/DraftEditor";
+import { bilingualName, useLanguage } from "@/lib/language";
 import { formatQty } from "@/lib/units";
 import type { ListDetailDTO, ListItemDTO } from "@/lib/types";
 
@@ -13,6 +14,7 @@ type FinalizedListProps = {
 
 /** Read-only print view of a finalized list, filtered to the selected shop. */
 export function FinalizedList({ list, items, shopName }: FinalizedListProps) {
+  const { language } = useLanguage();
   const groups = shopName ? [[shopName, items] as [string, ListItemDTO[]]] : groupByShop(items);
   let serial = 0;
 
@@ -28,6 +30,7 @@ export function FinalizedList({ list, items, shopName }: FinalizedListProps) {
           shopName={shopName}
           items={items}
           groupByShop={!shopName}
+          language={language}
         />
       </div>
 
@@ -44,15 +47,16 @@ export function FinalizedList({ list, items, shopName }: FinalizedListProps) {
             <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
               {groupItems.map((item) => {
                 serial += 1;
+                const name = bilingualName(item.nameTa, item.nameEn, language);
                 return (
                   <li key={item.id} className="ios-row">
                     <span className="w-6 flex-none text-[14px] tabular-nums text-ios-label-3">
                       {serial}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[16px] font-medium">{item.nameTa}</span>
+                      <span className="block truncate text-[16px] font-medium">{name.primary}</span>
                       <span className="block truncate text-[13px] text-ios-label-2">
-                        {item.nameEn}
+                        {name.secondary}
                       </span>
                     </span>
                     <span className="flex-none text-[15px] font-semibold tabular-nums">

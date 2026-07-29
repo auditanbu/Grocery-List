@@ -7,6 +7,7 @@ import { useState, useTransition } from "react";
 import { Sheet } from "@/components/Sheet";
 import { Stepper } from "@/components/Stepper";
 import { finalizeList, removeListItem, updateListItem } from "@/lib/actions";
+import { bilingualName, useLanguage } from "@/lib/language";
 import type { UnitType } from "@/lib/units";
 import type { ListDetailDTO, ListItemDTO, ShopDTO } from "@/lib/types";
 
@@ -16,6 +17,7 @@ type DraftEditorProps = {
 
 export function DraftEditor({ list }: DraftEditorProps) {
   const router = useRouter();
+  const { language } = useLanguage();
   const [shopPickerFor, setShopPickerFor] = useState<ListItemDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -101,12 +103,14 @@ export function DraftEditor({ list }: DraftEditorProps) {
                 {shopName} · {items.length}
               </p>
               <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
-                {items.map((item) => (
+                {items.map((item) => {
+                  const name = bilingualName(item.nameTa, item.nameEn, language);
+                  return (
                   <li key={item.id} className="px-4 py-3">
                     <div className="flex items-start gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[16px] font-medium">{item.nameTa}</p>
-                        <p className="truncate text-[13px] text-ios-label-2">{item.nameEn}</p>
+                        <p className="truncate text-[16px] font-medium">{name.primary}</p>
+                        <p className="truncate text-[13px] text-ios-label-2">{name.secondary}</p>
                       </div>
                       <Stepper
                         value={stateOf(item).quantity}
@@ -135,7 +139,8 @@ export function DraftEditor({ list }: DraftEditorProps) {
                       </button>
                     </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             </section>
           ))}

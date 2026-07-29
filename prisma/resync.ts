@@ -35,16 +35,32 @@ async function main() {
 
     // Matches Item's real uniqueness (nameEn, categoryId) — matching on
     // nameEn alone would spare an old item whose English name happens to
-    // coincide with a new one filed under a different category.
+    // coincide with a new one filed under a different category. Resolve
+    // each row's category by id rather than by name: a category's nameEn
+    // and nameTa can differ (nameEn is a translation, row.type is the
+    // Tamil spreadsheet text), so comparing name strings directly would
+    // flag every item as stale the moment nameEn stops matching row.type.
+    const allCategories = await prisma.category.findMany({
+      select: { id: true, nameEn: true, nameTa: true },
+    });
+    const categoryIdByName = new Map<string, number>();
+    for (const category of allCategories) {
+      categoryIdByName.set(category.nameEn, category.id);
+      if (category.nameTa) categoryIdByName.set(category.nameTa, category.id);
+    }
+
     const keepPairs = new Set(
-      data.items.map((row) => `${row.groceryEn.trim()}::${row.type.trim()}`),
+      data.items
+        .map((row) => {
+          const categoryId = categoryIdByName.get(row.type.trim());
+          return categoryId ? `${row.groceryEn.trim()}::${categoryId}` : null;
+        })
+        .filter((key): key is string => key !== null),
     );
     const allItems = await prisma.item.findMany({
-      select: { id: true, nameEn: true, category: { select: { nameEn: true } } },
+      select: { id: true, nameEn: true, categoryId: true },
     });
-    const staleItems = allItems.filter(
-      (item) => !keepPairs.has(`${item.nameEn}::${item.category.nameEn}`),
-    );
+    const staleItems = allItems.filter((item) => !keepPairs.has(`${item.nameEn}::${item.categoryId}`));
 
     let deactivated = 0;
     let deleted = 0;

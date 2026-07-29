@@ -7,6 +7,7 @@ import { PriceDelta } from "@/components/PriceDelta";
 import { PurchaseSheet } from "@/components/list/PurchaseSheet";
 import { groupByShop } from "@/components/list/DraftEditor";
 import { completeList } from "@/lib/actions";
+import { bilingualName, useLanguage } from "@/lib/language";
 import { formatPrice, formatQty } from "@/lib/units";
 import type { ListDetailDTO, ListItemDTO } from "@/lib/types";
 
@@ -17,6 +18,7 @@ type ShoppingViewProps = {
 
 export function ShoppingView({ list, items }: ShoppingViewProps) {
   const router = useRouter();
+  const { language } = useLanguage();
   const [active, setActive] = useState<ListItemDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -67,7 +69,9 @@ export function ShoppingView({ list, items }: ShoppingViewProps) {
               {shopName} · {shopItems.filter((item) => item.isPurchased).length}/{shopItems.length}
             </p>
             <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
-              {shopItems.map((item) => (
+              {shopItems.map((item) => {
+                const name = bilingualName(item.nameTa, item.nameEn, language);
+                return (
                 <li key={item.id}>
                   <button
                     type="button"
@@ -103,10 +107,10 @@ export function ShoppingView({ list, items }: ShoppingViewProps) {
                           item.isPurchased ? "text-ios-label-3 line-through" : ""
                         }`}
                       >
-                        {item.nameTa}
+                        {name.primary}
                       </span>
                       <span className="block truncate text-[13px] text-ios-label-2">
-                        {item.nameEn} · {formatQty(item.quantity, item.unitType)}
+                        {name.secondary} · {formatQty(item.quantity, item.unitType)}
                       </span>
                       {item.isPurchased ? (
                         <span className="mt-1 flex flex-wrap items-center gap-2">
@@ -126,7 +130,8 @@ export function ShoppingView({ list, items }: ShoppingViewProps) {
                     </span>
                   </button>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </section>
         ))
