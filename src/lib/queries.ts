@@ -77,12 +77,12 @@ export async function getMasterItems(options?: {
       ...(options?.includeInactive ? {} : { isActive: true }),
       ...(options?.categoryId ? { categoryId: options.categoryId } : {}),
       ...(options?.shopId ? { shopId: options.shopId } : {}),
+      // MySQL's default collation (utf8mb4_unicode_ci) is already
+      // case-insensitive, so `contains` needs no explicit mode here
+      // (unlike Postgres).
       ...(search
         ? {
-            OR: [
-              { nameEn: { contains: search, mode: "insensitive" as const } },
-              { nameTa: { contains: search } },
-            ],
+            OR: [{ nameEn: { contains: search } }, { nameTa: { contains: search } }],
           }
         : {}),
     },

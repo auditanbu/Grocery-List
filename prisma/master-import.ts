@@ -1,5 +1,5 @@
 import { PrismaClient } from "../src/generated/prisma/client.js";
-import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { parseUnitType } from "../src/lib/units.js";
 
 /** One spreadsheet row from "Grocery database.xlsx". */
@@ -26,10 +26,10 @@ export function createScriptClient(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error(
-      "DATABASE_URL is not set. Copy .env.example to .env and point it at your Postgres database.",
+      "DATABASE_URL is not set. Copy .env.example to .env and point it at your MySQL database.",
     );
   }
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+  return new PrismaClient({ adapter: new PrismaMariaDb(connectionString) });
 }
 
 /**

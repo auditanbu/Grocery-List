@@ -11,7 +11,7 @@ iPad and desktop.
 |---|---|
 | Frontend | Next.js 16 (App Router), React 19, Tailwind CSS 4 |
 | Backend | Next.js Server Actions + Route Handlers |
-| Database | PostgreSQL via Prisma ORM 7 (`@prisma/adapter-pg` driver adapter) |
+| Database | MySQL via Prisma ORM 7 (`@prisma/adapter-mariadb` driver adapter) |
 | PDF export | `jspdf` + `jspdf-autotable` |
 | PWA | Web App Manifest (`app/manifest.ts`) + a hand-written offline service worker |
 
@@ -23,16 +23,16 @@ npx create-next-app@latest grocery-planner \
   --typescript --tailwind --app --src-dir --import-alias "@/*"
 
 cd grocery-planner
-npm install prisma @prisma/client @prisma/adapter-pg pg dotenv server-only \
+npm install prisma @prisma/client @prisma/adapter-mariadb mariadb dotenv server-only \
   jspdf jspdf-autotable
 npm install -D tsx sharp
-npx prisma init --datasource-provider postgresql --output ../src/generated/prisma
+npx prisma init --datasource-provider mysql --output ../src/generated/prisma
 ```
 
 ### Local development
 
 ```bash
-cp .env.example .env          # point DATABASE_URL at your Postgres instance
+cp .env.example .env          # point DATABASE_URL at your MySQL instance
 npm install
 npm run db:migrate            # creates tables (prompts for a migration name first run)
 npm run db:seed               # loads master data from prisma/data/master-data.json
@@ -88,8 +88,10 @@ demand, and reports anything it had to skip.
   tab.
 
 Prisma 7 uses driver adapters instead of a bundled query engine binary —
-`src/lib/prisma.ts` wires up `@prisma/adapter-pg` and caches a single
-client instance across hot reloads.
+`src/lib/prisma.ts` wires up `@prisma/adapter-mariadb` (works against both
+MySQL and MariaDB) behind a lazily-initialized Proxy, so `next build` never
+needs a live database connection just to build, and caches a single client
+instance across hot reloads.
 
 ## 3. The unit-aware stepper
 
@@ -137,11 +139,12 @@ traditional print sheet with `jspdf-autotable`:
 
 1. **Push this repo to GitHub** (or connect your fork).
 2. In Railway: **New Project → Deploy from GitHub repo**, pick this repo.
-3. **Add a PostgreSQL plugin**: New → Database → PostgreSQL. Railway
-   creates a `DATABASE_URL` variable on that service automatically.
+3. **Add a MySQL plugin**: New → Database → Add MySQL (not Postgres —
+   the schema's `datasource` provider is `mysql`). Railway creates
+   `DATABASE_URL` and friends on that service automatically.
 4. On the **web service**, add an environment variable:
-   - `DATABASE_URL` → reference the Postgres plugin's URL, e.g.
-     `${{ Postgres.DATABASE_URL }}` in Railway's variable picker.
+   - `DATABASE_URL` → reference the MySQL plugin's URL, e.g.
+     `${{ MySQL.DATABASE_URL }}` in Railway's variable picker.
 5. **Build & start commands** (Railway auto-detects Next.js, but to be
    explicit under Settings → Deploy):
    - Build: `npm run build` (this runs `prisma generate` first)
@@ -158,12 +161,12 @@ traditional print sheet with `jspdf-autotable`:
    further config is needed for "Add to Home Screen" to work on that
    domain.
 
-Local Postgres alternative for development, if you don't want to depend on
+Local MySQL alternative for development, if you don't want to depend on
 Railway while iterating:
 
 ```bash
-docker run --name grocery-pg -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=grocery -p 5432:5432 -d postgres:16
+docker run --name grocery-mysql -e MYSQL_ROOT_PASSWORD=root \
+  -e MYSQL_DATABASE=grocery -p 3306:3306 -d mysql:8
 ```
 
 ## App structure
