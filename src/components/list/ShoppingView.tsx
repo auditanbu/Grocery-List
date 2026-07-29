@@ -142,7 +142,7 @@ export function ShoppingView({ list, items }: ShoppingViewProps) {
                     <span className="min-w-0 flex-1">
                       <span
                         className={`block truncate text-[16px] font-medium ${
-                          item.isPurchased ? "text-ios-label-3 line-through" : ""
+                          item.isPurchased ? "text-ios-label-3" : ""
                         }`}
                       >
                         {name.primary}
