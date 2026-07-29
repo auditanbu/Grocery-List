@@ -25,13 +25,15 @@ export function FinalizedList({ list, items, shopName }: FinalizedListProps) {
           {items.length} item{items.length === 1 ? "" : "s"}
           {shopName ? ` at ${shopName}` : " across all shops"}
         </p>
-        <ExportPdfButton
-          listName={list.name}
-          shopName={shopName}
-          items={items}
-          groupByShop={!shopName}
-          language={language}
-        />
+        {list.status !== "COMPLETED" ? (
+          <ExportPdfButton
+            listName={list.name}
+            shopName={shopName}
+            items={items}
+            groupByShop={!shopName}
+            language={language}
+          />
+        ) : null}
       </div>
 
       {items.length === 0 ? (
