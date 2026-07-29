@@ -1,8 +1,20 @@
-import { formatPrice } from "@/lib/units";
+import { formatPrice, projectPrice, unitGroup, type UnitType } from "@/lib/units";
 
 type PriceDeltaProps = {
   current: number;
   previous: number | null;
+  /**
+   * Quantity/unit each price was paid for. When both are given, `current`
+   * is projected onto `previous`'s quantity/unit before comparing — e.g.
+   * today's ₹ for 150 g becomes "what 200 g would have cost today" before
+   * comparing against last time's ₹ for 200 g — so a variable-unit item
+   * whose pack size changed still gets a fair delta instead of a raw,
+   * misleading one. Omit either pair to fall back to a raw comparison.
+   */
+  currentQuantity?: number;
+  currentUnitType?: UnitType;
+  previousQuantity?: number;
+  previousUnitType?: UnitType;
   /** `full` also prints the previous price next to the arrow. */
   variant?: "badge" | "full";
 };
@@ -12,14 +24,44 @@ type PriceDeltaProps = {
  * it is dearer, grey dash when unchanged. Renders nothing without a
  * previous price to compare against.
  */
-export function PriceDelta({ current, previous, variant = "badge" }: PriceDeltaProps) {
+export function PriceDelta({
+  current,
+  previous,
+  currentQuantity,
+  currentUnitType,
+  previousQuantity,
+  previousUnitType,
+  variant = "badge",
+}: PriceDeltaProps) {
   if (previous === null || previous === undefined || previous <= 0) {
     return variant === "full" ? (
       <span className="text-[12px] text-ios-label-3">No earlier price</span>
     ) : null;
   }
 
-  const diff = current - previous;
+  let comparable = current;
+  if (
+    currentQuantity !== undefined &&
+    currentUnitType !== undefined &&
+    previousQuantity !== undefined &&
+    previousUnitType !== undefined
+  ) {
+    if (unitGroup(currentUnitType) !== unitGroup(previousUnitType)) {
+      return variant === "full" ? (
+        <span className="text-[12px] text-ios-label-3">Different pack size — no comparison</span>
+      ) : null;
+    }
+    const projected = projectPrice(
+      current,
+      currentQuantity,
+      currentUnitType,
+      previousQuantity,
+      previousUnitType,
+    );
+    if (projected !== null) comparable = projected;
+  }
+
+  const diff = comparable - previous;
   const percent = Math.abs((diff / previous) * 100);
   const rounded = Math.round(Math.abs(diff) * 100) / 100;
 

@@ -158,6 +158,10 @@ export function ShoppingView({ list, items }: ShoppingViewProps) {
                           <PriceDelta
                             current={item.purchasePrice ?? 0}
                             previous={item.previousPrice}
+                            currentQuantity={item.quantity}
+                            currentUnitType={item.unitType}
+                            previousQuantity={item.previousQuantity ?? undefined}
+                            previousUnitType={item.previousUnitType ?? undefined}
                           />
                         </span>
                       ) : item.lastPrice !== null ? (

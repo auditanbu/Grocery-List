@@ -216,11 +216,19 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
                             {name.secondary}
                             {item.shopName ? ` · ${item.shopName}` : ""}
                           </p>
-                          <p className="truncate text-[13px] font-medium text-ios-label-2">
+                          <Link
+                            href={`/items/${item.id}`}
+                            className="mt-0.5 inline-flex items-center gap-1 truncate text-[13px] font-medium text-ios-blue active:opacity-60"
+                          >
                             {item.lastPrice !== null
                               ? `Last paid ${formatPrice(item.lastPrice)}`
                               : "No price yet"}
-                          </p>
+                            {item.hasVariableUnit ? (
+                              <span className="rounded-full bg-ios-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-ios-label-2 ring-1 ring-inset ring-ios-separator">
+                                Variable
+                              </span>
+                            ) : null}
+                          </Link>
                         </div>
 
                         {entry ? (

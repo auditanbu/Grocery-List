@@ -31,6 +31,8 @@ export type MasterItemDTO = {
   shopId: number | null;
   shopName: string | null;
   isActive: boolean;
+  /** Sold in inconsistent pack sizes — allows quantity/unit edits while shopping. */
+  hasVariableUnit: boolean;
   /** Most recent price paid, across all past lists. */
   lastPrice: number | null;
   lastPriceAt: string | null;
@@ -52,8 +54,16 @@ export type ListItemDTO = {
   purchasePrice: number | null;
   /** Snapshot taken when the item was checked off. */
   previousPrice: number | null;
+  /** Quantity/unit that previousPrice was paid for, for a fair comparison. */
+  previousQuantity: number | null;
+  previousUnitType: UnitType | null;
   /** Latest price from any earlier list — shown before the item is bought. */
   lastPrice: number | null;
+  /** Quantity/unit that lastPrice was paid for, for a fair comparison. */
+  lastPriceQuantity: number | null;
+  lastPriceUnitType: UnitType | null;
+  /** Sold in inconsistent pack sizes — allows quantity/unit edits while shopping. */
+  hasVariableUnit: boolean;
 };
 
 export type ListSummaryDTO = {

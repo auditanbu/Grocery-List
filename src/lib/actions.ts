@@ -206,15 +206,24 @@ export async function recordPurchase(input: {
   const previous = await prisma.priceHistory.findFirst({
     where: { itemId: row.itemId, NOT: { listId: row.listId } },
     orderBy: { purchasedAt: "desc" },
-    select: { price: true },
+    select: { price: true, quantity: true, unitType: true },
   });
   const previousPrice = previous ? Number(previous.price) : null;
+  const previousQuantity = previous ? Number(previous.quantity) : null;
+  const previousUnitType = previous?.unitType ?? null;
   const purchasedAt = new Date();
 
   await prisma.$transaction([
     prisma.groceryListItem.update({
       where: { id: row.id },
-      data: { isPurchased: true, purchasePrice: price, previousPrice, purchasedAt },
+      data: {
+        isPurchased: true,
+        purchasePrice: price,
+        previousPrice,
+        previousQuantity,
+        previousUnitType,
+        purchasedAt,
+      },
     }),
     // One history row per item per list — re-entering a price replaces it.
     prisma.priceHistory.deleteMany({ where: { listId: row.listId, itemId: row.itemId } }),
@@ -246,6 +255,8 @@ export async function undoPurchase(listItemId: number): Promise<ActionResult> {
         isPurchased: false,
         purchasePrice: null,
         previousPrice: null,
+        previousQuantity: null,
+        previousUnitType: null,
         purchasedAt: null,
       },
     }),
@@ -265,6 +276,7 @@ export async function upsertMasterItem(input: {
   shopId: number | null;
   defaultQty?: number;
   isActive?: boolean;
+  hasVariableUnit?: boolean;
 }): Promise<ActionResult<{ id: number }>> {
   const nameEn = input.nameEn.trim();
   const nameTa = input.nameTa.trim() || nameEn;
@@ -291,6 +303,7 @@ export async function upsertMasterItem(input: {
     shopId: input.shopId,
     defaultQty,
     isActive: input.isActive ?? true,
+    hasVariableUnit: input.hasVariableUnit ?? false,
   };
 
   const item = input.id
@@ -345,4 +358,10 @@ export async function createCategory(input: {
 export async function searchMasterItems(query: string) {
   const { getMasterItems } = await import("./queries");
   return getMasterItems({ search: query, take: 40 });
+}
+
+/** Powers the inline price-history preview in the purchase sheet. */
+export async function getItemPriceHistory(itemId: number) {
+  const { getPriceHistory } = await import("./queries");
+  return getPriceHistory(itemId);
 }
