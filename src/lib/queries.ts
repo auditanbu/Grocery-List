@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "./prisma";
+import type { UnitType } from "./units";
 import type {
   CategoryDTO,
   ListDetailDTO,
@@ -23,12 +24,14 @@ function numOrNull(value: DecimalLike): number | null {
   return typeof value === "number" ? value : value.toNumber();
 }
 
+type LastPriceEntry = { price: number; at: Date; quantity: number; unitType: UnitType };
+
 /**
  * Latest recorded price per item, ignoring one list (the one being shopped)
  * so an item re-priced today still compares against the previous month.
  */
 async function lastPriceMap(itemIds: number[], excludeListId?: number) {
-  if (itemIds.length === 0) return new Map<number, { price: number; at: Date }>();
+  if (itemIds.length === 0) return new Map<number, LastPriceEntry>();
 
   const rows = await prisma.priceHistory.findMany({
     where: {
@@ -36,13 +39,18 @@ async function lastPriceMap(itemIds: number[], excludeListId?: number) {
       ...(excludeListId ? { NOT: { listId: excludeListId } } : {}),
     },
     orderBy: { purchasedAt: "desc" },
-    select: { itemId: true, price: true, purchasedAt: true },
+    select: { itemId: true, price: true, purchasedAt: true, quantity: true, unitType: true },
   });
 
-  const map = new Map<number, { price: number; at: Date }>();
+  const map = new Map<number, LastPriceEntry>();
   for (const row of rows) {
     if (!map.has(row.itemId)) {
-      map.set(row.itemId, { price: num(row.price), at: row.purchasedAt });
+      map.set(row.itemId, {
+        price: num(row.price),
+        at: row.purchasedAt,
+        quantity: num(row.quantity),
+        unitType: row.unitType,
+      });
     }
   }
   return map;
@@ -105,6 +113,7 @@ export async function getMasterItems(options?: {
     shopId: item.shopId,
     shopName: item.shop?.name ?? null,
     isActive: item.isActive,
+    hasVariableUnit: item.hasVariableUnit,
     lastPrice: prices.get(item.id)?.price ?? null,
     lastPriceAt: prices.get(item.id)?.at.toISOString() ?? null,
   }));
@@ -157,23 +166,31 @@ export async function getList(id: number): Promise<ListDetailDTO | null> {
     list.id,
   );
 
-  const items: ListItemDTO[] = list.items.map((row) => ({
-    id: row.id,
-    itemId: row.itemId,
-    nameEn: row.item.nameEn,
-    nameTa: row.item.nameTa,
-    categoryId: row.item.categoryId,
-    categoryName: row.item.category.nameEn,
-    categoryNameTa: row.item.category.nameTa,
-    unitType: row.unitType,
-    quantity: num(row.quantity),
-    shopId: row.shopId,
-    shopName: row.shop?.name ?? null,
-    isPurchased: row.isPurchased,
-    purchasePrice: numOrNull(row.purchasePrice),
-    previousPrice: numOrNull(row.previousPrice),
-    lastPrice: prices.get(row.itemId)?.price ?? null,
-  }));
+  const items: ListItemDTO[] = list.items.map((row) => {
+    const last = prices.get(row.itemId);
+    return {
+      id: row.id,
+      itemId: row.itemId,
+      nameEn: row.item.nameEn,
+      nameTa: row.item.nameTa,
+      categoryId: row.item.categoryId,
+      categoryName: row.item.category.nameEn,
+      categoryNameTa: row.item.category.nameTa,
+      unitType: row.unitType,
+      quantity: num(row.quantity),
+      shopId: row.shopId,
+      shopName: row.shop?.name ?? null,
+      isPurchased: row.isPurchased,
+      purchasePrice: numOrNull(row.purchasePrice),
+      previousPrice: numOrNull(row.previousPrice),
+      previousQuantity: numOrNull(row.previousQuantity),
+      previousUnitType: row.previousUnitType,
+      lastPrice: last?.price ?? null,
+      lastPriceQuantity: last ? last.quantity : null,
+      lastPriceUnitType: last ? last.unitType : null,
+      hasVariableUnit: row.item.hasVariableUnit,
+    };
+  });
 
   return {
     ...toSummary(list),

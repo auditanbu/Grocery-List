@@ -51,7 +51,7 @@ export default async function ItemHistoryPage({ params }: { params: Promise<{ id
       ) : (
         <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
           {history.map((entry, index) => {
-            const previous = history[index + 1]?.price ?? null;
+            const previousEntry = history[index + 1] ?? null;
             return (
               <li key={entry.id} className="ios-row">
                 <span className="min-w-0 flex-1">
@@ -66,7 +66,14 @@ export default async function ItemHistoryPage({ params }: { params: Promise<{ id
                     {entry.shopName ? ` · ${entry.shopName}` : ""}
                   </span>
                 </span>
-                <PriceDelta current={entry.price} previous={previous} />
+                <PriceDelta
+                  current={entry.price}
+                  previous={previousEntry?.price ?? null}
+                  currentQuantity={entry.quantity}
+                  currentUnitType={entry.unitType}
+                  previousQuantity={previousEntry?.quantity}
+                  previousUnitType={previousEntry?.unitType}
+                />
               </li>
             );
           })}

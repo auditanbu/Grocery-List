@@ -40,6 +40,7 @@ type Draft = {
   shopId: number | null;
   defaultQty: number;
   isActive: boolean;
+  hasVariableUnit: boolean;
 };
 
 export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) {
@@ -101,6 +102,7 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
       shopId: null,
       defaultQty: 1,
       isActive: true,
+      hasVariableUnit: false,
     });
 
   const startEdit = (item: MasterItemDTO) =>
@@ -113,6 +115,7 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
       shopId: item.shopId,
       defaultQty: item.defaultQty || 1,
       isActive: item.isActive,
+      hasVariableUnit: item.hasVariableUnit,
     });
 
   const save = () => {
@@ -294,6 +297,11 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
                       <span className="block truncate text-[13px] text-ios-label-2">
                         {name.secondary} · {unitOptionLabel(item.unitType)}
                         {item.shopName ? ` · ${item.shopName}` : ""}
+                        {item.hasVariableUnit ? (
+                          <span className="ml-1.5 rounded-full bg-ios-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator">
+                            Variable
+                          </span>
+                        ) : null}
                       </span>
                     </span>
                     {item.lastPrice !== null ? (
@@ -377,7 +385,7 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
               </select>
             </Field>
 
-            <Field label="Unit (Qty Type)">
+            <Field label="Unit type (Qty Type)">
               <div className="flex flex-wrap gap-2">
                 {UNIT_TYPES.map((unit) => (
                   <button
@@ -402,12 +410,41 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
               </div>
             </Field>
 
-            <Field label={`Default quantity (${formatQty(draft.defaultQty, draft.unitType)})`}>
+            <Field label={`Unit (${formatQty(draft.defaultQty, draft.unitType)})`}>
               <Stepper
                 value={draft.defaultQty}
                 unit={draft.unitType}
                 onChange={(defaultQty, unitType) => setDraft({ ...draft, defaultQty, unitType })}
               />
+            </Field>
+
+            <Field label="Variable size">
+              <button
+                type="button"
+                onClick={() => setDraft({ ...draft, hasVariableUnit: !draft.hasVariableUnit })}
+                className="flex w-full items-center justify-between gap-3 rounded-ios bg-ios-surface-2 px-4 py-3 text-left ring-1 ring-inset ring-ios-separator"
+              >
+                <span className="text-[15px] text-ios-label-1">
+                  Allow quantity/unit changes while shopping
+                </span>
+                <span
+                  aria-hidden
+                  className={`relative h-7 w-12 flex-none rounded-full transition ${
+                    draft.hasVariableUnit ? "bg-ios-green" : "bg-ios-separator"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition ${
+                      draft.hasVariableUnit ? "left-[22px]" : "left-0.5"
+                    }`}
+                  />
+                </span>
+              </button>
+              <p className="pt-1.5 text-[12px] text-ios-label-3">
+                For items sold in inconsistent pack sizes (soaps, pastes,
+                shampoos, ...) — like &ldquo;{formatQty(draft.defaultQty, draft.unitType)}&rdquo;
+                above, when a store only stocks a different size or pack.
+              </p>
             </Field>
 
             <Field label="Shop by (From)">
