@@ -6,6 +6,10 @@
  *
  * Expected headers (extra columns are ignored, order does not matter):
  *   Grocery | Grocery.1 | Type | Qty Type | From
+ *
+ * Optional — marks items sold in inconsistent pack sizes (soaps, pastes,
+ * shampoos, ...) so they get the quantity/unit editor while shopping:
+ *   Unit (pack size, e.g. 200) | Unit Type (g | ml | kg | L | blank)
  */
 import "dotenv/config";
 import { readFile } from "node:fs/promises";
@@ -63,9 +67,16 @@ const HEADER_ALIASES: Record<keyof MasterRow, string[]> = {
   grocery: ["grocery", "tamil", "tamil name", "item"],
   groceryEn: ["grocery.1", "grocery1", "english", "english name", "item name"],
   type: ["type", "category"],
-  qtyType: ["qty type", "qtytype", "unit", "uom"],
+  qtyType: ["qty type", "qtytype", "unit type", "uom"],
   from: ["from", "shop", "shop by", "store"],
+  // Optional — present on the supplementary "variable pack size" sheet
+  // (e.g. soaps/pastes sold in inconsistent sizes), absent from the main
+  // spreadsheet export. A row with a non-blank "Unit" is treated as marked
+  // for variable-unit support.
+  unit: ["unit", "pack size", "pack qty", "size"],
+  variableUnit: ["variable unit", "has variable unit", "variable size"],
 };
+const OPTIONAL_COLUMNS: (keyof MasterRow)[] = ["grocery", "from", "unit", "variableUnit"];
 
 function columnIndexes(header: string[]) {
   const normalized = header.map((h) => h.trim().toLowerCase());
@@ -92,7 +103,7 @@ async function main() {
 
   const indexes = columnIndexes(rows[0]);
   const missing = (Object.keys(indexes) as (keyof MasterRow)[]).filter(
-    (key) => indexes[key] === -1 && key !== "grocery" && key !== "from",
+    (key) => indexes[key] === -1 && !OPTIONAL_COLUMNS.includes(key),
   );
   if (missing.length) {
     console.error(
@@ -102,13 +113,24 @@ async function main() {
   }
 
   const at = (row: string[], index: number) => (index === -1 ? "" : (row[index] ?? "").trim());
-  const items: MasterRow[] = rows.slice(1).map((row) => ({
-    grocery: at(row, indexes.grocery),
-    groceryEn: at(row, indexes.groceryEn),
-    type: at(row, indexes.type),
-    qtyType: at(row, indexes.qtyType),
-    from: at(row, indexes.from),
-  }));
+  const items: MasterRow[] = rows.slice(1).map((row) => {
+    const unitRaw = at(row, indexes.unit);
+    const unit = unitRaw ? Number.parseFloat(unitRaw) : undefined;
+    const variableUnitRaw = at(row, indexes.variableUnit).toLowerCase();
+
+    return {
+      grocery: at(row, indexes.grocery),
+      groceryEn: at(row, indexes.groceryEn),
+      type: at(row, indexes.type),
+      qtyType: at(row, indexes.qtyType),
+      from: at(row, indexes.from),
+      unit: unit !== undefined && Number.isFinite(unit) ? unit : undefined,
+      // Explicit "yes/true/1" wins; otherwise a filled-in "Unit" implies it.
+      variableUnit: variableUnitRaw
+        ? ["yes", "true", "1", "y"].includes(variableUnitRaw)
+        : unitRaw !== "",
+    };
+  });
 
   const prisma = createScriptClient();
   try {

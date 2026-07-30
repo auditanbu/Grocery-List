@@ -135,6 +135,63 @@ export function formatPrice(value: number): string {
 }
 
 /**
+ * Groups unit types that can be fairly converted between each other for
+ * price comparison — g and kg are both "weight" (base unit: grams), ml and
+ * L are both "volume" (base unit: ml). Rs and countable items have no
+ * smaller/larger unit to convert to or from.
+ */
+type UnitGroup = "weight" | "volume" | "count" | "currency";
+
+const UNIT_GROUP: Record<UnitType, UnitGroup> = {
+  KG: "weight",
+  G: "weight",
+  L: "volume",
+  ML: "volume",
+  RS: "currency",
+  COUNT: "count",
+};
+
+/** How many of the unit's base measure (grams, ml) one unit amounts to. */
+const BASE_UNIT_FACTOR: Record<UnitType, number> = {
+  KG: 1000,
+  G: 1,
+  L: 1000,
+  ML: 1,
+  RS: 1,
+  COUNT: 1,
+};
+
+export function unitGroup(unit: UnitType): UnitGroup {
+  return UNIT_GROUP[unit];
+}
+
+/** Price per base unit (per gram, per ml, per item) — the fair basis for comparison. */
+export function unitPriceOf(price: number, quantity: number, unit: UnitType): number | null {
+  if (!Number.isFinite(price) || !Number.isFinite(quantity) || quantity <= 0) return null;
+  return price / (quantity * BASE_UNIT_FACTOR[unit]);
+}
+
+/**
+ * What `price` (paid for `quantity` of `unit`) works out to at
+ * `targetQuantity` of `targetUnit` — e.g. "this month's 150 g at today's
+ * price would have cost ₹X at last month's 200 g". Returns null when the
+ * two units aren't in the same group (nothing sensible to project, e.g.
+ * comparing a weight to a count).
+ */
+export function projectPrice(
+  price: number,
+  quantity: number,
+  unit: UnitType,
+  targetQuantity: number,
+  targetUnit: UnitType,
+): number | null {
+  if (unitGroup(unit) !== unitGroup(targetUnit)) return null;
+  const perBase = unitPriceOf(price, quantity, unit);
+  if (perBase === null) return null;
+  return perBase * targetQuantity * BASE_UNIT_FACTOR[targetUnit];
+}
+
+/**
  * Maps the spreadsheet's "Qty Type" column onto the UnitType enum.
  * A blank cell means the item is countable.
  */

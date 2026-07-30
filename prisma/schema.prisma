@@ -63,19 +63,23 @@ model Shop {
 
 /// A master-data grocery item.
 model Item {
-  id         Int      @id @default(autoincrement())
-  nameTa     String
-  nameEn     String
-  unitType   UnitType @default(COUNT)
+  id              Int      @id @default(autoincrement())
+  nameTa          String
+  nameEn          String
+  unitType        UnitType @default(COUNT)
   /// Quantity pre-filled when the item is added to a list.
-  defaultQty Decimal  @default(1) @db.Decimal(10, 2)
-  categoryId Int
+  defaultQty      Decimal  @default(1) @db.Decimal(10, 2)
+  categoryId      Int
   /// Default shop ("From"); can be overridden per list item.
-  shopId     Int?
-  isActive   Boolean  @default(true)
-  notes      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  shopId          Int?
+  isActive        Boolean  @default(true)
+  /// Marked in the source spreadsheet as sold in inconsistent pack sizes
+  /// (soaps, pastes, shampoos, ...). Only these items expose the
+  /// quantity/unit editor while shopping and on the create/edit item form.
+  hasVariableUnit Boolean  @default(false)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   category       Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   shop           Shop?             @relation(fields: [shopId], references: [id], onDelete: SetNull)
@@ -119,12 +123,17 @@ model GroceryListItem {
   /// Shop this row must be bought from (overrides Item.shopId).
   shopId   Int?
 
-  isPurchased   Boolean   @default(false)
+  isPurchased      Boolean   @default(false)
   /// Price actually paid, entered while shopping.
-  purchasePrice Decimal?  @db.Decimal(10, 2)
+  purchasePrice    Decimal?  @db.Decimal(10, 2)
   /// Snapshot of the previous month's price, kept for the up/down indicator.
-  previousPrice Decimal?  @db.Decimal(10, 2)
-  purchasedAt   DateTime?
+  previousPrice    Decimal?  @db.Decimal(10, 2)
+  /// Snapshot of the quantity/unit that previousPrice was paid for — needed
+  /// to compare fairly when a variable-unit item's size changes between
+  /// purchases (e.g. 150g this month vs. 200g last month).
+  previousQuantity Decimal?  @db.Decimal(10, 2)
+  previousUnitType UnitType?
+  purchasedAt      DateTime?
 
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())

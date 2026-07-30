@@ -58,8 +58,8 @@ app works out of the box. To load your actual spreadsheet:
 
 1. In Excel/Numbers/Sheets, **File → Save As / Export → CSV (UTF-8)**.
 2. Keep (or rename) the header row to include: `Grocery`, `Grocery.1`,
-   `Type`, `Qty Type`, `From` (aliases like "English", "Category", "Unit",
-   "Shop" are also recognized — see `prisma/import-csv.ts`).
+   `Type`, `Qty Type`, `From` (aliases like "English", "Category", "Unit
+   Type", "Shop" are also recognized — see `prisma/import-csv.ts`).
 3. Run:
 
    ```bash
@@ -69,6 +69,14 @@ app works out of the box. To load your actual spreadsheet:
 The importer is idempotent (safe to re-run), creates categories/shops on
 demand, and reports anything it had to skip.
 
+Items sold in inconsistent pack sizes (soaps, pastes, shampoos, ...) can be
+marked for the quantity/unit editor by adding two optional columns to the
+same CSV: `Unit` (pack size, e.g. `200`) and `Unit Type` (`g` | `ml` | `kg` |
+`L` | blank). A row with a non-blank `Unit` is treated as marked, and its
+value becomes the item's default pack size — see
+`prisma/data/master-data.json`'s `unit`/`variableUnit` fields for the
+current set (synced from a supplementary spreadsheet).
+
 ## 2. Prisma schema
 
 `prisma/schema.prisma` models the spreadsheet 1:1:
@@ -77,7 +85,10 @@ demand, and reports anything it had to skip.
 - **`Shop`** — the `From` column ("Shop By").
 - **`Item`** — master catalogue: `Grocery`/`Grocery.1` names, `unitType`
   (`KG | G | L | ML | RS | COUNT`, from `Qty Type`), default shop, default
-  quantity.
+  quantity, and `hasVariableUnit` — marks items sold in inconsistent pack
+  sizes, which get a quantity/unit editor on the create/edit form and while
+  shopping (see `src/lib/units.ts`'s `projectPrice` for how the price
+  comparison stays fair when the size changes between purchases).
 - **`GroceryList`** — one row per month (`monthKey = "YYYY-MM"`, unique),
   with `status: DRAFT | FINALIZED | COMPLETED`.
 - **`GroceryListItem`** — a line on a list: quantity, unit snapshot, shop

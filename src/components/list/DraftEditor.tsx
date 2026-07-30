@@ -166,6 +166,12 @@ export function DraftEditor({ list }: DraftEditorProps) {
                       >
                         {item.shopName ?? "Pick shop"}
                       </button>
+                      <Link
+                        href={`/items/${item.itemId}`}
+                        className="h-8 rounded-full bg-ios-surface-2 px-3 text-[13px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator active:scale-95 flex items-center"
+                      >
+                        Price history
+                      </Link>
                       <button
                         type="button"
                         onClick={() => remove(item)}

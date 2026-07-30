@@ -14,6 +14,14 @@ export type MasterRow = {
   qtyType: string;
   /** "From" — shop name */
   from: string;
+  /**
+   * Marks an item as sold in inconsistent pack sizes (soaps, pastes,
+   * shampoos, ...) — from the supplementary "Unit"/"Unit Type" sheet.
+   * Only items marked here get the quantity/unit editor while shopping.
+   */
+  variableUnit?: boolean;
+  /** Pack size ("Unit" column) — overrides the default-quantity heuristic below. */
+  unit?: number;
 };
 
 export type MasterData = {
@@ -93,6 +101,9 @@ export async function importMasterData(prisma: PrismaClient, data: MasterData) {
 
     const unitType = parseUnitType(row.qtyType);
     const shopId = shopIds.get(row.from?.trim() ?? "") ?? null;
+    const hasVariableUnit = row.variableUnit ?? false;
+    const defaultQty =
+      row.unit !== undefined ? row.unit : unitType === "G" || unitType === "ML" ? 100 : 1;
     const existing = await prisma.item.findUnique({
       where: { nameEn_categoryId: { nameEn, categoryId } },
       select: { id: true },
@@ -104,14 +115,22 @@ export async function importMasterData(prisma: PrismaClient, data: MasterData) {
       // resync.ts, when it dropped out of the spreadsheet) and has since
       // come back — the spreadsheet is the source of truth for what's
       // current.
-      update: { nameTa: nameTa || nameEn, unitType, shopId, isActive: true },
+      update: {
+        nameTa: nameTa || nameEn,
+        unitType,
+        shopId,
+        isActive: true,
+        hasVariableUnit,
+        ...(row.unit !== undefined ? { defaultQty } : {}),
+      },
       create: {
         nameEn,
         nameTa: nameTa || nameEn,
         unitType,
         categoryId,
         shopId,
-        defaultQty: unitType === "G" || unitType === "ML" ? 100 : 1,
+        defaultQty,
+        hasVariableUnit,
       },
     });
 
