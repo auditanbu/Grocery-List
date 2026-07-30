@@ -18,11 +18,13 @@ type AddItemsPageProps = {
 
 /**
  * A row's live state on this list.
- *   listItemId: null -> "Add" was tapped but nothing is saved yet; the
- *   stepper shows 0 and the row only becomes a real list row on the
- *   first +/- tap (or typed amount).
+ *   listItemId: null -> "Add" was tapped (or "-" walked the quantity back
+ *   down to 0) but nothing is saved; the stepper shows 0 and the row only
+ *   becomes a real list row on the first +/- tap past zero.
  */
 type Entry = { listItemId: number | null; quantity: number; unitType: UnitType };
+
+type StatusFilter = "all" | "unselected" | "zero";
 
 /**
  * Full-page item picker for a draft list. Each row carries its own
@@ -33,6 +35,9 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
   const router = useRouter();
   const { language } = useLanguage();
   const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -57,18 +62,37 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
   // that creates it has come back with a listItemId.
   const creating = useRef<Set<number>>(new Set());
 
+  const categoryOptions = useMemo(() => {
+    const seen = new Map<number, { label: string; count: number }>();
+    for (const item of items) {
+      const label = language === "ta" ? (item.categoryNameTa ?? item.categoryName) : item.categoryName;
+      const existing = seen.get(item.categoryId);
+      if (existing) existing.count += 1;
+      else seen.set(item.categoryId, { label, count: 1 });
+    }
+    return [...seen.entries()]
+      .map(([id, value]) => ({ id, ...value }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [items, language]);
+
   const results = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const trimmed = query.trim();
-    const matches = needle
-      ? items.filter(
-          (item) =>
-            item.nameEn.toLowerCase().includes(needle) ||
-            item.nameTa.includes(trimmed) ||
-            item.categoryName.toLowerCase().includes(needle) ||
-            (item.categoryNameTa ?? "").includes(trimmed),
-        )
-      : items;
+    const matches = items.filter((item) => {
+      if (categoryId !== null && item.categoryId !== categoryId) return false;
+
+      const entry = entries[item.id];
+      if (statusFilter === "unselected" && entry) return false;
+      if (statusFilter === "zero" && (!entry || entry.quantity !== 0)) return false;
+
+      if (!needle) return true;
+      return (
+        item.nameEn.toLowerCase().includes(needle) ||
+        item.nameTa.includes(trimmed) ||
+        item.categoryName.toLowerCase().includes(needle) ||
+        (item.categoryNameTa ?? "").includes(trimmed)
+      );
+    });
 
     // Grouped by category id (stable across a language switch), labeled in
     // whichever language is currently selected.
@@ -80,7 +104,7 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
       else grouped.set(item.categoryId, { label, items: [item] });
     }
     return [...grouped.entries()];
-  }, [items, query, language]);
+  }, [items, query, language, categoryId, statusFilter, entries]);
 
   /** Reveals the stepper at 0 — nothing is saved until the first real change. */
   const add = (item: MasterItemDTO) => {
@@ -91,9 +115,26 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
     }));
   };
 
+  /** The "-" button walked the quantity down to 0 — un-persist back to the pending state. */
+  const dropToZero = (item: MasterItemDTO, entry: Entry, unitType: UnitType) => {
+    setEntries((current) => ({ ...current, [item.id]: { listItemId: null, quantity: 0, unitType } }));
+    if (entry.listItemId === null) return;
+    startTransition(async () => {
+      const result = await removeListItem(entry.listItemId as number);
+      if (!result.ok) setError(result.error);
+      router.refresh();
+    });
+  };
+
   const changeQuantity = (item: MasterItemDTO, quantity: number, unitType: UnitType) => {
     const entry = entries[item.id];
     if (!entry) return;
+
+    if (quantity === 0) {
+      dropToZero(item, entry, unitType);
+      return;
+    }
+
     setEntries((current) => ({ ...current, [item.id]: { ...entry, quantity, unitType } }));
 
     if (entry.listItemId === null) {
@@ -150,6 +191,13 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
 
   const addedCount = Object.values(entries).filter((entry) => entry.listItemId !== null).length;
 
+  const statusChip = (active: boolean) =>
+    `h-9 flex-none rounded-full px-4 text-[14px] font-medium transition active:scale-95 ${
+      active
+        ? "bg-ios-blue text-white"
+        : "bg-ios-surface text-ios-label-2 ring-1 ring-inset ring-ios-separator"
+    }`;
+
   return (
     <div className="space-y-5 pb-6">
       <header className="space-y-3 pt-1">
@@ -176,17 +224,96 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
               {items.length} in master list · {addedCount} added
             </p>
           </div>
-          <LanguageToggle />
+          <div className="flex flex-none items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSearchOpen((open) => {
+                  if (open) setQuery("");
+                  return !open;
+                });
+              }}
+              aria-label={searchOpen ? "Close search" : "Search"}
+              title={searchOpen ? "Close search" : "Search"}
+              className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-ios-surface text-ios-blue shadow-ios transition active:scale-95"
+            >
+              {searchOpen ? (
+                <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+                  <path
+                    d="M6 6l12 12M18 6L6 18"
+                    stroke="currentColor"
+                    strokeWidth="2.25"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+                  <circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" strokeWidth="2.1" />
+                  <path d="M20 20l-4.3-4.3" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" />
+                </svg>
+              )}
+            </button>
+            <LanguageToggle />
+          </div>
         </div>
       </header>
 
-      <input
-        autoFocus
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Search Tamil or English name"
-        className="h-12 w-full rounded-ios bg-ios-surface px-4 text-[17px] shadow-ios outline-none focus:ring-2 focus:ring-ios-blue"
-      />
+      {searchOpen ? (
+        <input
+          autoFocus
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search Tamil or English name"
+          className="h-12 w-full rounded-ios bg-ios-surface px-4 text-[17px] shadow-ios outline-none focus:ring-2 focus:ring-ios-blue"
+        />
+      ) : null}
+
+      <div className="-mx-4 overflow-x-auto px-4 pb-1">
+        <div className="flex w-max gap-2">
+          <button
+            type="button"
+            onClick={() => setCategoryId(null)}
+            className={statusChip(categoryId === null)}
+          >
+            All categories
+          </button>
+          {categoryOptions.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setCategoryId(option.id)}
+              className={statusChip(categoryId === option.id)}
+            >
+              {option.label}
+              <span className="ml-1.5 tabular-nums opacity-70">{option.count}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setStatusFilter("all")}
+          className={statusChip(statusFilter === "all")}
+        >
+          All
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusFilter("unselected")}
+          className={statusChip(statusFilter === "unselected")}
+        >
+          Not added
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusFilter("zero")}
+          className={statusChip(statusFilter === "zero")}
+        >
+          Zero qty
+        </button>
+      </div>
 
       {error ? (
         <p className="rounded-ios bg-ios-red-soft px-4 py-3 text-[14px] text-ios-red">{error}</p>
@@ -194,12 +321,12 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
 
       {results.length === 0 ? (
         <p className="ios-card p-6 text-center text-[15px] text-ios-label-2">
-          Nothing matched &ldquo;{query}&rdquo;.
+          {query ? `Nothing matched “${query}”.` : "Nothing matches these filters."}
         </p>
       ) : (
         <div className="space-y-5">
-          {results.map(([categoryId, group]) => (
-            <section key={categoryId}>
+          {results.map(([groupCategoryId, group]) => (
+            <section key={groupCategoryId}>
               <p className="px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-ios-label-3">
                 {group.label}
               </p>
@@ -224,30 +351,15 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
                         </div>
 
                         {entry ? (
-                          <div className="flex flex-none items-center gap-1.5">
-                            <Stepper
-                              value={entry.quantity}
-                              unit={entry.unitType}
-                              size="compact"
-                              onChange={(quantity, unitType) => changeQuantity(item, quantity, unitType)}
-                              aria-label={`Quantity for ${item.nameEn}`}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => remove(item)}
-                              aria-label={`Remove ${item.nameEn}`}
-                              className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-ios-label-3 transition active:bg-ios-surface-2"
-                            >
-                              <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-                                <path
-                                  d="M6 6l12 12M18 6L6 18"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                />
-                              </svg>
-                            </button>
-                          </div>
+                          <Stepper
+                            value={entry.quantity}
+                            unit={entry.unitType}
+                            size="compact"
+                            minOverride={0}
+                            onBelowMin={() => remove(item)}
+                            onChange={(quantity, unitType) => changeQuantity(item, quantity, unitType)}
+                            aria-label={`Quantity for ${item.nameEn}`}
+                          />
                         ) : (
                           <button
                             type="button"

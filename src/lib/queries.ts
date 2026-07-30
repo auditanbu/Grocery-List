@@ -182,15 +182,6 @@ export async function getList(id: number): Promise<ListDetailDTO | null> {
   };
 }
 
-/** The list for the current month, if one has been started. */
-export async function getListByMonth(monthKey: string) {
-  const list = await prisma.groceryList.findUnique({
-    where: { monthKey },
-    include: { items: { select: { isPurchased: true, purchasePrice: true } } },
-  });
-  return list ? toSummary(list) : null;
-}
-
 export async function getPriceHistory(itemId: number): Promise<PriceHistoryDTO[]> {
   const rows = await prisma.priceHistory.findMany({
     where: { itemId },

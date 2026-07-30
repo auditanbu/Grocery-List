@@ -4,11 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   UNIT_LABEL,
-  decrement,
   formatQtyValue,
   incrementWithUnit,
   minFor,
   normalizeWithUnit,
+  roundQty,
   stepFor,
   type UnitType,
 } from "@/lib/units";
@@ -22,6 +22,14 @@ type StepperProps = {
   /** Compact fits inside a list row; regular is used inside sheets. */
   size?: "compact" | "regular";
   "aria-label"?: string;
+  /**
+   * Floor for the decrease button, in place of the unit's normal minimum
+   * (one step). Pair with `onBelowMin` to let "-" walk past the usual
+   * floor down to this value instead of disabling.
+   */
+  minOverride?: number;
+  /** Fires instead of decrementing once the value is already at the floor. */
+  onBelowMin?: () => void;
 };
 
 const HOLD_DELAY_MS = 450;
@@ -47,14 +55,20 @@ export function Stepper({
   disabled = false,
   size = "regular",
   "aria-label": ariaLabel,
+  minOverride,
+  onBelowMin,
 }: StepperProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const timers = useRef<{ timeout?: ReturnType<typeof setTimeout>; interval?: ReturnType<typeof setInterval> }>({});
   const latestValue = useRef(value);
   const latestUnit = useRef(unit);
+  const latestMinOverride = useRef(minOverride);
+  const latestOnBelowMin = useRef(onBelowMin);
   latestValue.current = value;
   latestUnit.current = unit;
+  latestMinOverride.current = minOverride;
+  latestOnBelowMin.current = onBelowMin;
 
   const stopHold = useCallback(() => {
     if (timers.current.timeout) clearTimeout(timers.current.timeout);
@@ -74,7 +88,15 @@ export function Stepper({
           onChange(result.quantity, result.unit);
         }
       } else {
-        const next = decrement(latestValue.current, latestUnit.current);
+        const floor = latestMinOverride.current ?? minFor(latestUnit.current);
+        if (latestValue.current <= floor) {
+          latestOnBelowMin.current?.();
+          return;
+        }
+        const next = roundQty(
+          Math.max(latestValue.current - stepFor(latestUnit.current), floor),
+          latestUnit.current,
+        );
         if (next !== latestValue.current) {
           latestValue.current = next;
           onChange(next, latestUnit.current);
@@ -119,7 +141,7 @@ export function Stepper({
     }
   };
 
-  const atMinimum = value <= minFor(unit);
+  const atMinimum = value <= (minOverride ?? minFor(unit)) && !onBelowMin;
   const compact = size === "compact";
   const buttonSize = compact ? "h-10 w-10" : "h-12 w-12";
   const valueWidth = compact ? "min-w-[4.25rem]" : "min-w-[5.5rem]";

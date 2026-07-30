@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import { Sheet } from "@/components/Sheet";
+import { ShopFilter } from "@/components/list/ShopFilter";
 import { Stepper } from "@/components/Stepper";
 import { finalizeList, removeListItem, updateListItem } from "@/lib/actions";
 import { bilingualName, useLanguage } from "@/lib/language";
@@ -19,8 +20,31 @@ export function DraftEditor({ list }: DraftEditorProps) {
   const router = useRouter();
   const { language } = useLanguage();
   const [shopPickerFor, setShopPickerFor] = useState<ListItemDTO | null>(null);
+  const [shopId, setShopId] = useState<number | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const shopOptions = useMemo(() => {
+    const counts = new Map<number | null, { name: string; count: number }>();
+    for (const item of list.items) {
+      const key = item.shopId;
+      const entry = counts.get(key) ?? { name: item.shopName ?? "Not set", count: 0 };
+      entry.count += 1;
+      counts.set(key, entry);
+    }
+    return [...counts.entries()]
+      .map(([id, value]) => ({ id, name: value.name, count: value.count }))
+      .sort((a, b) => {
+        if (a.id === null) return 1;
+        if (b.id === null) return -1;
+        return a.name.localeCompare(b.name);
+      });
+  }, [list.items]);
+
+  const visibleItems = useMemo(
+    () => (shopId === undefined ? list.items : list.items.filter((item) => item.shopId === shopId)),
+    [list.items, shopId],
+  );
 
   // Optimistic quantity/unit keep the stepper responsive while the action runs.
   const [overrides, setOverrides] = useState<Record<number, { quantity: number; unitType: UnitType }>>({});
@@ -65,7 +89,7 @@ export function DraftEditor({ list }: DraftEditorProps) {
     });
   };
 
-  const byShop = groupByShop(list.items);
+  const byShop = groupByShop(visibleItems);
 
   return (
     <div className="space-y-5">
@@ -84,6 +108,15 @@ export function DraftEditor({ list }: DraftEditorProps) {
         Add item
       </Link>
 
+      {list.items.length > 0 ? (
+        <ShopFilter
+          options={shopOptions}
+          value={shopId}
+          onChange={setShopId}
+          total={list.items.length}
+        />
+      ) : null}
+
       {error ? (
         <p className="rounded-ios bg-ios-red-soft px-4 py-3 text-[14px] text-ios-red">{error}</p>
       ) : null}
@@ -95,6 +128,10 @@ export function DraftEditor({ list }: DraftEditorProps) {
             Search your master list and set the quantity and shop for each item.
           </p>
         </div>
+      ) : visibleItems.length === 0 ? (
+        <p className="ios-card p-6 text-center text-[15px] text-ios-label-2">
+          No items for this shop.
+        </p>
       ) : (
         <div className="space-y-5">
           {byShop.map(([shopName, items]) => (

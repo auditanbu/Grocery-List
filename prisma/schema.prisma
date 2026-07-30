@@ -92,8 +92,9 @@ model Item {
 model GroceryList {
   id          Int        @id @default(autoincrement())
   name        String
-  /// Sortable month key, "YYYY-MM". Unique so one list per month is the norm.
-  monthKey    String     @unique
+  /// Sortable month key, "YYYY-MM". Several lists can share a month as
+  /// long as their names differ.
+  monthKey    String
   status      ListStatus @default(DRAFT)
   finalizedAt DateTime?
   completedAt DateTime?
@@ -103,6 +104,7 @@ model GroceryList {
   items          GroceryListItem[]
   priceHistories PriceHistory[]
 
+  @@unique([monthKey, name])
   @@index([monthKey])
 }
 

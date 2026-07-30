@@ -20,7 +20,7 @@ async function seedDemoHistory(prisma: ReturnType<typeof createScriptClient>) {
   const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const monthKey = monthKeyOf(lastMonth);
 
-  const existing = await prisma.groceryList.findUnique({ where: { monthKey } });
+  const existing = await prisma.groceryList.findFirst({ where: { monthKey } });
   if (existing) {
     console.log(`   demo: list "${existing.name}" already exists, skipping`);
     return;

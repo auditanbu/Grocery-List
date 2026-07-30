@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 
 import { AppNav } from "@/components/AppNav";
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
+import { AdminProvider } from "@/lib/admin-context";
+import { isAdminSession } from "@/lib/admin";
 import { LanguageProvider } from "@/lib/language";
 import { ThemeProvider, noFlashThemeScript } from "@/lib/theme";
 import "./globals.css";
@@ -31,11 +33,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const isAdmin = await isAdminSession();
+
   return (
     <html lang="en" className="h-full antialiased">
       <head>
@@ -44,15 +48,17 @@ export default function RootLayout({
       </head>
       <body className="flex min-h-full flex-col md:flex-row">
         <ThemeProvider>
-          <LanguageProvider>
-            <AppNav />
-            <div className="flex-1 md:pl-64">
-              {/* Bottom padding clears the tab bar on mobile. */}
-              <main className="mx-auto w-full max-w-3xl px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 md:pb-12 md:pt-8">
-                {children}
-              </main>
-            </div>
-          </LanguageProvider>
+          <AdminProvider initialIsAdmin={isAdmin}>
+            <LanguageProvider>
+              <AppNav />
+              <div className="flex-1 md:pl-64">
+                {/* Bottom padding clears the tab bar on mobile. */}
+                <main className="mx-auto w-full max-w-3xl px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 md:pb-12 md:pt-8">
+                  {children}
+                </main>
+              </div>
+            </LanguageProvider>
+          </AdminProvider>
         </ThemeProvider>
         <ServiceWorkerRegistrar />
       </body>

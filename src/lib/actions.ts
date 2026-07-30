@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { PrismaClientKnownRequestError } from "@/generated/prisma/internal/prismaNamespace";
+import { isAdminSession } from "./admin";
 import { prisma } from "./prisma";
 import { listNameFor, monthKeyOf } from "./dates";
 import { normalizeQty, type UnitType } from "./units";
@@ -25,7 +26,9 @@ function revalidateList(listId: number) {
 
 /**
  * Starts a monthly list. Defaults to the current month with a `MMM YYYY`
- * name; returns the existing list if that month was already started.
+ * name. A month can hold several lists as long as their names differ —
+ * submitting the exact same month + name again just reopens that list
+ * instead of creating a duplicate.
  */
 export async function createList(input: {
   name?: string;
@@ -37,7 +40,7 @@ export async function createList(input: {
   const [year, month] = monthKey.split("-").map(Number);
   const name = input.name?.trim() || listNameFor(new Date(year, month - 1, 1));
 
-  const existing = await prisma.groceryList.findUnique({ where: { monthKey } });
+  const existing = await prisma.groceryList.findUnique({ where: { monthKey_name: { monthKey, name } } });
   if (existing) {
     return { ok: true, data: { id: existing.id, existed: true } };
   }
@@ -50,12 +53,24 @@ export async function createList(input: {
 export async function renameList(listId: number, name: string): Promise<ActionResult> {
   const trimmed = name.trim();
   if (!trimmed) return fail("Name cannot be empty.");
+
+  const list = await prisma.groceryList.findUnique({ where: { id: listId }, select: { monthKey: true } });
+  if (!list) return fail("List not found.");
+
+  const clash = await prisma.groceryList.findFirst({
+    where: { monthKey: list.monthKey, name: trimmed, NOT: { id: listId } },
+    select: { id: true },
+  });
+  if (clash) return fail(`"${trimmed}" already exists for this month.`);
+
   await prisma.groceryList.update({ where: { id: listId }, data: { name: trimmed } });
   revalidateList(listId);
   return { ok: true };
 }
 
+/** Admin only — a closed list is a shared family record, not something anyone can erase. */
 export async function deleteList(listId: number): Promise<ActionResult> {
+  if (!(await isAdminSession())) return fail("Admin only.");
   await prisma.groceryList.delete({ where: { id: listId } });
   revalidatePath("/");
   revalidatePath("/history");
