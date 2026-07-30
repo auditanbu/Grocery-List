@@ -43,11 +43,17 @@ type Draft = {
   hasVariableUnit: boolean;
 };
 
+/** True when the Tamil name was never actually set — it's just a copy of the English name. */
+function needsTamil(item: MasterItemDTO): boolean {
+  return item.nameTa.trim().toLowerCase() === item.nameEn.trim().toLowerCase();
+}
+
 export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) {
   const router = useRouter();
   const { language } = useLanguage();
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [needsTamilOnly, setNeedsTamilOnly] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -63,6 +69,7 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
     const trimmed = query.trim();
     const matches = items.filter((item) => {
       if (categoryId && item.categoryId !== categoryId) return false;
+      if (needsTamilOnly && !needsTamil(item)) return false;
       if (!needle) return true;
       return (
         item.nameEn.toLowerCase().includes(needle) ||
@@ -83,7 +90,9 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
       else grouped.set(item.categoryId, { label, items: [item] });
     }
     return [...grouped.entries()];
-  }, [items, query, categoryId, language]);
+  }, [items, query, categoryId, needsTamilOnly, language]);
+
+  const needsTamilCount = useMemo(() => items.filter(needsTamil).length, [items]);
 
   const categoryItemCounts = useMemo(() => {
     const counts = new Map<number, number>();
@@ -255,6 +264,12 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
             ))}
           </div>
         </div>
+
+        {needsTamilCount > 0 ? (
+          <FilterChip active={needsTamilOnly} onClick={() => setNeedsTamilOnly((v) => !v)} tone="warning">
+            Needs Tamil name · {needsTamilCount}
+          </FilterChip>
+        ) : null}
       </div>
 
       <button
@@ -300,6 +315,11 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
                         {item.hasVariableUnit ? (
                           <span className="ml-1.5 rounded-full bg-ios-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator">
                             Variable
+                          </span>
+                        ) : null}
+                        {needsTamil(item) ? (
+                          <span className="ml-1.5 rounded-full bg-ios-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-ios-orange ring-1 ring-inset ring-ios-separator">
+                            Needs Tamil
                           </span>
                         ) : null}
                       </span>
@@ -598,19 +618,20 @@ function FilterChip({
   active,
   onClick,
   children,
+  tone = "default",
 }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
+  tone?: "default" | "warning";
 }) {
+  const activeClass = tone === "warning" ? "bg-ios-orange text-white" : "bg-ios-blue text-white";
   return (
     <button
       type="button"
       onClick={onClick}
       className={`h-9 flex-none rounded-full px-4 text-[14px] font-medium transition active:scale-95 ${
-        active
-          ? "bg-ios-blue text-white"
-          : "bg-ios-surface text-ios-label-2 ring-1 ring-inset ring-ios-separator"
+        active ? activeClass : "bg-ios-surface text-ios-label-2 ring-1 ring-inset ring-ios-separator"
       }`}
     >
       {children}

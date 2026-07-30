@@ -304,9 +304,22 @@ export async function upsertMasterItem(input: {
   hasVariableUnit?: boolean;
 }): Promise<ActionResult<{ id: number }>> {
   const nameEn = input.nameEn.trim();
-  const nameTa = input.nameTa.trim() || nameEn;
   if (!nameEn) return fail("English name is required.");
   if (!input.categoryId) return fail("Pick a category.");
+
+  // A blank Tamil field on a brand-new item falls back to the English name
+  // (better than truly empty). On an EDIT, though, that same fallback would
+  // silently overwrite a real Tamil name whenever the field is left blank —
+  // keep whatever's already stored instead of destroying it.
+  let nameTa = input.nameTa.trim();
+  if (!nameTa) {
+    if (input.id) {
+      const existing = await prisma.item.findUnique({ where: { id: input.id }, select: { nameTa: true } });
+      nameTa = existing?.nameTa || nameEn;
+    } else {
+      nameTa = nameEn;
+    }
+  }
 
   const defaultQty = normalizeQty(input.defaultQty ?? 1, input.unitType);
 
