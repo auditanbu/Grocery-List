@@ -7,11 +7,13 @@ import { useMemo, useState, useTransition } from "react";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { DraftEditor } from "@/components/list/DraftEditor";
+import { ExportPdfButton } from "@/components/list/ExportPdfButton";
 import { FinalizedList } from "@/components/list/FinalizedList";
 import { ShopFilter } from "@/components/list/ShopFilter";
 import { ShoppingView } from "@/components/list/ShoppingView";
 import { reopenList } from "@/lib/actions";
 import { monthKeyToLabel } from "@/lib/dates";
+import { useLanguage } from "@/lib/language";
 import type { ListDetailDTO } from "@/lib/types";
 
 type ListScreenProps = {
@@ -28,6 +30,7 @@ const STATUS_LABEL = {
 
 export function ListScreen({ list }: ListScreenProps) {
   const router = useRouter();
+  const { language } = useLanguage();
   const [mode, setMode] = useState<Mode>(list.status === "COMPLETED" ? "shopping" : "list");
   const [shopId, setShopId] = useState<number | null | undefined>(undefined);
   const [pending, startTransition] = useTransition();
@@ -92,6 +95,16 @@ export function ListScreen({ list }: ListScreenProps) {
             </p>
           </div>
           <div className="flex flex-none items-center gap-2">
+            {mode === "list" && list.status === "FINALIZED" ? (
+              <ExportPdfButton
+                listName={list.name}
+                shopName={selectedShopName}
+                items={visibleItems}
+                groupByShop={!selectedShopName}
+                language={language}
+                variant="icon"
+              />
+            ) : null}
             <LanguageToggle />
             {list.status === "FINALIZED" ? (
               <button
@@ -132,7 +145,7 @@ export function ListScreen({ list }: ListScreenProps) {
           />
 
           {mode === "list" ? (
-            <FinalizedList list={list} items={visibleItems} shopName={selectedShopName} />
+            <FinalizedList items={visibleItems} shopName={selectedShopName} />
           ) : (
             <ShoppingView list={list} items={visibleItems} />
           )}

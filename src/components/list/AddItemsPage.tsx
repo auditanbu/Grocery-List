@@ -6,14 +6,21 @@ import { useMemo, useRef, useState, useTransition } from "react";
 
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { Stepper } from "@/components/Stepper";
-import { addListItem, removeListItem, updateListItem } from "@/lib/actions";
+import {
+  addListItem,
+  getItemPriceHistory,
+  removeListItem,
+  updateListItem,
+  updateMasterItemQuick,
+} from "@/lib/actions";
 import { bilingualName, useLanguage } from "@/lib/language";
-import { formatPrice, type UnitType } from "@/lib/units";
-import type { ListDetailDTO, MasterItemDTO } from "@/lib/types";
+import { UNIT_TYPES, formatPrice, formatQty, unitOptionLabel, type UnitType } from "@/lib/units";
+import type { ListDetailDTO, MasterItemDTO, PriceHistoryDTO, ShopDTO } from "@/lib/types";
 
 type AddItemsPageProps = {
   list: ListDetailDTO;
   items: MasterItemDTO[];
+  shops: ShopDTO[];
 };
 
 /**
@@ -31,7 +38,7 @@ type StatusFilter = "all" | "unselected" | "zero";
  * unit-aware stepper and last-paid price inline — tapping "Add" reveals
  * the stepper starting at 0, no separate configure step.
  */
-export function AddItemsPage({ list, items }: AddItemsPageProps) {
+export function AddItemsPage({ list, items, shops }: AddItemsPageProps) {
   const router = useRouter();
   const { language } = useLanguage();
   const [query, setQuery] = useState("");
@@ -40,6 +47,32 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
+  const [historyByItem, setHistoryByItem] = useState<Record<number, PriceHistoryDTO[] | undefined>>({});
+
+  const toggleExpanded = (item: MasterItemDTO) => {
+    setExpandedItemId((current) => (current === item.id ? null : item.id));
+    if (!(item.id in historyByItem)) {
+      getItemPriceHistory(item.id).then((history) =>
+        setHistoryByItem((prev) => ({ ...prev, [item.id]: history })),
+      );
+    }
+  };
+
+  const setItemUnitType = (item: MasterItemDTO, unitType: UnitType) => {
+    startTransition(async () => {
+      await updateMasterItemQuick({ itemId: item.id, unitType });
+      router.refresh();
+    });
+  };
+
+  const setItemShop = (item: MasterItemDTO, shopId: number | null) => {
+    startTransition(async () => {
+      await updateMasterItemQuick({ itemId: item.id, shopId });
+      router.refresh();
+    });
+  };
 
   const initialEntries = useMemo(() => {
     const map: Record<number, Entry> = {};
@@ -334,6 +367,8 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
                 {group.items.map((item) => {
                   const entry = entries[item.id];
                   const name = bilingualName(item.nameTa, item.nameEn, language);
+                  const expanded = expandedItemId === item.id;
+                  const history = historyByItem[item.id];
                   return (
                     <li key={item.id} className="px-4 py-3">
                       <div className="flex items-center gap-3">
@@ -343,8 +378,9 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
                             {name.secondary}
                             {item.shopName ? ` · ${item.shopName}` : ""}
                           </p>
-                          <Link
-                            href={`/items/${item.id}`}
+                          <button
+                            type="button"
+                            onClick={() => toggleExpanded(item)}
                             className="mt-0.5 inline-flex items-center gap-1 truncate text-[13px] font-medium text-ios-blue active:opacity-60"
                           >
                             {item.lastPrice !== null
@@ -355,7 +391,21 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
                                 Variable
                               </span>
                             ) : null}
-                          </Link>
+                            <svg
+                              viewBox="0 0 24 24"
+                              className={`h-3 w-3 flex-none transition-transform ${expanded ? "rotate-180" : ""}`}
+                              aria-hidden
+                            >
+                              <path
+                                d="M6 9l6 6 6-6"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </button>
                         </div>
 
                         {entry ? (
@@ -378,6 +428,89 @@ export function AddItemsPage({ list, items }: AddItemsPageProps) {
                           </button>
                         )}
                       </div>
+
+                      {expanded ? (
+                        <div className="mt-3 space-y-3 rounded-ios bg-ios-surface-2 p-3 ring-1 ring-inset ring-ios-separator">
+                          <div>
+                            <p className="pb-1.5 text-[12px] font-medium text-ios-label-2">Unit type</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {UNIT_TYPES.map((unit) => (
+                                <button
+                                  key={unit}
+                                  type="button"
+                                  onClick={() => setItemUnitType(item, unit)}
+                                  className={`h-8 rounded-full px-3 text-[13px] font-medium transition active:scale-95 ${
+                                    item.unitType === unit
+                                      ? "bg-ios-blue text-white"
+                                      : "bg-ios-surface text-ios-label-2 ring-1 ring-inset ring-ios-separator"
+                                  }`}
+                                >
+                                  {unitOptionLabel(unit)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <p className="pb-1.5 text-[12px] font-medium text-ios-label-2">Shop by (From)</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {shops.map((shop) => (
+                                <button
+                                  key={shop.id}
+                                  type="button"
+                                  onClick={() => setItemShop(item, shop.id)}
+                                  className={`h-8 rounded-full px-3 text-[13px] font-medium transition active:scale-95 ${
+                                    item.shopId === shop.id
+                                      ? "bg-ios-blue text-white"
+                                      : "bg-ios-surface text-ios-label-2 ring-1 ring-inset ring-ios-separator"
+                                  }`}
+                                >
+                                  {shop.name}
+                                </button>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => setItemShop(item, null)}
+                                className={`h-8 rounded-full px-3 text-[13px] font-medium transition active:scale-95 ${
+                                  item.shopId === null
+                                    ? "bg-ios-blue text-white"
+                                    : "bg-ios-surface text-ios-label-2 ring-1 ring-inset ring-ios-separator"
+                                }`}
+                              >
+                                Not set
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <p className="pb-1.5 text-[12px] font-medium text-ios-label-2">Price history</p>
+                            {history === undefined ? (
+                              <p className="text-[13px] text-ios-label-2">Loading…</p>
+                            ) : history.length === 0 ? (
+                              <p className="text-[13px] text-ios-label-2">No purchases recorded yet.</p>
+                            ) : (
+                              <ul className="divide-y divide-ios-separator overflow-hidden rounded-ios bg-ios-surface">
+                                {history.slice(0, 5).map((entryRow) => (
+                                  <li
+                                    key={entryRow.id}
+                                    className="flex items-center justify-between px-3 py-2"
+                                  >
+                                    <span className="text-[13px] font-medium tabular-nums">
+                                      {formatPrice(entryRow.price)}
+                                      <span className="ml-1.5 text-[12px] font-normal text-ios-label-2">
+                                        for {formatQty(entryRow.quantity, entryRow.unitType)}
+                                      </span>
+                                    </span>
+                                    <span className="text-[12px] text-ios-label-3">
+                                      {entryRow.listName ?? entryRow.shopName ?? ""}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
                     </li>
                   );
                 })}

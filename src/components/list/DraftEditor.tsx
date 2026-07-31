@@ -7,10 +7,10 @@ import { useMemo, useState, useTransition } from "react";
 import { Sheet } from "@/components/Sheet";
 import { ShopFilter } from "@/components/list/ShopFilter";
 import { Stepper } from "@/components/Stepper";
-import { finalizeList, removeListItem, updateListItem } from "@/lib/actions";
+import { finalizeList, getItemPriceHistory, removeListItem, updateListItem } from "@/lib/actions";
 import { bilingualName, useLanguage } from "@/lib/language";
-import type { UnitType } from "@/lib/units";
-import type { ListDetailDTO, ListItemDTO, ShopDTO } from "@/lib/types";
+import { formatPrice, formatQty, type UnitType } from "@/lib/units";
+import type { ListDetailDTO, ListItemDTO, PriceHistoryDTO, ShopDTO } from "@/lib/types";
 
 type DraftEditorProps = {
   list: ListDetailDTO;
@@ -23,6 +23,18 @@ export function DraftEditor({ list }: DraftEditorProps) {
   const [shopId, setShopId] = useState<number | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
+  const [historyByItem, setHistoryByItem] = useState<Record<number, PriceHistoryDTO[] | undefined>>({});
+
+  const toggleHistory = (item: ListItemDTO) => {
+    setExpandedItemId((current) => (current === item.id ? null : item.id));
+    if (!(item.itemId in historyByItem)) {
+      getItemPriceHistory(item.itemId).then((history) =>
+        setHistoryByItem((prev) => ({ ...prev, [item.itemId]: history })),
+      );
+    }
+  };
 
   const shopOptions = useMemo(() => {
     const counts = new Map<number | null, { name: string; count: number }>();
@@ -142,6 +154,8 @@ export function DraftEditor({ list }: DraftEditorProps) {
               <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
                 {items.map((item) => {
                   const name = bilingualName(item.nameTa, item.nameEn, language);
+                  const expanded = expandedItemId === item.id;
+                  const history = historyByItem[item.itemId];
                   return (
                   <li key={item.id} className="px-4 py-3">
                     <div className="flex items-start gap-3">
@@ -166,12 +180,27 @@ export function DraftEditor({ list }: DraftEditorProps) {
                       >
                         {item.shopName ?? "Pick shop"}
                       </button>
-                      <Link
-                        href={`/items/${item.itemId}`}
-                        className="h-8 rounded-full bg-ios-surface-2 px-3 text-[13px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator active:scale-95 flex items-center"
+                      <button
+                        type="button"
+                        onClick={() => toggleHistory(item)}
+                        className="flex h-8 items-center gap-1 rounded-full bg-ios-surface-2 px-3 text-[13px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator active:scale-95"
                       >
                         Price history
-                      </Link>
+                        <svg
+                          viewBox="0 0 24 24"
+                          className={`h-3 w-3 flex-none transition-transform ${expanded ? "rotate-180" : ""}`}
+                          aria-hidden
+                        >
+                          <path
+                            d="M6 9l6 6 6-6"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
                       <button
                         type="button"
                         onClick={() => remove(item)}
@@ -181,6 +210,32 @@ export function DraftEditor({ list }: DraftEditorProps) {
                         Remove
                       </button>
                     </div>
+
+                    {expanded ? (
+                      <div className="mt-2 rounded-ios bg-ios-surface-2 p-3 ring-1 ring-inset ring-ios-separator">
+                        {history === undefined ? (
+                          <p className="text-[13px] text-ios-label-2">Loading…</p>
+                        ) : history.length === 0 ? (
+                          <p className="text-[13px] text-ios-label-2">No purchases recorded yet.</p>
+                        ) : (
+                          <ul className="divide-y divide-ios-separator overflow-hidden rounded-ios bg-ios-surface">
+                            {history.slice(0, 5).map((entry) => (
+                              <li key={entry.id} className="flex items-center justify-between px-3 py-2">
+                                <span className="text-[13px] font-medium tabular-nums">
+                                  {formatPrice(entry.price)}
+                                  <span className="ml-1.5 text-[12px] font-normal text-ios-label-2">
+                                    for {formatQty(entry.quantity, entry.unitType)}
+                                  </span>
+                                </span>
+                                <span className="text-[12px] text-ios-label-3">
+                                  {entry.listName ?? entry.shopName ?? ""}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ) : null}
                   </li>
                   );
                 })}

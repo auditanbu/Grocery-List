@@ -353,6 +353,29 @@ export async function upsertMasterItem(input: {
   return { ok: true, data: { id: item.id } };
 }
 
+/**
+ * Lets the "last paid" panel on the Add items page tweak an item's default
+ * unit and shop right there, without the full master-item form (no name/
+ * category to re-validate).
+ */
+export async function updateMasterItemQuick(input: {
+  itemId: number;
+  unitType?: UnitType;
+  shopId?: number | null;
+}): Promise<ActionResult> {
+  const data: { unitType?: UnitType; shopId?: number | null; defaultQty?: number } = {};
+  if (input.unitType !== undefined) {
+    const current = await prisma.item.findUnique({ where: { id: input.itemId }, select: { defaultQty: true } });
+    data.unitType = input.unitType;
+    data.defaultQty = normalizeQty(Number(current?.defaultQty ?? 1), input.unitType);
+  }
+  if (input.shopId !== undefined) data.shopId = input.shopId;
+
+  await prisma.item.update({ where: { id: input.itemId }, data });
+  revalidatePath("/master");
+  return { ok: true };
+}
+
 export async function setMasterItemActive(
   itemId: number,
   isActive: boolean,

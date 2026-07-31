@@ -465,7 +465,7 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
               </div>
             </Field>
 
-            <Field label={`Unit (${formatQty(draft.defaultQty, draft.unitType)})`}>
+            <Field label={`Unit size (${formatQty(draft.defaultQty, draft.unitType)})`}>
               <Stepper
                 value={draft.defaultQty}
                 unit={draft.unitType}
@@ -480,7 +480,7 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
                 className="flex w-full items-center justify-between gap-3 rounded-ios bg-ios-surface-2 px-4 py-3 text-left ring-1 ring-inset ring-ios-separator"
               >
                 <span className="text-[15px] text-ios-label-1">
-                  Allow quantity/unit changes while shopping
+                  Allow unit size changes while shopping
                 </span>
                 <span
                   aria-hidden
