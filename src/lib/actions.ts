@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { PrismaClientKnownRequestError } from "@/generated/prisma/internal/prismaNamespace";
+import masterData from "../../prisma/data/master-data.json";
 import { isAdminSession } from "./admin";
 import { prisma } from "./prisma";
 import { listNameFor, monthKeyOf } from "./dates";
@@ -441,6 +442,41 @@ export async function updateCategory(input: {
   await prisma.category.update({ where: { id: input.id }, data: { nameEn, nameTa } });
   revalidatePath("/master");
   return { ok: true };
+}
+
+type KnownTranslationRow = { grocery: string; groceryEn: string };
+
+/**
+ * "Needs Tamil" items (nameTa === nameEn) usually just weren't translated
+ * when they were created — often manually, outside a spreadsheet import.
+ * The original spreadsheet (bundled at build time) already has the right
+ * Tamil name for anything that came from it, so try that lookup before
+ * asking someone to type each one in by hand.
+ */
+export async function fixKnownTranslations(): Promise<
+  ActionResult<{ fixed: number; remaining: number }>
+> {
+  if (!(await isAdminSession())) return fail("Admin only.");
+
+  const lookup = new Map<string, string>();
+  for (const row of (masterData.items as KnownTranslationRow[]) ?? []) {
+    const key = row.groceryEn.trim().toLowerCase();
+    if (key && !lookup.has(key)) lookup.set(key, row.grocery.trim());
+  }
+
+  const items = await prisma.item.findMany({ select: { id: true, nameEn: true, nameTa: true } });
+  const broken = items.filter((item) => item.nameTa.trim().toLowerCase() === item.nameEn.trim().toLowerCase());
+
+  let fixed = 0;
+  for (const item of broken) {
+    const translation = lookup.get(item.nameEn.trim().toLowerCase());
+    if (!translation) continue;
+    await prisma.item.update({ where: { id: item.id }, data: { nameTa: translation } });
+    fixed += 1;
+  }
+
+  revalidatePath("/master");
+  return { ok: true, data: { fixed, remaining: broken.length - fixed } };
 }
 
 /** Powers the search field in the "add item" sheet. */

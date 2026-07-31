@@ -10,10 +10,12 @@ import { Stepper } from "@/components/Stepper";
 import {
   deleteCategory,
   deleteMasterItem,
+  fixKnownTranslations,
   setMasterItemActive,
   updateCategory,
   upsertMasterItem,
 } from "@/lib/actions";
+import { useAdmin } from "@/lib/admin-context";
 import { bilingualName, useLanguage } from "@/lib/language";
 import {
   UNIT_TYPES,
@@ -51,9 +53,11 @@ function needsTamil(item: MasterItemDTO): boolean {
 export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) {
   const router = useRouter();
   const { language } = useLanguage();
+  const { isAdmin } = useAdmin();
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [needsTamilOnly, setNeedsTamilOnly] = useState(false);
+  const [autoFixMessage, setAutoFixMessage] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -192,6 +196,24 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
     setCategoriesOpen(true);
   };
 
+  const runAutoFix = () => {
+    setAutoFixMessage(null);
+    startTransition(async () => {
+      const result = await fixKnownTranslations();
+      if (!result.ok) {
+        setAutoFixMessage(result.error);
+        return;
+      }
+      const { fixed, remaining } = result.data;
+      setAutoFixMessage(
+        remaining > 0
+          ? `Fixed ${fixed}. ${remaining} left with no known match — edit those by hand.`
+          : `Fixed ${fixed}. All caught up.`,
+      );
+      router.refresh();
+    });
+  };
+
   const saveCategory = (categoryId: number) => {
     const categoryDraft = categoryDrafts[categoryId];
     if (!categoryDraft) return;
@@ -266,10 +288,23 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
         </div>
 
         {needsTamilCount > 0 ? (
-          <FilterChip active={needsTamilOnly} onClick={() => setNeedsTamilOnly((v) => !v)} tone="warning">
-            Needs Tamil name · {needsTamilCount}
-          </FilterChip>
+          <div className="flex flex-wrap items-center gap-2">
+            <FilterChip active={needsTamilOnly} onClick={() => setNeedsTamilOnly((v) => !v)} tone="warning">
+              Needs Tamil name · {needsTamilCount}
+            </FilterChip>
+            {isAdmin ? (
+              <button
+                type="button"
+                onClick={runAutoFix}
+                disabled={pending}
+                className="h-9 flex-none rounded-full bg-ios-surface px-4 text-[14px] font-medium text-ios-blue shadow-ios transition active:scale-95 disabled:opacity-50"
+              >
+                Auto-fix known names
+              </button>
+            ) : null}
+          </div>
         ) : null}
+        {autoFixMessage ? <p className="text-[13px] text-ios-label-2">{autoFixMessage}</p> : null}
       </div>
 
       <button
