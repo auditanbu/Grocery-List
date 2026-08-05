@@ -18,11 +18,11 @@ function fail(error: string): { ok: false; error: string } {
 }
 
 function revalidateList(listId: number) {
-  revalidatePath("/");
-  revalidatePath("/history");
-  revalidatePath(`/lists/${listId}`);
-  revalidatePath(`/lists/${listId}/view`);
-  revalidatePath(`/lists/${listId}/shop`);
+  revalidatePath("/grocery");
+  revalidatePath("/grocery/history");
+  revalidatePath(`/grocery/lists/${listId}`);
+  revalidatePath(`/grocery/lists/${listId}/view`);
+  revalidatePath(`/grocery/lists/${listId}/shop`);
 }
 
 /**
@@ -47,7 +47,7 @@ export async function createList(input: {
   }
 
   const list = await prisma.groceryList.create({ data: { name, monthKey } });
-  revalidatePath("/");
+  revalidatePath("/grocery");
   return { ok: true, data: { id: list.id, existed: false } };
 }
 
@@ -73,8 +73,8 @@ export async function renameList(listId: number, name: string): Promise<ActionRe
 export async function deleteList(listId: number): Promise<ActionResult> {
   if (!(await isAdminSession())) return fail("Admin only.");
   await prisma.groceryList.delete({ where: { id: listId } });
-  revalidatePath("/");
-  revalidatePath("/history");
+  revalidatePath("/grocery");
+  revalidatePath("/grocery/history");
   return { ok: true };
 }
 
@@ -349,7 +349,7 @@ export async function upsertMasterItem(input: {
     ? await prisma.item.update({ where: { id: input.id }, data })
     : await prisma.item.create({ data });
 
-  revalidatePath("/master");
+  revalidatePath("/grocery/master");
   return { ok: true, data: { id: item.id } };
 }
 
@@ -372,7 +372,7 @@ export async function updateMasterItemQuick(input: {
   if (input.shopId !== undefined) data.shopId = input.shopId;
 
   await prisma.item.update({ where: { id: input.itemId }, data });
-  revalidatePath("/master");
+  revalidatePath("/grocery/master");
   return { ok: true };
 }
 
@@ -381,7 +381,7 @@ export async function setMasterItemActive(
   isActive: boolean,
 ): Promise<ActionResult> {
   await prisma.item.update({ where: { id: itemId }, data: { isActive } });
-  revalidatePath("/master");
+  revalidatePath("/grocery/master");
   return { ok: true };
 }
 
@@ -394,12 +394,12 @@ export async function setMasterItemActive(
 export async function deleteMasterItem(itemId: number): Promise<ActionResult<{ deleted: boolean }>> {
   try {
     await prisma.item.delete({ where: { id: itemId } });
-    revalidatePath("/master");
+    revalidatePath("/grocery/master");
     return { ok: true, data: { deleted: true } };
   } catch (err) {
     if (err instanceof PrismaClientKnownRequestError && err.code === "P2003") {
       await prisma.item.update({ where: { id: itemId }, data: { isActive: false } });
-      revalidatePath("/master");
+      revalidatePath("/grocery/master");
       return { ok: true, data: { deleted: false } };
     }
     throw err;
@@ -412,7 +412,7 @@ export async function deleteCategory(categoryId: number): Promise<ActionResult> 
   if (count > 0) return fail("This category still has items — move or delete them first.");
 
   await prisma.category.delete({ where: { id: categoryId } });
-  revalidatePath("/master");
+  revalidatePath("/grocery/master");
   return { ok: true };
 }
 
@@ -425,7 +425,7 @@ export async function createShop(name: string): Promise<ActionResult<{ id: numbe
 
   const count = await prisma.shop.count();
   const shop = await prisma.shop.create({ data: { name: trimmed, sortOrder: count } });
-  revalidatePath("/master");
+  revalidatePath("/grocery/master");
   return { ok: true, data: { id: shop.id } };
 }
 
@@ -443,7 +443,7 @@ export async function createCategory(input: {
   const category = await prisma.category.create({
     data: { nameEn, nameTa: input.nameTa?.trim() || null, sortOrder: count },
   });
-  revalidatePath("/master");
+  revalidatePath("/grocery/master");
   return { ok: true, data: { id: category.id } };
 }
 
@@ -463,7 +463,7 @@ export async function updateCategory(input: {
   if (clash) return fail(`"${nameEn}" already exists.`);
 
   await prisma.category.update({ where: { id: input.id }, data: { nameEn, nameTa } });
-  revalidatePath("/master");
+  revalidatePath("/grocery/master");
   return { ok: true };
 }
 
@@ -498,7 +498,7 @@ export async function fixKnownTranslations(): Promise<
     fixed += 1;
   }
 
-  revalidatePath("/master");
+  revalidatePath("/grocery/master");
   return { ok: true, data: { fixed, remaining: broken.length - fixed } };
 }
 

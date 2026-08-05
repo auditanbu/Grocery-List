@@ -106,7 +106,7 @@ export function DraftEditor({ list }: DraftEditorProps) {
   return (
     <div className="space-y-5">
       <Link
-        href={`/lists/${list.id}/add`}
+        href={`/grocery/lists/${list.id}/add`}
         className="flex h-12 w-full items-center justify-center gap-2 rounded-ios bg-ios-blue text-[17px] font-semibold text-white transition active:scale-[0.98]"
       >
         <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>

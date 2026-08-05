@@ -366,7 +366,7 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
                     ) : null}
                   </button>
                   <Link
-                    href={`/items/${item.id}`}
+                    href={`/grocery/items/${item.id}`}
                     aria-label={`Price history for ${item.nameEn}`}
                     className="flex h-11 w-11 flex-none items-center justify-center text-ios-label-3 active:opacity-60"
                   >

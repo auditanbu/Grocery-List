@@ -12,7 +12,7 @@ export default async function AddItemsRoute({ params }: { params: Promise<{ id: 
 
   const list = await getList(listId);
   if (!list) notFound();
-  if (list.status !== "DRAFT") redirect(`/lists/${listId}`);
+  if (list.status !== "DRAFT") redirect(`/grocery/lists/${listId}`);
 
   const [items, shops] = await Promise.all([getMasterItems(), getShops()]);
 

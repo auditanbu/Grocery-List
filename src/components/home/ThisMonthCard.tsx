@@ -42,7 +42,7 @@ export function ThisMonthCard({ list }: { list: ListSummaryDTO }) {
 
   return (
     <div className="ios-card relative overflow-hidden">
-      <Link href={`/lists/${list.id}`} className="block active:opacity-70">
+      <Link href={`/grocery/lists/${list.id}`} className="block active:opacity-70">
         <div className={`p-5 ${isAdmin ? "pr-14" : ""}`}>
           <div className="flex items-start justify-between gap-3">
             <p className="min-w-0 truncate text-[20px] font-semibold tracking-tight">{list.name}</p>

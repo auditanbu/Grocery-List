@@ -9,13 +9,13 @@ import { ThemeProvider, noFlashThemeScript } from "@/lib/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Grocery Planner",
-  description: "Plan, print and shop your monthly grocery list.",
-  applicationName: "Grocery Planner",
+  title: "Home",
+  description: "Grocery lists, petrol spending, and more — all in one household hub.",
+  applicationName: "Home",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Grocery",
+    title: "Home",
     statusBarStyle: "default",
   },
   formatDetection: { telephone: false },

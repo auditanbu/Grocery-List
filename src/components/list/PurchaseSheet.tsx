@@ -200,7 +200,7 @@ export function PurchaseSheet({ item, onClose }: PurchaseSheetProps) {
               Price history
             </p>
             <Link
-              href={`/items/${item.itemId}`}
+              href={`/grocery/items/${item.itemId}`}
               className="text-[13px] font-medium text-ios-blue active:opacity-60"
             >
               See all

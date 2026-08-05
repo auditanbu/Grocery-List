@@ -22,7 +22,7 @@ export default async function ItemHistoryPage({ params }: { params: Promise<{ id
 
   return (
     <div className="space-y-5">
-      <Link href="/master" className="inline-flex items-center gap-1 pt-1 text-[15px] text-ios-blue">
+      <Link href="/grocery/master" className="inline-flex items-center gap-1 pt-1 text-[15px] text-ios-blue">
         <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
           <path
             d="M15 5l-7 7 7 7"

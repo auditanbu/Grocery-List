@@ -35,7 +35,7 @@ export function CreateListButton({
         return;
       }
       setOpen(false);
-      router.push(`/lists/${result.data.id}`);
+      router.push(`/grocery/lists/${result.data.id}`);
       router.refresh();
     });
   };

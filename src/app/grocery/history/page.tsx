@@ -32,7 +32,7 @@ export default async function HistoryPage() {
           <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
             {changes.map((change) => (
               <li key={change.itemId}>
-                <Link href={`/items/${change.itemId}`} className="ios-row active:bg-ios-surface-2">
+                <Link href={`/grocery/items/${change.itemId}`} className="ios-row active:bg-ios-surface-2">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[16px] font-medium">{change.nameTa}</span>
                     <span className="block truncate text-[13px] text-ios-label-2">
@@ -55,7 +55,7 @@ export default async function HistoryPage() {
           <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
             {lists.map((list) => (
               <li key={list.id}>
-                <Link href={`/lists/${list.id}`} className="ios-row active:bg-ios-surface-2">
+                <Link href={`/grocery/lists/${list.id}`} className="ios-row active:bg-ios-surface-2">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[16px] font-medium">{list.name}</span>
                     <span className="block text-[13px] text-ios-label-2">

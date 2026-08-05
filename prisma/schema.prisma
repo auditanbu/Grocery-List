@@ -1,11 +1,17 @@
-// Monthly Grocery Planner — Prisma schema
+// Home — a small household hub, one module per household task.
 //
+// ## Grocery module
 // Mirrors the master data exported from "Grocery database.xlsx":
 //   Grocery    -> Item.nameTa   (Tamil name)
 //   Grocery.1  -> Item.nameEn   (English name)
 //   Type       -> Category      (e.g. பருப்பு வகை / Dals)
 //   Qty Type   -> Item.unitType (kg, g, L, ml, Rs, or blank = countable)
 //   From       -> Shop          (e.g. D Mart, Balamurugan, Jio Mart)
+//
+// ## Petrol Card module
+// FuelEntry logs one refuel (vehicle, amount, when, where); FuelBudget is a
+// single adjustable monthly spending limit compared against the current
+// month's FuelEntry total.
 
 generator client {
   provider = "prisma-client"
@@ -166,4 +172,37 @@ model PriceHistory {
 
   @@index([itemId, purchasedAt])
   @@index([listId])
+}
+
+// ---------------------------------------------------------------------------
+// Petrol Card module
+// ---------------------------------------------------------------------------
+
+enum VehicleType {
+  TWO_WHEELER
+  CAR
+}
+
+/// One refuel: how much, which vehicle, when, and (if the browser allowed
+/// it) where — captured automatically via the Geolocation API.
+model FuelEntry {
+  id          Int         @id @default(autoincrement())
+  vehicleType VehicleType
+  amount      Decimal     @db.Decimal(10, 2)
+  refueledAt  DateTime
+  latitude    Decimal?    @db.Decimal(9, 6)
+  longitude   Decimal?    @db.Decimal(9, 6)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([refueledAt])
+  @@index([vehicleType])
+}
+
+/// A single adjustable monthly spending limit — not one row per month, just
+/// whatever's currently set, compared against the current month's spend.
+model FuelBudget {
+  id        Int      @id @default(autoincrement())
+  amount    Decimal  @db.Decimal(10, 2)
+  updatedAt DateTime @updatedAt
 }

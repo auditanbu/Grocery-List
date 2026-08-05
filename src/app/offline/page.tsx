@@ -1,4 +1,4 @@
-export const metadata = { title: "Offline · Grocery Planner" };
+export const metadata = { title: "Offline · Home" };
 
 export default function OfflinePage() {
   return (

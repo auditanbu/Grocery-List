@@ -235,7 +235,7 @@ export function AddItemsPage({ list, items, shops }: AddItemsPageProps) {
     <div className="space-y-5 pb-6">
       <header className="space-y-3 pt-1">
         <Link
-          href={`/lists/${list.id}`}
+          href={`/grocery/lists/${list.id}`}
           className="inline-flex items-center gap-1 text-[15px] text-ios-blue"
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>

@@ -39,7 +39,7 @@ export function ListRow({ list }: { list: ListSummaryDTO }) {
   };
 
   return (
-    <Link href={`/lists/${list.id}`} className="ios-row active:bg-ios-surface-2">
+    <Link href={`/grocery/lists/${list.id}`} className="ios-row active:bg-ios-surface-2">
       <div className="min-w-0 flex-1">
         <p className="truncate text-[16px] font-medium">{list.name}</p>
         <p className="text-[13px] text-ios-label-2">
