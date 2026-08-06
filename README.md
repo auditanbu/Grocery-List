@@ -220,7 +220,7 @@ public/
   pages (so list data is never stale while online) with a cached fallback,
   and cache-first for hashed static assets. It's registered by
   `ServiceWorkerRegistrar` in production builds only.
-- Icons are generated from `public/icons/icon.svg` via
+- Icons are generated from `public/icons/icon-source.png` via
   `node scripts/generate-icons.mjs` (requires the `sharp` dev dependency).
 - `viewport-fit: cover` plus `env(safe-area-inset-*)` padding keep content
   clear of the iPhone notch/home indicator once installed to the home

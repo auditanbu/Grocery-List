@@ -5,12 +5,12 @@
  * cached copy (and finally /offline) as the fallback. Static build assets
  * are cache-first since they are content-hashed.
  */
-const VERSION = "grocery-v1";
+const VERSION = "grocery-v2";
 const PAGE_CACHE = `${VERSION}-pages`;
 const ASSET_CACHE = `${VERSION}-assets`;
 const OFFLINE_URL = "/offline";
 
-const PRECACHE = [OFFLINE_URL, "/icons/icon.svg", "/icons/icon-192.png"];
+const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
