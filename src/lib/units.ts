@@ -114,17 +114,39 @@ export function incrementWithUnit(
   return normalizeWithUnit(increment(value, unit), unit);
 }
 
-/** "0.5", "150", "10", "3" — no unit suffix. */
-export function formatQtyValue(value: number, unit: UnitType): string {
-  return value.toFixed(UNIT_PRECISION[unit]);
+/** The smaller unit kg/L reads as once an amount drops under 1 (kg -> g, L -> ml). */
+const UNIT_DEMOTE_TO: Partial<Record<UnitType, UnitType>> = {
+  KG: "G",
+  L: "ML",
+};
+
+/**
+ * How a quantity should actually be displayed: kg/L amounts under 1 read
+ * as g/ml instead (0.5 kg -> 500 g) — the inverse of the g/ml -> kg/L
+ * promotion at the 1000 boundary. Doesn't touch the stored quantity/unit,
+ * only what's shown.
+ */
+export function displayUnitFor(value: number, unit: UnitType): { quantity: number; unit: UnitType } {
+  const smallUnit = UNIT_DEMOTE_TO[unit];
+  if (smallUnit && value > 0 && value < 1) {
+    return { quantity: roundQty(value * UNIT_PROMOTE_FACTOR, smallUnit), unit: smallUnit };
+  }
+  return { quantity: value, unit };
 }
 
-/** "0.5 kg", "150 g", "₹10", "3". */
+/** "0.5", "150", "10", "3", "1" (never a trailing ".0") — no unit suffix. */
+export function formatQtyValue(value: number, unit: UnitType): string {
+  const fixed = value.toFixed(UNIT_PRECISION[unit]);
+  return fixed.includes(".") ? fixed.replace(/0+$/, "").replace(/\.$/, "") : fixed;
+}
+
+/** "500 g", "1 kg", "1.5 kg", "₹10", "3" — kg/L under 1 shown as g/ml. */
 export function formatQty(value: number, unit: UnitType): string {
-  const amount = formatQtyValue(value, unit);
-  if (unit === "COUNT") return amount;
-  if (unit === "RS") return `₹${amount}`;
-  return `${amount} ${UNIT_LABEL[unit]}`;
+  const display = displayUnitFor(value, unit);
+  const amount = formatQtyValue(display.quantity, display.unit);
+  if (display.unit === "COUNT") return amount;
+  if (display.unit === "RS") return `₹${amount}`;
+  return `${amount} ${UNIT_LABEL[display.unit]}`;
 }
 
 export function formatPrice(value: number): string {
