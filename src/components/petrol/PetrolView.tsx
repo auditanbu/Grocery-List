@@ -326,7 +326,10 @@ function AddEntrySheet({ open, onClose }: { open: boolean; onClose: () => void }
       const result = await createFuelEntry({
         vehicleType,
         amount: parsed,
-        refueledAt,
+        // `refueledAt` is a naive datetime-local string with no timezone; resolve it
+        // against the browser's local timezone here, since the server's timezone
+        // (UTC on Railway) would otherwise misinterpret the same string.
+        refueledAt: new Date(refueledAt).toISOString(),
         latitude: coords?.lat ?? null,
         longitude: coords?.lng ?? null,
       });
