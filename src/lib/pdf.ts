@@ -187,8 +187,14 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+// Single-quoted: this stack is interpolated straight into a double-quoted
+// HTML style="..." attribute (see tamilPageHtml) — double-quoted family
+// names here would close that attribute early and silently drop every
+// declaration after font-family (margin, fixed page height, overflow
+// clip, font-size), which is exactly what caused Tamil PDFs to render
+// with no page margins and get stretched to fill the sheet.
 const TAMIL_FONT_STACK =
-  '"Noto Sans Tamil", "Tamil Sangam MN", "Tamil MN", "Nirmala UI", -apple-system, sans-serif';
+  "'Noto Sans Tamil', 'Tamil Sangam MN', 'Tamil MN', 'Nirmala UI', -apple-system, sans-serif";
 
 const TAMIL_PAGE_MARGIN_MM = 14;
 
