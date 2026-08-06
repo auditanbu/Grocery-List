@@ -9,7 +9,7 @@
   ],
   "categories": [
     {
-      "nameTa": "பயிறு வகை",
+      "nameTa": "பயறு வகை",
       "nameEn": "Legumes"
     },
     {
@@ -55,9 +55,9 @@
   ],
   "items": [
     {
-      "grocery": "பச்சை பயிரு",
+      "grocery": "பச்சை பயறு",
       "groceryEn": "Green gram dal",
-      "type": "பயிறு வகை",
+      "type": "பயறு வகை",
       "qtyType": "Kg",
       "from": "Balamurugan"
     },
@@ -185,9 +185,9 @@
       "from": "Balamurugan"
     },
     {
-      "grocery": "தட்டை பயிரு",
+      "grocery": "தட்டை பயறு",
       "groceryEn": "Cowpeas",
-      "type": "பயிறு வகை",
+      "type": "பயறு வகை",
       "qtyType": "g",
       "from": "Balamurugan"
     },
@@ -494,7 +494,7 @@
     {
       "grocery": "மல்லி",
       "groceryEn": "Coriander",
-      "type": "பயிறு வகை",
+      "type": "பயறு வகை",
       "qtyType": "Kg",
       "from": "Balamurugan"
     },

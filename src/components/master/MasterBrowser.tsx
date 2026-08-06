@@ -287,16 +287,19 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
           </div>
         </div>
 
-        {needsTamilCount > 0 ? (
+        {needsTamilCount > 0 || isAdmin ? (
           <div className="flex flex-wrap items-center gap-2">
-            <FilterChip active={needsTamilOnly} onClick={() => setNeedsTamilOnly((v) => !v)} tone="warning">
-              Needs Tamil name · {needsTamilCount}
-            </FilterChip>
+            {needsTamilCount > 0 ? (
+              <FilterChip active={needsTamilOnly} onClick={() => setNeedsTamilOnly((v) => !v)} tone="warning">
+                Needs Tamil name · {needsTamilCount}
+              </FilterChip>
+            ) : null}
             {isAdmin ? (
               <button
                 type="button"
                 onClick={runAutoFix}
                 disabled={pending}
+                title="Also corrects Tamil names that already have text but don't match the spreadsheet"
                 className="h-9 flex-none rounded-full bg-ios-surface px-4 text-[14px] font-medium text-ios-blue shadow-ios transition active:scale-95 disabled:opacity-50"
               >
                 Auto-fix known names

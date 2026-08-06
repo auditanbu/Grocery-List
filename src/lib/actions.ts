@@ -470,11 +470,19 @@ export async function updateCategory(input: {
 type KnownTranslationRow = { grocery: string; groceryEn: string };
 
 /**
- * "Needs Tamil" items (nameTa === nameEn) usually just weren't translated
- * when they were created — often manually, outside a spreadsheet import.
- * The original spreadsheet (bundled at build time) already has the right
- * Tamil name for anything that came from it, so try that lookup before
- * asking someone to type each one in by hand.
+ * Fixes two kinds of Tamil drift against the original spreadsheet (bundled
+ * at build time), which is treated as ground truth for anything that came
+ * from it:
+ *
+ *  - "Needs Tamil" items (nameTa === nameEn) that just weren't translated
+ *    when created — often manually, outside a spreadsheet import.
+ *  - Items that already have *some* Tamil name, but it doesn't match the
+ *    spreadsheet's spelling (a typo introduced by hand-editing, or a stale
+ *    import from before the spreadsheet was corrected).
+ *
+ * Only the first kind counts against `remaining` — the second kind is
+ * always resolvable from the spreadsheet by definition, so it's silently
+ * corrected rather than reported as needing manual entry.
  */
 export async function fixKnownTranslations(): Promise<
   ActionResult<{ fixed: number; remaining: number }>
@@ -488,18 +496,23 @@ export async function fixKnownTranslations(): Promise<
   }
 
   const items = await prisma.item.findMany({ select: { id: true, nameEn: true, nameTa: true } });
-  const broken = items.filter((item) => item.nameTa.trim().toLowerCase() === item.nameEn.trim().toLowerCase());
 
   let fixed = 0;
-  for (const item of broken) {
-    const translation = lookup.get(item.nameEn.trim().toLowerCase());
-    if (!translation) continue;
-    await prisma.item.update({ where: { id: item.id }, data: { nameTa: translation } });
-    fixed += 1;
+  let remaining = 0;
+  for (const item of items) {
+    const nameTa = item.nameTa.trim();
+    const nameEn = item.nameEn.trim();
+    const translation = lookup.get(nameEn.toLowerCase());
+    if (translation && translation !== nameTa) {
+      await prisma.item.update({ where: { id: item.id }, data: { nameTa: translation } });
+      fixed += 1;
+    } else if (!translation && nameTa.toLowerCase() === nameEn.toLowerCase()) {
+      remaining += 1;
+    }
   }
 
   revalidatePath("/grocery/master");
-  return { ok: true, data: { fixed, remaining: broken.length - fixed } };
+  return { ok: true, data: { fixed, remaining } };
 }
 
 /** Powers the search field in the "add item" sheet. */
