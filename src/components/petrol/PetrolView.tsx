@@ -325,7 +325,9 @@ function EntrySheet({
         setCoords({ lat, lng });
         setLocationLabel(null);
         setLocationStatus("done");
-        reverseGeocode(lat, lng).then((label) => setLocationLabel(label));
+        // Only fill the label in if the user hasn't already started typing their own —
+        // this resolves after a delay and shouldn't clobber a manual correction.
+        reverseGeocode(lat, lng).then((label) => setLocationLabel((prev) => prev ?? label));
       },
       () => setLocationStatus("denied"),
       { enableHighAccuracy: true, timeout: 10000 },
@@ -346,7 +348,7 @@ function EntrySheet({
       setLocationLabel(entry.locationLabel);
       setLocationStatus(entry.latitude !== null ? "done" : "idle");
       if (entry.latitude !== null && entry.longitude !== null && !entry.locationLabel) {
-        reverseGeocode(entry.latitude, entry.longitude).then((label) => setLocationLabel(label));
+        reverseGeocode(entry.latitude, entry.longitude).then((label) => setLocationLabel((prev) => prev ?? label));
       }
     } else {
       setVehicleId(vehicles[0]?.id ?? null);
@@ -381,7 +383,7 @@ function EntrySheet({
         refueledAt: new Date(refueledAt).toISOString(),
         latitude: coords?.lat ?? null,
         longitude: coords?.lng ?? null,
-        locationLabel,
+        locationLabel: locationLabel?.trim() || null,
       };
       const result = isEdit ? await updateFuelEntry(entry.id, payload) : await createFuelEntry(payload);
       if (!result.ok) {
@@ -490,28 +492,49 @@ function EntrySheet({
 
       <div>
         <p className="pb-1.5 text-[13px] font-medium text-ios-label-2">Location</p>
-        <div className="flex items-center gap-2 rounded-ios bg-ios-surface-2 px-4 py-3 ring-1 ring-inset ring-ios-separator">
-          {locationStatus === "loading" ? (
-            <span className="text-[14px] text-ios-label-2">Getting your location…</span>
-          ) : locationStatus === "done" && coords ? (
-            <span className="text-[14px] text-ios-label-2">
-              📍 {locationLabel ?? `${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`}
-            </span>
-          ) : locationStatus === "denied" ? (
-            <span className="text-[14px] text-ios-label-2">Location unavailable — that&apos;s fine, skipping it.</span>
-          ) : locationStatus === "unsupported" ? (
-            <span className="text-[14px] text-ios-label-2">Location isn&apos;t supported on this device.</span>
-          ) : (
-            <span className="text-[14px] text-ios-label-2">Not captured yet.</span>
-          )}
-          <button
-            type="button"
-            onClick={captureLocation}
-            className="ml-auto h-8 flex-none rounded-full bg-ios-surface px-3 text-[13px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator active:scale-95"
-          >
-            Retry
-          </button>
-        </div>
+        {locationStatus === "done" && coords ? (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 rounded-ios bg-ios-surface-2 px-4 ring-1 ring-inset ring-ios-separator focus-within:ring-2 focus-within:ring-ios-blue">
+              <span aria-hidden className="flex-none text-[14px]">📍</span>
+              <input
+                type="text"
+                value={locationLabel ?? ""}
+                onChange={(event) => setLocationLabel(event.target.value)}
+                placeholder="Area name"
+                className="h-12 w-full min-w-0 bg-transparent text-[14px] outline-none"
+              />
+              <button
+                type="button"
+                onClick={captureLocation}
+                className="ml-auto h-8 flex-none rounded-full bg-ios-surface px-3 text-[13px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator active:scale-95"
+              >
+                Retry
+              </button>
+            </div>
+            <p className="px-1 text-[12px] text-ios-label-3">
+              {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)} — the name is auto-suggested; edit it if it&apos;s off.
+            </p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 rounded-ios bg-ios-surface-2 px-4 py-3 ring-1 ring-inset ring-ios-separator">
+            {locationStatus === "loading" ? (
+              <span className="text-[14px] text-ios-label-2">Getting your location…</span>
+            ) : locationStatus === "denied" ? (
+              <span className="text-[14px] text-ios-label-2">Location unavailable — that&apos;s fine, skipping it.</span>
+            ) : locationStatus === "unsupported" ? (
+              <span className="text-[14px] text-ios-label-2">Location isn&apos;t supported on this device.</span>
+            ) : (
+              <span className="text-[14px] text-ios-label-2">Not captured yet.</span>
+            )}
+            <button
+              type="button"
+              onClick={captureLocation}
+              className="ml-auto h-8 flex-none rounded-full bg-ios-surface px-3 text-[13px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator active:scale-95"
+            >
+              Retry
+            </button>
+          </div>
+        )}
       </div>
 
       {error ? <p className="text-[14px] text-ios-red">{error}</p> : null}
