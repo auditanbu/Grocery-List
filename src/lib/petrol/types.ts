@@ -9,6 +9,7 @@ export type FuelEntryDTO = {
   refueledAt: string;
   latitude: number | null;
   longitude: number | null;
+  locationLabel: string | null;
 };
 
 export type FuelSummaryDTO = {

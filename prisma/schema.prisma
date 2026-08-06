@@ -192,6 +192,8 @@ model FuelEntry {
   refueledAt  DateTime
   latitude    Decimal?    @db.Decimal(9, 6)
   longitude   Decimal?    @db.Decimal(9, 6)
+  /// A short human-readable area name resolved from lat/lng client-side (e.g. "Indiranagar, Bengaluru").
+  locationLabel String?   @db.VarChar(191)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 

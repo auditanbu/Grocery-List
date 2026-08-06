@@ -10,7 +10,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAdmin } from "@/lib/admin-context";
 import { formatDate, monthKeyToLabel, shiftMonthKey } from "@/lib/dates";
 import { formatPrice } from "@/lib/units";
-import { createFuelEntry, deleteFuelEntry, setFuelBudget } from "@/lib/petrol/actions";
+import { createFuelEntry, deleteFuelEntry, setFuelBudget, updateFuelEntry } from "@/lib/petrol/actions";
 import type { FuelEntryDTO, FuelSummaryDTO, VehicleType } from "@/lib/petrol/types";
 
 type PetrolViewProps = {
@@ -18,9 +18,28 @@ type PetrolViewProps = {
 };
 
 const VEHICLE_LABEL: Record<VehicleType, string> = {
-  TWO_WHEELER: "Two Wheeler",
-  CAR: "Car",
+  TWO_WHEELER: "Burgman (Suzuki)",
+  CAR: "Nissan Micra",
 };
+
+/** Resolves lat/lng to a short area name via OpenStreetMap's free Nominatim API — no key needed. */
+async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const address = data?.address ?? {};
+    const area = address.suburb || address.neighbourhood || address.village || address.road;
+    const city = address.city || address.town || address.state_district;
+    const label = [area, city].filter(Boolean).join(", ");
+    return label || data?.display_name || null;
+  } catch {
+    return null;
+  }
+}
 
 function VehicleIcon({ vehicle, className }: { vehicle: VehicleType; className?: string }) {
   if (vehicle === "CAR") {
@@ -74,6 +93,7 @@ export function PetrolView({ summary }: PetrolViewProps) {
   const router = useRouter();
   const { isAdmin } = useAdmin();
   const [addOpen, setAddOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<FuelEntryDTO | null>(null);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -230,12 +250,29 @@ export function PetrolView({ summary }: PetrolViewProps) {
                             rel="noopener noreferrer"
                             className="text-ios-blue active:opacity-60"
                           >
-                            Location
+                            {entry.locationLabel ?? "Location"}
                           </a>
                         </>
                       ) : null}
                     </span>
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => setEditingEntry(entry)}
+                    aria-label="Edit entry"
+                    className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-ios-blue transition active:bg-ios-blue-soft"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+                      <path
+                        d="M4 20h4l10.5-10.5a1.5 1.5 0 0 0 0-2.12l-1.88-1.88a1.5 1.5 0 0 0-2.12 0L4 16v4Z"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
                   {isAdmin ? (
                     <button
                       type="button"
@@ -263,7 +300,12 @@ export function PetrolView({ summary }: PetrolViewProps) {
         )}
       </section>
 
-      <AddEntrySheet open={addOpen} onClose={() => setAddOpen(false)} />
+      <EntrySheet open={addOpen} onClose={() => setAddOpen(false)} entry={null} />
+      <EntrySheet
+        open={editingEntry !== null}
+        onClose={() => setEditingEntry(null)}
+        entry={editingEntry}
+      />
       <BudgetSheet open={budgetOpen} onClose={() => setBudgetOpen(false)} current={summary.budget} />
     </div>
   );
@@ -276,13 +318,23 @@ function monthKeyOfNow(): string {
 
 type LocationStatus = "idle" | "loading" | "done" | "denied" | "unsupported";
 
-function AddEntrySheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+function EntrySheet({
+  open,
+  onClose,
+  entry,
+}: {
+  open: boolean;
+  onClose: () => void;
+  entry: FuelEntryDTO | null;
+}) {
   const router = useRouter();
+  const isEdit = entry !== null;
   const [vehicleType, setVehicleType] = useState<VehicleType>("TWO_WHEELER");
   const [amount, setAmount] = useState("");
   const [refueledAt, setRefueledAt] = useState(() => toLocalDateTimeInputValue(new Date()));
   const [locationStatus, setLocationStatus] = useState<LocationStatus>("idle");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationLabel, setLocationLabel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -294,25 +346,44 @@ function AddEntrySheet({ open, onClose }: { open: boolean; onClose: () => void }
     setLocationStatus("loading");
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setCoords({ lat, lng });
+        setLocationLabel(null);
         setLocationStatus("done");
+        reverseGeocode(lat, lng).then((label) => setLocationLabel(label));
       },
       () => setLocationStatus("denied"),
       { enableHighAccuracy: true, timeout: 10000 },
     );
   };
 
-  // Reset the form and kick off geolocation capture each time the sheet opens.
+  // Reset the form each time the sheet opens. When editing, prefill from the entry
+  // and leave its saved location alone — only "Retry" should overwrite it with the
+  // current location, since the entry may well have been logged somewhere else.
   useEffect(() => {
     if (!open) return;
-    setVehicleType("TWO_WHEELER");
-    setAmount("");
-    setRefueledAt(toLocalDateTimeInputValue(new Date()));
     setError(null);
-    setCoords(null);
-    captureLocation();
+    if (entry) {
+      setVehicleType(entry.vehicleType);
+      setAmount(String(entry.amount));
+      setRefueledAt(toLocalDateTimeInputValue(new Date(entry.refueledAt)));
+      setCoords(entry.latitude !== null && entry.longitude !== null ? { lat: entry.latitude, lng: entry.longitude } : null);
+      setLocationLabel(entry.locationLabel);
+      setLocationStatus(entry.latitude !== null ? "done" : "idle");
+      if (entry.latitude !== null && entry.longitude !== null && !entry.locationLabel) {
+        reverseGeocode(entry.latitude, entry.longitude).then((label) => setLocationLabel(label));
+      }
+    } else {
+      setVehicleType("TWO_WHEELER");
+      setAmount("");
+      setRefueledAt(toLocalDateTimeInputValue(new Date()));
+      setCoords(null);
+      setLocationLabel(null);
+      captureLocation();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, entry]);
 
   const parsed = Number.parseFloat(amount.replace(",", "."));
   const valid = Number.isFinite(parsed) && parsed > 0;
@@ -323,7 +394,7 @@ function AddEntrySheet({ open, onClose }: { open: boolean; onClose: () => void }
       return;
     }
     startTransition(async () => {
-      const result = await createFuelEntry({
+      const payload = {
         vehicleType,
         amount: parsed,
         // `refueledAt` is a naive datetime-local string with no timezone; resolve it
@@ -332,7 +403,9 @@ function AddEntrySheet({ open, onClose }: { open: boolean; onClose: () => void }
         refueledAt: new Date(refueledAt).toISOString(),
         latitude: coords?.lat ?? null,
         longitude: coords?.lng ?? null,
-      });
+        locationLabel,
+      };
+      const result = isEdit ? await updateFuelEntry(entry.id, payload) : await createFuelEntry(payload);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -346,7 +419,7 @@ function AddEntrySheet({ open, onClose }: { open: boolean; onClose: () => void }
     <Sheet
       open={open}
       onClose={onClose}
-      title="Add refuel"
+      title={isEdit ? "Edit refuel" : "Add refuel"}
       subtitle="Location is captured automatically if your browser allows it."
       footer={
         <button
@@ -355,7 +428,7 @@ function AddEntrySheet({ open, onClose }: { open: boolean; onClose: () => void }
           disabled={pending}
           className="flex h-12 w-full items-center justify-center rounded-ios bg-ios-blue text-[17px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
         >
-          {pending ? "Saving…" : "Save refuel"}
+          {pending ? "Saving…" : isEdit ? "Save changes" : "Save refuel"}
         </button>
       }
     >
@@ -414,7 +487,7 @@ function AddEntrySheet({ open, onClose }: { open: boolean; onClose: () => void }
             <span className="text-[14px] text-ios-label-2">Getting your location…</span>
           ) : locationStatus === "done" && coords ? (
             <span className="text-[14px] text-ios-label-2">
-              📍 {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
+              📍 {locationLabel ?? `${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`}
             </span>
           ) : locationStatus === "denied" ? (
             <span className="text-[14px] text-ios-label-2">Location unavailable — that&apos;s fine, skipping it.</span>

@@ -14,14 +14,17 @@ function fail(error: string): { ok: false; error: string } {
   return { ok: false, error };
 }
 
-export async function createFuelEntry(input: {
+type FuelEntryInput = {
   vehicleType: VehicleType;
   amount: number;
-  /** ISO datetime string, e.g. from an `<input type="datetime-local">`. */
+  /** UTC ISO datetime string, already resolved from the browser's local timezone. */
   refueledAt: string;
   latitude?: number | null;
   longitude?: number | null;
-}): Promise<ActionResult<{ id: number }>> {
+  locationLabel?: string | null;
+};
+
+export async function createFuelEntry(input: FuelEntryInput): Promise<ActionResult<{ id: number }>> {
   if (!Number.isFinite(input.amount) || input.amount <= 0) return fail("Enter a valid amount.");
 
   const refueledAt = new Date(input.refueledAt);
@@ -34,11 +37,34 @@ export async function createFuelEntry(input: {
       refueledAt,
       latitude: input.latitude ?? null,
       longitude: input.longitude ?? null,
+      locationLabel: input.locationLabel ?? null,
     },
   });
 
   revalidatePath("/petrol");
   return { ok: true, data: { id: entry.id } };
+}
+
+export async function updateFuelEntry(id: number, input: FuelEntryInput): Promise<ActionResult> {
+  if (!Number.isFinite(input.amount) || input.amount <= 0) return fail("Enter a valid amount.");
+
+  const refueledAt = new Date(input.refueledAt);
+  if (Number.isNaN(refueledAt.getTime())) return fail("Enter a valid date and time.");
+
+  await prisma.fuelEntry.update({
+    where: { id },
+    data: {
+      vehicleType: input.vehicleType,
+      amount: Math.round(input.amount * 100) / 100,
+      refueledAt,
+      latitude: input.latitude ?? null,
+      longitude: input.longitude ?? null,
+      locationLabel: input.locationLabel ?? null,
+    },
+  });
+
+  revalidatePath("/petrol");
+  return { ok: true };
 }
 
 /** Admin only — a logged refuel is a shared spending record. */

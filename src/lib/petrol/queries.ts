@@ -35,6 +35,7 @@ export async function getFuelEntries(monthKey: string): Promise<FuelEntryDTO[]> 
     refueledAt: row.refueledAt.toISOString(),
     latitude: row.latitude !== null ? num(row.latitude) : null,
     longitude: row.longitude !== null ? num(row.longitude) : null,
+    locationLabel: row.locationLabel,
   }));
 }
 
