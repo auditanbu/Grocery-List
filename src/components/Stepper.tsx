@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   UNIT_LABEL,
+  displayUnitFor,
   formatQtyValue,
   incrementWithUnit,
   minFor,
@@ -146,6 +147,10 @@ export function Stepper({
   const buttonSize = compact ? "h-10 w-10" : "h-12 w-12";
   const valueWidth = compact ? "min-w-[4.25rem]" : "min-w-[5.5rem]";
   const unitLabel = UNIT_LABEL[unit];
+  // Display only (0.5 kg reads as 500 g) — editing stays in the item's
+  // stored unit so a typed amount round-trips without surprises.
+  const display = displayUnitFor(value, unit);
+  const displayUnitLabel = UNIT_LABEL[display.unit];
 
   return (
     <div
@@ -196,9 +201,9 @@ export function Stepper({
           className={`${valueWidth} text-center text-[17px] font-semibold tabular-nums`}
         >
           {unit === "RS" ? "₹" : ""}
-          {formatQtyValue(value, unit)}
-          {unitLabel && unit !== "RS" ? (
-            <span className="ml-1 text-[13px] font-medium text-ios-label-2">{unitLabel}</span>
+          {formatQtyValue(display.quantity, display.unit)}
+          {displayUnitLabel && unit !== "RS" ? (
+            <span className="ml-1 text-[13px] font-medium text-ios-label-2">{displayUnitLabel}</span>
           ) : null}
         </button>
       )}

@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
-import { UNIT_LABEL, formatQtyValue, type UnitType } from "./units";
+import { UNIT_LABEL, displayUnitFor, formatQtyValue, type UnitType } from "./units";
 
 export type PdfItem = {
   nameEn: string;
@@ -156,11 +156,12 @@ function buildEnglishPdf(items: PdfItem[], options: PdfOptions): jsPDF {
 }
 
 function rowFor(item: PdfItem, serial: number): string[] {
+  const display = displayUnitFor(item.quantity, item.unitType);
   return [
     String(serial),
     item.nameEn,
-    formatQtyValue(item.quantity, item.unitType),
-    UNIT_LABEL[item.unitType] || "nos",
+    formatQtyValue(display.quantity, display.unit),
+    UNIT_LABEL[display.unit] || "nos",
     "",
   ];
 }
@@ -224,14 +225,15 @@ function tamilRowHtml(row: TamilRow, rowIndex: number): string {
     return `<tr data-row="${rowIndex}"><td colspan="5" style="padding:2.2mm;background:#f2f2f7;font-weight:700;color:#333;">${escapeHtml(row.label)}</td></tr>`;
   }
   const { item, serial } = row;
+  const display = displayUnitFor(item.quantity, item.unitType);
   return `<tr data-row="${rowIndex}" style="border-bottom:1px solid #ddd;">
     <td style="padding:2.2mm; text-align:center;color:#666;">${serial}</td>
     <td style="padding:2.2mm;">
       <div style="font-weight:600;">${escapeHtml(item.nameTa)}</div>
       <div style="font-size:9pt;color:#666;">${escapeHtml(item.nameEn)}</div>
     </td>
-    <td style="padding:2.2mm; text-align:right;">${escapeHtml(formatQtyValue(item.quantity, item.unitType))}</td>
-    <td style="padding:2.2mm; text-align:center;">${escapeHtml(UNIT_LABEL[item.unitType] || "nos")}</td>
+    <td style="padding:2.2mm; text-align:right;">${escapeHtml(formatQtyValue(display.quantity, display.unit))}</td>
+    <td style="padding:2.2mm; text-align:center;">${escapeHtml(UNIT_LABEL[display.unit] || "nos")}</td>
     <td style="padding:2.2mm;"></td>
   </tr>`;
 }
