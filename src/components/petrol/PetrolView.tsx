@@ -10,16 +10,18 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAdmin } from "@/lib/admin-context";
 import { formatDate, monthKeyToLabel, shiftMonthKey } from "@/lib/dates";
 import { formatPrice } from "@/lib/units";
-import { createFuelEntry, deleteFuelEntry, setFuelBudget, updateFuelEntry } from "@/lib/petrol/actions";
-import type { FuelEntryDTO, FuelSummaryDTO, VehicleType } from "@/lib/petrol/types";
+import {
+  createFuelEntry,
+  createVehicle,
+  deleteFuelEntry,
+  setFuelBudget,
+  updateFuelEntry,
+  updateVehicle,
+} from "@/lib/petrol/actions";
+import type { FuelEntryDTO, FuelSummaryDTO, VehicleDTO, VehicleType } from "@/lib/petrol/types";
 
 type PetrolViewProps = {
   summary: FuelSummaryDTO;
-};
-
-const VEHICLE_LABEL: Record<VehicleType, string> = {
-  TWO_WHEELER: "Burgman (Suzuki)",
-  CAR: "Nissan Micra",
 };
 
 /** Resolves lat/lng to a short area name via OpenStreetMap's free Nominatim API — no key needed. */
@@ -90,28 +92,17 @@ function toLocalDateTimeInputValue(date: Date): string {
 }
 
 export function PetrolView({ summary }: PetrolViewProps) {
-  const router = useRouter();
   const { isAdmin } = useAdmin();
   const [addOpen, setAddOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<FuelEntryDTO | null>(null);
   const [budgetOpen, setBudgetOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [vehiclesOpen, setVehiclesOpen] = useState(false);
 
   const isCurrentMonth = summary.monthKey === monthKeyOfNow();
   const percent =
     summary.budget && summary.budget > 0 ? Math.min(100, Math.round((summary.spent / summary.budget) * 100)) : 0;
   const overBudget = summary.remaining !== null && summary.remaining < 0;
   const barColor = overBudget ? "bg-ios-red" : percent >= 85 ? "bg-ios-orange" : "bg-ios-blue";
-
-  const remove = (entry: FuelEntryDTO) => {
-    if (!window.confirm(`Delete this ${formatPrice(entry.amount)} refuel entry?`)) return;
-    startTransition(async () => {
-      const result = await deleteFuelEntry(entry.id);
-      if (!result.ok) setError(result.error);
-      router.refresh();
-    });
-  };
 
   return (
     <div className="space-y-6">
@@ -123,6 +114,14 @@ export function PetrolView({ summary }: PetrolViewProps) {
           <h1 className="text-[34px] font-bold leading-tight tracking-tight">Petrol Card</h1>
         </div>
         <div className="flex flex-none items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setVehiclesOpen(true)}
+            aria-label="Vehicles"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-ios-surface text-ios-blue shadow-ios active:scale-95"
+          >
+            <VehicleIcon vehicle="CAR" className="h-4.5 w-4.5" />
+          </button>
           <AdminLoginButton />
           <ThemeToggle />
         </div>
@@ -210,10 +209,6 @@ export function PetrolView({ summary }: PetrolViewProps) {
         Add refuel
       </button>
 
-      {error ? (
-        <p className="rounded-ios bg-ios-red-soft px-4 py-3 text-[14px] text-ios-red">{error}</p>
-      ) : null}
-
       <section>
         <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">
           {isCurrentMonth ? "This month" : "Entries"}
@@ -234,27 +229,21 @@ export function PetrolView({ summary }: PetrolViewProps) {
                   <span className="min-w-0 flex-1">
                     <span className="block text-[16px] font-semibold tabular-nums">
                       {formatPrice(entry.amount)}
-                      <span className="ml-1.5 text-[13px] font-normal text-ios-label-2">
-                        {VEHICLE_LABEL[entry.vehicleType]}
-                      </span>
+                      <span className="ml-1.5 text-[13px] font-normal text-ios-label-2">{entry.vehicleName}</span>
                     </span>
                     <span className="block truncate text-[13px] text-ios-label-2">
-                      {formatDate(date)} ·{" "}
-                      {date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-                      {entry.latitude !== null && entry.longitude !== null ? (
-                        <>
-                          {" · "}
-                          <a
-                            href={`https://maps.google.com/?q=${entry.latitude},${entry.longitude}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-ios-blue active:opacity-60"
-                          >
-                            {entry.locationLabel ?? "Location"}
-                          </a>
-                        </>
-                      ) : null}
+                      {formatDate(date)} · {date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
                     </span>
+                    {entry.latitude !== null && entry.longitude !== null ? (
+                      <a
+                        href={`https://maps.google.com/?q=${entry.latitude},${entry.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block truncate text-[13px] text-ios-blue active:opacity-60"
+                      >
+                        {entry.locationLabel ?? "Location"}
+                      </a>
+                    ) : null}
                   </span>
                   <button
                     type="button"
@@ -273,26 +262,6 @@ export function PetrolView({ summary }: PetrolViewProps) {
                       />
                     </svg>
                   </button>
-                  {isAdmin ? (
-                    <button
-                      type="button"
-                      onClick={() => remove(entry)}
-                      disabled={pending}
-                      aria-label="Delete entry"
-                      className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-ios-red transition active:bg-ios-red-soft disabled:opacity-50"
-                    >
-                      <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
-                        <path
-                          d="M5 7h14M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-8 0v12a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V7"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </button>
-                  ) : null}
                 </li>
               );
             })}
@@ -300,13 +269,15 @@ export function PetrolView({ summary }: PetrolViewProps) {
         )}
       </section>
 
-      <EntrySheet open={addOpen} onClose={() => setAddOpen(false)} entry={null} />
+      <EntrySheet open={addOpen} onClose={() => setAddOpen(false)} entry={null} vehicles={summary.vehicles} />
       <EntrySheet
         open={editingEntry !== null}
         onClose={() => setEditingEntry(null)}
         entry={editingEntry}
+        vehicles={summary.vehicles}
       />
       <BudgetSheet open={budgetOpen} onClose={() => setBudgetOpen(false)} current={summary.budget} />
+      <VehiclesSheet open={vehiclesOpen} onClose={() => setVehiclesOpen(false)} vehicles={summary.vehicles} />
     </div>
   );
 }
@@ -322,14 +293,17 @@ function EntrySheet({
   open,
   onClose,
   entry,
+  vehicles,
 }: {
   open: boolean;
   onClose: () => void;
   entry: FuelEntryDTO | null;
+  vehicles: VehicleDTO[];
 }) {
   const router = useRouter();
+  const { isAdmin } = useAdmin();
   const isEdit = entry !== null;
-  const [vehicleType, setVehicleType] = useState<VehicleType>("TWO_WHEELER");
+  const [vehicleId, setVehicleId] = useState<number | null>(null);
   const [amount, setAmount] = useState("");
   const [refueledAt, setRefueledAt] = useState(() => toLocalDateTimeInputValue(new Date()));
   const [locationStatus, setLocationStatus] = useState<LocationStatus>("idle");
@@ -365,7 +339,7 @@ function EntrySheet({
     if (!open) return;
     setError(null);
     if (entry) {
-      setVehicleType(entry.vehicleType);
+      setVehicleId(entry.vehicleId);
       setAmount(String(entry.amount));
       setRefueledAt(toLocalDateTimeInputValue(new Date(entry.refueledAt)));
       setCoords(entry.latitude !== null && entry.longitude !== null ? { lat: entry.latitude, lng: entry.longitude } : null);
@@ -375,7 +349,7 @@ function EntrySheet({
         reverseGeocode(entry.latitude, entry.longitude).then((label) => setLocationLabel(label));
       }
     } else {
-      setVehicleType("TWO_WHEELER");
+      setVehicleId(vehicles[0]?.id ?? null);
       setAmount("");
       setRefueledAt(toLocalDateTimeInputValue(new Date()));
       setCoords(null);
@@ -386,16 +360,20 @@ function EntrySheet({
   }, [open, entry]);
 
   const parsed = Number.parseFloat(amount.replace(",", "."));
-  const valid = Number.isFinite(parsed) && parsed > 0;
+  const valid = Number.isFinite(parsed) && parsed > 0 && vehicleId !== null;
 
   const save = () => {
+    if (vehicleId === null) {
+      setError("Choose a vehicle.");
+      return;
+    }
     if (!valid) {
       setError("Enter how much you refueled for.");
       return;
     }
     startTransition(async () => {
       const payload = {
-        vehicleType,
+        vehicleId,
         amount: parsed,
         // `refueledAt` is a naive datetime-local string with no timezone; resolve it
         // against the browser's local timezone here, since the server's timezone
@@ -415,6 +393,20 @@ function EntrySheet({
     });
   };
 
+  const remove = () => {
+    if (!entry) return;
+    if (!window.confirm(`Delete this ${formatPrice(entry.amount)} refuel entry?`)) return;
+    startTransition(async () => {
+      const result = await deleteFuelEntry(entry.id);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onClose();
+      router.refresh();
+    });
+  };
+
   return (
     <Sheet
       open={open}
@@ -422,36 +414,52 @@ function EntrySheet({
       title={isEdit ? "Edit refuel" : "Add refuel"}
       subtitle="Location is captured automatically if your browser allows it."
       footer={
-        <button
-          type="button"
-          onClick={save}
-          disabled={pending}
-          className="flex h-12 w-full items-center justify-center rounded-ios bg-ios-blue text-[17px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
-        >
-          {pending ? "Saving…" : isEdit ? "Save changes" : "Save refuel"}
-        </button>
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={save}
+            disabled={pending}
+            className="flex h-12 w-full items-center justify-center rounded-ios bg-ios-blue text-[17px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
+          >
+            {pending ? "Saving…" : isEdit ? "Save changes" : "Save refuel"}
+          </button>
+          {isEdit && isAdmin ? (
+            <button
+              type="button"
+              onClick={remove}
+              disabled={pending}
+              className="flex h-11 w-full items-center justify-center rounded-ios text-[15px] font-medium text-ios-red transition active:bg-ios-red-soft disabled:opacity-50"
+            >
+              Delete refuel
+            </button>
+          ) : null}
+        </div>
       }
     >
       <div className="space-y-4 pb-3">
       <div>
         <p className="pb-1.5 text-[13px] font-medium text-ios-label-2">Vehicle</p>
-        <div className="flex gap-2">
-          {(["TWO_WHEELER", "CAR"] as VehicleType[]).map((vehicle) => (
-            <button
-              key={vehicle}
-              type="button"
-              onClick={() => setVehicleType(vehicle)}
-              className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-ios text-[15px] font-medium transition active:scale-[0.98] ${
-                vehicleType === vehicle
-                  ? "bg-ios-blue text-white"
-                  : "bg-ios-surface-2 text-ios-label-2 ring-1 ring-inset ring-ios-separator"
-              }`}
-            >
-              <VehicleIcon vehicle={vehicle} className="h-5 w-5" />
-              {VEHICLE_LABEL[vehicle]}
-            </button>
-          ))}
-        </div>
+        {vehicles.length === 0 ? (
+          <p className="text-[14px] text-ios-label-2">No vehicles yet — add one from the vehicles button first.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {vehicles.map((vehicle) => (
+              <button
+                key={vehicle.id}
+                type="button"
+                onClick={() => setVehicleId(vehicle.id)}
+                className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-ios px-3 text-[15px] font-medium transition active:scale-[0.98] ${
+                  vehicleId === vehicle.id
+                    ? "bg-ios-blue text-white"
+                    : "bg-ios-surface-2 text-ios-label-2 ring-1 ring-inset ring-ios-separator"
+                }`}
+              >
+                <VehicleIcon vehicle={vehicle.type} className="h-5 w-5 flex-none" />
+                <span className="truncate">{vehicle.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <label className="block">
@@ -583,6 +591,228 @@ function BudgetSheet({
         </label>
         {error ? <p className="text-[14px] text-ios-red">{error}</p> : null}
       </div>
+    </Sheet>
+  );
+}
+
+type VehicleFormState = {
+  name: string;
+  type: VehicleType;
+  registrationNumber: string;
+  insuranceRenewal: string;
+};
+
+function emptyVehicleForm(): VehicleFormState {
+  return { name: "", type: "TWO_WHEELER", registrationNumber: "", insuranceRenewal: "" };
+}
+
+function VehiclesSheet({
+  open,
+  onClose,
+  vehicles,
+}: {
+  open: boolean;
+  onClose: () => void;
+  vehicles: VehicleDTO[];
+}) {
+  const router = useRouter();
+  const { isAdmin } = useAdmin();
+  const [mode, setMode] = useState<"list" | "form">("list");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [form, setForm] = useState<VehicleFormState>(emptyVehicleForm());
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!open) return;
+    setMode("list");
+    setEditingId(null);
+    setError(null);
+  }, [open]);
+
+  const openAdd = () => {
+    setForm(emptyVehicleForm());
+    setEditingId(null);
+    setError(null);
+    setMode("form");
+  };
+
+  const openEdit = (vehicle: VehicleDTO) => {
+    setForm({
+      name: vehicle.name,
+      type: vehicle.type,
+      registrationNumber: vehicle.registrationNumber ?? "",
+      insuranceRenewal: vehicle.insuranceRenewal ?? "",
+    });
+    setEditingId(vehicle.id);
+    setError(null);
+    setMode("form");
+  };
+
+  const save = () => {
+    if (!form.name.trim()) {
+      setError("Enter a vehicle name.");
+      return;
+    }
+    startTransition(async () => {
+      const payload = {
+        name: form.name,
+        type: form.type,
+        registrationNumber: form.registrationNumber || null,
+        insuranceRenewal: form.insuranceRenewal || null,
+      };
+      const result = editingId !== null ? await updateVehicle(editingId, payload) : await createVehicle(payload);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setMode("list");
+      router.refresh();
+    });
+  };
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={mode === "form" ? (editingId !== null ? "Edit vehicle" : "Add vehicle") : "Vehicles"}
+      subtitle={mode === "list" ? "Household vehicles used for refuels." : undefined}
+      footer={
+        mode === "form" ? (
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={save}
+              disabled={pending}
+              className="flex h-12 w-full items-center justify-center rounded-ios bg-ios-blue text-[17px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
+            >
+              {pending ? "Saving…" : "Save vehicle"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("list")}
+              className="flex h-11 w-full items-center justify-center text-[15px] font-medium text-ios-label-2"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : isAdmin ? (
+          <button
+            type="button"
+            onClick={openAdd}
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-ios bg-ios-blue text-[17px] font-semibold text-white transition active:scale-[0.98]"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+              <path d="M12 6v12M6 12h12" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
+            </svg>
+            Add vehicle
+          </button>
+        ) : undefined
+      }
+    >
+      {mode === "list" ? (
+        vehicles.length === 0 ? (
+          <p className="py-6 text-center text-[15px] text-ios-label-2">No vehicles yet.</p>
+        ) : (
+          <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
+            {vehicles.map((vehicle) => (
+              <li key={vehicle.id} className="flex items-center gap-3 px-4 py-3">
+                <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-ios-blue-soft text-ios-blue">
+                  <VehicleIcon vehicle={vehicle.type} className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-semibold">{vehicle.name}</span>
+                  <span className="block truncate text-[13px] text-ios-label-2">
+                    {vehicle.registrationNumber ?? "No registration number"}
+                  </span>
+                  {vehicle.insuranceRenewal ? (
+                    <span className="block truncate text-[13px] text-ios-label-2">
+                      Insurance renews {formatDate(new Date(`${vehicle.insuranceRenewal}T00:00:00`))}
+                    </span>
+                  ) : null}
+                </span>
+                {isAdmin ? (
+                  <button
+                    type="button"
+                    onClick={() => openEdit(vehicle)}
+                    aria-label={`Edit ${vehicle.name}`}
+                    className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-ios-blue transition active:bg-ios-blue-soft"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+                      <path
+                        d="M4 20h4l10.5-10.5a1.5 1.5 0 0 0 0-2.12l-1.88-1.88a1.5 1.5 0 0 0-2.12 0L4 16v4Z"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )
+      ) : (
+        <div className="space-y-4 pb-3">
+          <div>
+            <p className="pb-1.5 text-[13px] font-medium text-ios-label-2">Type</p>
+            <div className="flex gap-2">
+              {(["TWO_WHEELER", "CAR"] as VehicleType[]).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, type }))}
+                  className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-ios text-[15px] font-medium transition active:scale-[0.98] ${
+                    form.type === type
+                      ? "bg-ios-blue text-white"
+                      : "bg-ios-surface-2 text-ios-label-2 ring-1 ring-inset ring-ios-separator"
+                  }`}
+                >
+                  <VehicleIcon vehicle={type} className="h-5 w-5" />
+                  {type === "TWO_WHEELER" ? "Two Wheeler" : "Car"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <label className="block">
+            <span className="text-[13px] font-medium text-ios-label-2">Name</span>
+            <input
+              autoFocus
+              type="text"
+              value={form.name}
+              onChange={(event) => setForm((f) => ({ ...f, name: event.target.value }))}
+              placeholder="e.g. Burgman (Suzuki)"
+              className="mt-1.5 h-12 w-full rounded-ios bg-ios-surface-2 px-4 text-[16px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-[13px] font-medium text-ios-label-2">Registration number</span>
+            <input
+              type="text"
+              value={form.registrationNumber}
+              onChange={(event) => setForm((f) => ({ ...f, registrationNumber: event.target.value }))}
+              placeholder="e.g. KA 01 AB 1234"
+              className="mt-1.5 h-12 w-full rounded-ios bg-ios-surface-2 px-4 text-[16px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-[13px] font-medium text-ios-label-2">Insurance renewal date</span>
+            <input
+              type="date"
+              value={form.insuranceRenewal}
+              onChange={(event) => setForm((f) => ({ ...f, insuranceRenewal: event.target.value }))}
+              className="mt-1.5 h-12 w-full rounded-ios bg-ios-surface-2 px-4 text-[16px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
+            />
+          </label>
+
+          {error ? <p className="text-[14px] text-ios-red">{error}</p> : null}
+        </div>
+      )}
     </Sheet>
   );
 }

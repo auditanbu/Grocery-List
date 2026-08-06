@@ -183,11 +183,25 @@ enum VehicleType {
   CAR
 }
 
+/// A household vehicle. Kept as real rows (rather than a fixed enum) so
+/// vehicles can be added and their details edited over time.
+model Vehicle {
+  id                 Int         @id @default(autoincrement())
+  name               String      @db.VarChar(191)
+  type               VehicleType
+  registrationNumber String?     @db.VarChar(32)
+  insuranceRenewal   DateTime?   @db.Date
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  fuelEntries FuelEntry[]
+}
+
 /// One refuel: how much, which vehicle, when, and (if the browser allowed
 /// it) where — captured automatically via the Geolocation API.
 model FuelEntry {
   id          Int         @id @default(autoincrement())
-  vehicleType VehicleType
+  vehicleId   Int
   amount      Decimal     @db.Decimal(10, 2)
   refueledAt  DateTime
   latitude    Decimal?    @db.Decimal(9, 6)
@@ -197,8 +211,10 @@ model FuelEntry {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+
   @@index([refueledAt])
-  @@index([vehicleType])
+  @@index([vehicleId])
 }
 
 /// A single adjustable monthly spending limit — not one row per month, just

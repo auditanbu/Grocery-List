@@ -1,7 +1,7 @@
 import "server-only";
 
 import { prisma } from "../prisma";
-import type { FuelEntryDTO, FuelSummaryDTO } from "./types";
+import type { FuelEntryDTO, FuelSummaryDTO, VehicleDTO } from "./types";
 
 type DecimalLike = { toNumber(): number } | number | null | undefined;
 
@@ -21,16 +21,30 @@ export async function getFuelBudget(): Promise<number | null> {
   return budget ? num(budget.amount) : null;
 }
 
+export async function getVehicles(): Promise<VehicleDTO[]> {
+  const rows = await prisma.vehicle.findMany({ orderBy: { id: "asc" } });
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    type: row.type,
+    registrationNumber: row.registrationNumber,
+    insuranceRenewal: row.insuranceRenewal ? row.insuranceRenewal.toISOString().slice(0, 10) : null,
+  }));
+}
+
 export async function getFuelEntries(monthKey: string): Promise<FuelEntryDTO[]> {
   const { start, end } = monthRange(monthKey);
   const rows = await prisma.fuelEntry.findMany({
     where: { refueledAt: { gte: start, lt: end } },
     orderBy: { refueledAt: "desc" },
+    include: { vehicle: true },
   });
 
   return rows.map((row) => ({
     id: row.id,
-    vehicleType: row.vehicleType,
+    vehicleId: row.vehicleId,
+    vehicleName: row.vehicle.name,
+    vehicleType: row.vehicle.type,
     amount: num(row.amount),
     refueledAt: row.refueledAt.toISOString(),
     latitude: row.latitude !== null ? num(row.latitude) : null,
@@ -40,7 +54,11 @@ export async function getFuelEntries(monthKey: string): Promise<FuelEntryDTO[]> 
 }
 
 export async function getFuelSummary(monthKey: string): Promise<FuelSummaryDTO> {
-  const [entries, budget] = await Promise.all([getFuelEntries(monthKey), getFuelBudget()]);
+  const [entries, budget, vehicles] = await Promise.all([
+    getFuelEntries(monthKey),
+    getFuelBudget(),
+    getVehicles(),
+  ]);
   const spent = entries.reduce((sum, entry) => sum + entry.amount, 0);
 
   return {
@@ -49,6 +67,7 @@ export async function getFuelSummary(monthKey: string): Promise<FuelSummaryDTO> 
     budget,
     remaining: budget !== null ? budget - spent : null,
     entries,
+    vehicles,
   };
 }
 

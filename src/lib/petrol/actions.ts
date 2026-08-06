@@ -15,7 +15,7 @@ function fail(error: string): { ok: false; error: string } {
 }
 
 type FuelEntryInput = {
-  vehicleType: VehicleType;
+  vehicleId: number;
   amount: number;
   /** UTC ISO datetime string, already resolved from the browser's local timezone. */
   refueledAt: string;
@@ -26,13 +26,14 @@ type FuelEntryInput = {
 
 export async function createFuelEntry(input: FuelEntryInput): Promise<ActionResult<{ id: number }>> {
   if (!Number.isFinite(input.amount) || input.amount <= 0) return fail("Enter a valid amount.");
+  if (!Number.isFinite(input.vehicleId)) return fail("Choose a vehicle.");
 
   const refueledAt = new Date(input.refueledAt);
   if (Number.isNaN(refueledAt.getTime())) return fail("Enter a valid date and time.");
 
   const entry = await prisma.fuelEntry.create({
     data: {
-      vehicleType: input.vehicleType,
+      vehicleId: input.vehicleId,
       amount: Math.round(input.amount * 100) / 100,
       refueledAt,
       latitude: input.latitude ?? null,
@@ -47,6 +48,7 @@ export async function createFuelEntry(input: FuelEntryInput): Promise<ActionResu
 
 export async function updateFuelEntry(id: number, input: FuelEntryInput): Promise<ActionResult> {
   if (!Number.isFinite(input.amount) || input.amount <= 0) return fail("Enter a valid amount.");
+  if (!Number.isFinite(input.vehicleId)) return fail("Choose a vehicle.");
 
   const refueledAt = new Date(input.refueledAt);
   if (Number.isNaN(refueledAt.getTime())) return fail("Enter a valid date and time.");
@@ -54,7 +56,7 @@ export async function updateFuelEntry(id: number, input: FuelEntryInput): Promis
   await prisma.fuelEntry.update({
     where: { id },
     data: {
-      vehicleType: input.vehicleType,
+      vehicleId: input.vehicleId,
       amount: Math.round(input.amount * 100) / 100,
       refueledAt,
       latitude: input.latitude ?? null,
@@ -86,6 +88,60 @@ export async function setFuelBudget(amount: number): Promise<ActionResult> {
   } else {
     await prisma.fuelBudget.create({ data: { amount } });
   }
+
+  revalidatePath("/petrol");
+  return { ok: true };
+}
+
+type VehicleInput = {
+  name: string;
+  type: VehicleType;
+  registrationNumber?: string | null;
+  /** yyyy-mm-dd, or null/empty to clear. */
+  insuranceRenewal?: string | null;
+};
+
+function parseInsuranceRenewal(value: string | null | undefined): Date | null | undefined {
+  if (value === undefined) return undefined;
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** Admin only — vehicle setup (name, registration, insurance) is household admin data. */
+export async function createVehicle(input: VehicleInput): Promise<ActionResult<{ id: number }>> {
+  if (!(await isAdminSession())) return fail("Admin only.");
+  const name = input.name.trim();
+  if (!name) return fail("Enter a vehicle name.");
+
+  const vehicle = await prisma.vehicle.create({
+    data: {
+      name,
+      type: input.type,
+      registrationNumber: input.registrationNumber?.trim() || null,
+      insuranceRenewal: parseInsuranceRenewal(input.insuranceRenewal) ?? null,
+    },
+  });
+
+  revalidatePath("/petrol");
+  return { ok: true, data: { id: vehicle.id } };
+}
+
+/** Admin only — see createVehicle. */
+export async function updateVehicle(id: number, input: VehicleInput): Promise<ActionResult> {
+  if (!(await isAdminSession())) return fail("Admin only.");
+  const name = input.name.trim();
+  if (!name) return fail("Enter a vehicle name.");
+
+  await prisma.vehicle.update({
+    where: { id },
+    data: {
+      name,
+      type: input.type,
+      registrationNumber: input.registrationNumber?.trim() || null,
+      insuranceRenewal: parseInsuranceRenewal(input.insuranceRenewal) ?? null,
+    },
+  });
 
   revalidatePath("/petrol");
   return { ok: true };
