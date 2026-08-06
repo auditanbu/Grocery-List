@@ -12,6 +12,14 @@
 // FuelEntry logs one refuel (vehicle, amount, when, where); FuelBudget is a
 // single adjustable monthly spending limit compared against the current
 // month's FuelEntry total.
+//
+// ## Family Tree module
+// Imported from "Family_tree.xlsx" (a PowerPoint/Excel SmartArt org chart
+// used as a genealogy diagram — see prisma/import-family-tree.ts for how
+// its shapes were extracted). FamilyMember is one person; FamilyRelationship
+// is a directed edge between two members, either PARENT_OF (parent -> child,
+// a child can have more than one) or SPOUSE_OF. Members and edges can both
+// be added from the UI to expand the tree beyond the imported data.
 
 generator client {
   provider = "prisma-client"
@@ -186,16 +194,16 @@ enum VehicleType {
 /// One refuel: how much, which vehicle, when, and (if the browser allowed
 /// it) where — captured automatically via the Geolocation API.
 model FuelEntry {
-  id          Int         @id @default(autoincrement())
-  vehicleType VehicleType
-  amount      Decimal     @db.Decimal(10, 2)
-  refueledAt  DateTime
-  latitude    Decimal?    @db.Decimal(9, 6)
-  longitude   Decimal?    @db.Decimal(9, 6)
+  id            Int         @id @default(autoincrement())
+  vehicleType   VehicleType
+  amount        Decimal     @db.Decimal(10, 2)
+  refueledAt    DateTime
+  latitude      Decimal?    @db.Decimal(9, 6)
+  longitude     Decimal?    @db.Decimal(9, 6)
   /// A short human-readable area name resolved from lat/lng client-side (e.g. "Indiranagar, Bengaluru").
-  locationLabel String?   @db.VarChar(191)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  locationLabel String?     @db.VarChar(191)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   @@index([refueledAt])
   @@index([vehicleType])
@@ -207,4 +215,63 @@ model FuelBudget {
   id        Int      @id @default(autoincrement())
   amount    Decimal  @db.Decimal(10, 2)
   updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Family Tree module
+// ---------------------------------------------------------------------------
+
+enum Gender {
+  MALE
+  FEMALE
+  UNKNOWN
+}
+
+enum RelationType {
+  PARENT_OF
+  SPOUSE_OF
+}
+
+/// A person in the family tree.
+model FamilyMember {
+  id            Int      @id @default(autoincrement())
+  fullName      String
+  gender        Gender   @default(UNKNOWN)
+  birthYear     Int?
+  notes         String?
+  /// True for a box the original chart left blank (an unnamed spouse or
+  /// child) — surfaced in the UI as "tap to name" until someone fills it in.
+  isPlaceholder Boolean  @default(false)
+  /// Stable id from the source SmartArt shape, so re-running the import
+  /// script updates existing rows instead of creating duplicates. Null for
+  /// members added by hand from the UI.
+  importKey     String?  @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  relationshipsFrom FamilyRelationship[] @relation("RelationshipFrom")
+  relationshipsTo   FamilyRelationship[] @relation("RelationshipTo")
+}
+
+/// A directed edge between two family members.
+///   PARENT_OF: fromMember is a parent of toMember (a child may have more
+///              than one incoming PARENT_OF edge, one per parent).
+///   SPOUSE_OF: fromMember and toMember are married/partnered — stored once
+///              per couple; queries check both directions.
+model FamilyRelationship {
+  id           Int          @id @default(autoincrement())
+  type         RelationType
+  fromMemberId Int
+  toMemberId   Int
+  /// Preserves the order children/spouses were listed in, so the tree
+  /// renders in the same order as the source chart.
+  sortOrder    Int          @default(0)
+  createdAt    DateTime     @default(now())
+
+  fromMember FamilyMember @relation("RelationshipFrom", fields: [fromMemberId], references: [id], onDelete: Cascade)
+  toMember   FamilyMember @relation("RelationshipTo", fields: [toMemberId], references: [id], onDelete: Cascade)
+
+  @@unique([fromMemberId, toMemberId, type])
+  @@index([fromMemberId])
+  @@index([toMemberId])
 }

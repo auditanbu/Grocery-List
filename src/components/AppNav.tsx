@@ -66,6 +66,19 @@ const MASTER_TAB: Tab = {
   ),
 };
 
+const FAMILY_TAB: Tab = {
+  href: "/family",
+  label: "Family",
+  icon: (active) => (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden {...strokeProps}>
+      <circle cx="8.5" cy="7" r="2.75" fill={active ? "currentColor" : "none"} />
+      <circle cx="16" cy="9.5" r="2.25" fill={active ? "currentColor" : "none"} />
+      <path d="M3.5 19v-1.5a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4V19" />
+      <path d="M14 19v-1a3.4 3.4 0 0 1 3.2-3.4h.3a3.2 3.2 0 0 1 3 3.2V19" />
+    </svg>
+  ),
+};
+
 const HISTORY_TAB: Tab = {
   href: "/grocery/history",
   label: "History",
@@ -89,8 +102,8 @@ export function AppNav() {
   const pathname = usePathname() ?? "/";
   const inGrocery = pathname.startsWith("/grocery");
   const tabs: Tab[] = inGrocery
-    ? [HOME_TAB, GROCERY_TAB, MASTER_TAB, HISTORY_TAB, PETROL_TAB]
-    : [HOME_TAB, GROCERY_TAB, PETROL_TAB];
+    ? [HOME_TAB, GROCERY_TAB, MASTER_TAB, HISTORY_TAB, PETROL_TAB, FAMILY_TAB]
+    : [HOME_TAB, GROCERY_TAB, PETROL_TAB, FAMILY_TAB];
 
   return (
     <>

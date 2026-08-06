@@ -52,6 +52,32 @@ const MODULES = [
       </svg>
     ),
   },
+  {
+    href: "/family",
+    name: "Family Tree",
+    description: "Browse the family tree, and add new members as the family grows.",
+    accent: "bg-ios-green-soft text-ios-green",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-7 w-7" aria-hidden>
+        <circle cx="8.5" cy="7" r="2.75" fill="none" stroke="currentColor" strokeWidth="1.8" />
+        <circle cx="16" cy="9.5" r="2.25" fill="none" stroke="currentColor" strokeWidth="1.8" />
+        <path
+          d="M3.5 19v-1.5a4 4 0 0 1 4-4h2a4 4 0 0 1 4 4V19"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+        <path
+          d="M14 19v-1a3.4 3.4 0 0 1 3.2-3.4h.3a3.2 3.2 0 0 1 3 3.2V19"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
 ] as const;
 
 export default function DashboardPage() {
