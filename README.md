@@ -11,6 +11,7 @@ iPad and desktop.
 |---|---|
 | Frontend | Next.js 16 (App Router), React 19, Tailwind CSS 4 |
 | Backend | Next.js Server Actions + Route Handlers |
+| Notifications | Web Push (`web-push` + VAPID) via the service worker |
 | Database | MySQL via Prisma ORM 7 (`@prisma/adapter-mariadb` driver adapter) |
 | PDF export | `jspdf` + `jspdf-autotable` |
 | PWA | Web App Manifest (`app/manifest.ts`) + a hand-written offline service worker |
@@ -98,6 +99,11 @@ current set (synced from a supplementary spreadsheet).
   to power the "cheaper/dearer than last time" comparison and the History
   tab.
 
+The Family Budget module adds `BudgetCategory`, `BudgetExpense` (the recurrence
+rule), `BudgetOccurrence` (sparse — only touched dates), `BudgetReminder` (the
+push dedupe log) and `PushSubscription`. See §5 for why occurrences are derived
+rather than materialized.
+
 Prisma 7 uses driver adapters instead of a bundled query engine binary —
 `src/lib/prisma.ts` wires up `@prisma/adapter-mariadb` (works against both
 MySQL and MariaDB) behind a lazily-initialized Proxy, so `next build` never
@@ -146,16 +152,99 @@ traditional print sheet with `jspdf-autotable`:
 - Invoked from `ExportPdfButton` on the finalized list screen, filtered to
   whatever shop chip is currently selected.
 
-## 5. Deploying to Railway
+## 5. Family Budget module
+
+`/budget` tracks recurring household bills — rent, EB, insurance, internet,
+mobile — on a calendar and a list, covering both past and upcoming dates.
+Only an admin (unlocked with the app's PIN, see `src/lib/admin.ts`) can add or
+change anything; every other family member has read-only access. The client
+only hides the controls — every mutating Server Action re-checks the admin
+cookie server-side.
+
+### Occurrences are derived, not stored
+
+`BudgetExpense` is a **rule**, not a list of dates: an anchor date plus an
+interval in months (`ONE_OFF`, `MONTHLY`, `EVERY_2_MONTHS`, `QUARTERLY`,
+`HALF_YEARLY`, `YEARLY`, or `CUSTOM_MONTHS` with its own "every N months").
+Due dates are computed on read by `src/lib/budget/recurrence.ts`, so:
+
+- the calendar works arbitrarily far forward and back with no generator job
+  and no horizon to run past;
+- editing a rule needs no reconciliation of already-generated rows.
+
+`BudgetOccurrence` is therefore **sparse** — a row exists only once someone has
+touched that date (paid it, skipped it, or overridden its amount). Reads take
+the union of rule-generated dates and stored rows, so a row whose date the rule
+no longer produces still appears, flagged as *moved*, and editing a schedule
+can never silently erase payment history.
+
+Occurrence k is always `anchorDate + k * interval` months, computed from the
+anchor rather than by stepping off occurrence k−1, and clamped to short months.
+A bill due on the 31st therefore gives 31 Jan → 28 Feb → **31** Mar → 30 Apr,
+instead of collapsing to the 28th forever. `scripts/check-recurrence.ts`
+(`npx tsx scripts/check-recurrence.ts`) asserts this and ~35 other cases.
+
+### Dates are civil strings
+
+Due dates are `"YYYY-MM-DD"` `CHAR(10)` columns, extending the existing
+`monthKey` convention rather than using `DATE`/`DateTime`. They sort and range
+lexicographically, and nothing round-trips through a `Date` whose timezone
+could shift it a day. The only place the real clock is read is
+`todayDateKey()` in `src/lib/dates.ts`, which applies India's fixed +5:30 so
+"today" is correct even though Railway runs UTC.
+
+### Reminders
+
+Two independent channels, so the module is useful even with nothing configured:
+
+1. **In-app alerts** — overdue and due-in-7-days banners on `/budget`. Always
+   on, every device, no setup.
+2. **Web push** — a notification on the due date, plus a heads-up
+   `reminderLeadDays` beforehand (default 2).
+
+Push setup:
+
+```bash
+npx web-push generate-vapid-keys     # -> VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY
+```
+
+Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` and `CRON_SECRET`
+on the web service. Each family member then opens `/budget` → the bell icon →
+**Turn on for this device**. Subscribing is deliberately *not* admin-gated —
+reminders are useless if only one person can receive them.
+
+> **On iPhone, web push only works once the app is added to the Home Screen**
+> (iOS 16.4+). In a normal Safari tab the API is absent and the sheet says so.
+> The in-app alerts still work there.
+
+`POST /api/budget/reminders` runs the daily sweep, authenticated with the
+`x-cron-secret` header (an unset `CRON_SECRET` returns 503 — it never falls
+open). `GET` on the same URL is always a dry run, which is a safe way to see
+what would fire. The sweep is **idempotent**: it writes a `BudgetReminder` row
+before sending, and that row's unique key on `(expenseId, dueDate, kind)` means
+a re-run sends nothing. Dead endpoints (HTTP 404/410) are pruned automatically.
+
+Trigger it once a day, either way:
+
+- **Railway cron service** — a second service from this repo, Start Command
+  `npm run cron:reminders`, Cron Schedule `30 3 * * *` (09:00 IST), with
+  `APP_URL` and `CRON_SECRET` set.
+- **External scheduler** (free) — cron-job.org or a GitHub Actions
+  `schedule` workflow POSTing the URL with the `x-cron-secret` header.
+
+## 6. Deploying to Railway
 
 1. **Push this repo to GitHub** (or connect your fork).
 2. In Railway: **New Project → Deploy from GitHub repo**, pick this repo.
 3. **Add a MySQL plugin**: New → Database → Add MySQL (not Postgres —
    the schema's `datasource` provider is `mysql`). Railway creates
    `DATABASE_URL` and friends on that service automatically.
-4. On the **web service**, add an environment variable:
+4. On the **web service**, add environment variables:
    - `DATABASE_URL` → reference the MySQL plugin's URL, e.g.
      `${{ MySQL.DATABASE_URL }}` in Railway's variable picker.
+   - For Family Budget push reminders (optional — everything else works
+     without them): `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
+     and `CRON_SECRET`. See §5 for how to generate the keys.
 5. **Build & start commands** (Railway auto-detects Next.js, but to be
    explicit under Settings → Deploy):
    - Build: `npm run build` (this runs `prisma generate` first)
@@ -195,6 +284,10 @@ src/
     master/page.tsx         Master List tab — browse/search/edit the catalogue
     history/page.tsx        History tab — spend per month, biggest price moves
     items/[id]/page.tsx      Per-item price history
+    budget/page.tsx          Family Budget — calendar + list, ?month=YYYY-MM
+    budget/expenses/page.tsx  Manage the recurring expense rules (admin)
+    api/budget/reminders/route.ts    Daily reminder sweep (x-cron-secret)
+    api/budget/subscription/route.ts Re-register a rotated push endpoint
     manifest.ts              Web App Manifest
   components/
     Stepper.tsx              The unit-aware +/- control
@@ -203,13 +296,20 @@ src/
     AppNav.tsx               Bottom tab bar (mobile) / sidebar (iPad & desktop)
     list/                    Draft editor, finalized list, shopping mode, PDF button
     master/                  Master catalogue browser + editor sheet
+    budget/                  Calendar grid, list view, expense + payment sheets
   lib/
     units.ts                 Stepper steps, formatting, Qty Type parsing
     pdf.ts                    Print-sheet PDF builder
     prisma.ts, queries.ts     DB client + read queries (Decimal → plain number)
     actions.ts                Server Actions (create/finalize lists, record purchases, …)
+    dates.ts                  monthKey + "YYYY-MM-DD" civil-date helpers
+    budget/                   recurrence.ts (rule maths), queries, actions,
+                              push.ts / push-client.ts, reminders.ts
+scripts/
+  check-recurrence.ts        Assertions for the recurrence maths (npx tsx)
+  send-reminders.ts          Daily cron trigger (npm run cron:reminders)
 public/
-  sw.js                      Offline shell service worker
+  sw.js                      Offline shell service worker + push handlers
   icons/                     Manifest icons (generated by scripts/generate-icons.mjs)
 ```
 

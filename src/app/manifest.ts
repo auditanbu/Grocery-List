@@ -20,6 +20,7 @@ export default function manifest(): MetadataRoute.Manifest {
     shortcuts: [
       { name: "Grocery", url: "/grocery" },
       { name: "Petrol Card", url: "/petrol" },
+      { name: "Family Budget", url: "/budget" },
     ],
   };
 }
