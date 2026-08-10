@@ -169,14 +169,26 @@ export async function removeListItem(listItemId: number): Promise<ActionResult> 
   return { ok: true };
 }
 
+/**
+ * Items still at quantity 0 ("check availability") are draft-only — a
+ * shopping list can't send you to buy zero of something, so they're dropped
+ * here rather than carried into the finalized/shopping view or the PDF.
+ *
+ * Checked before anything is deleted, and the drop + status flip run in one
+ * transaction, so a rejected finalize (every item still at 0) leaves the
+ * draft completely untouched rather than silently wiping the placeholders.
+ */
 export async function finalizeList(listId: number): Promise<ActionResult> {
-  const count = await prisma.groceryListItem.count({ where: { listId } });
-  if (count === 0) return fail("Add at least one item before finalizing.");
+  const keepable = await prisma.groceryListItem.count({ where: { listId, NOT: { quantity: 0 } } });
+  if (keepable === 0) return fail("Add at least one item with a quantity before finalizing.");
 
-  await prisma.groceryList.update({
-    where: { id: listId },
-    data: { status: "FINALIZED", finalizedAt: new Date() },
-  });
+  await prisma.$transaction([
+    prisma.groceryListItem.deleteMany({ where: { listId, quantity: 0 } }),
+    prisma.groceryList.update({
+      where: { id: listId },
+      data: { status: "FINALIZED", finalizedAt: new Date() },
+    }),
+  ]);
   revalidateList(listId);
   return { ok: true };
 }

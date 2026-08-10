@@ -91,6 +91,14 @@ export function DraftEditor({ list }: DraftEditorProps) {
 
   const finalize = () => {
     setError(null);
+    const zeroCount = list.items.filter((item) => item.quantity === 0).length;
+    if (zeroCount > 0) {
+      const noun = zeroCount === 1 ? "item is" : "items are";
+      const proceed = window.confirm(
+        `${zeroCount} ${noun} still at 0 quantity and will be removed when you finalize. Continue?`,
+      );
+      if (!proceed) return;
+    }
     startTransition(async () => {
       const result = await finalizeList(list.id);
       if (!result.ok) {
@@ -162,11 +170,18 @@ export function DraftEditor({ list }: DraftEditorProps) {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[16px] font-medium">{name.primary}</p>
                         <p className="truncate text-[13px] text-ios-label-2">{name.secondary}</p>
+                        {stateOf(item).quantity === 0 ? (
+                          <span className="mt-0.5 inline-flex items-center rounded-full bg-ios-orange/15 px-2 py-0.5 text-[11px] font-medium text-ios-orange">
+                            Check availability
+                          </span>
+                        ) : null}
                       </div>
                       <Stepper
                         value={stateOf(item).quantity}
                         unit={stateOf(item).unitType}
                         size="compact"
+                        minOverride={0}
+                        onBelowMin={() => remove(item)}
                         onChange={(quantity, unitType) => changeQuantity(item, quantity, unitType)}
                         aria-label={`Quantity for ${item.nameEn}`}
                       />
