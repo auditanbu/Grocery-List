@@ -65,8 +65,14 @@ export function roundQty(value: number, unit: UnitType): number {
   return Math.round(value * factor) / factor;
 }
 
-/** Snaps an arbitrary value onto the unit's step grid, clamped at the minimum. */
+/**
+ * Snaps an arbitrary value onto the unit's step grid, clamped at the
+ * minimum — except an explicit 0 (or a non-positive/invalid input) is left
+ * as exactly 0, since that's the deliberate "on the list, quantity not
+ * decided yet" state rather than a rounding artifact.
+ */
 export function normalizeQty(value: number, unit: UnitType): number {
+  if (!Number.isFinite(value) || value <= 0) return 0;
   const step = stepFor(unit);
   const snapped = Math.round(value / step) * step;
   return roundQty(Math.max(snapped, minFor(unit)), unit);

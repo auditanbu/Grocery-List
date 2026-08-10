@@ -139,22 +139,45 @@ export function AddItemsPage({ list, items, shops }: AddItemsPageProps) {
     return [...grouped.entries()];
   }, [items, query, language, categoryId, statusFilter, entries]);
 
-  /** Reveals the stepper at 0 — nothing is saved until the first real change. */
+  /**
+   * Persists a real row at quantity 0 right away — "on the list, check
+   * availability" is a deliberate state, not just revealing the stepper.
+   */
   const add = (item: MasterItemDTO) => {
     setError(null);
+    const unitType = item.unitType;
     setEntries((current) => ({
       ...current,
-      [item.id]: { listItemId: null, quantity: 0, unitType: item.unitType },
+      [item.id]: { listItemId: null, quantity: 0, unitType },
     }));
-  };
 
-  /** The "-" button walked the quantity down to 0 — un-persist back to the pending state. */
-  const dropToZero = (item: MasterItemDTO, entry: Entry, unitType: UnitType) => {
-    setEntries((current) => ({ ...current, [item.id]: { listItemId: null, quantity: 0, unitType } }));
-    if (entry.listItemId === null) return;
+    if (creating.current.has(item.id)) return; // a create is already in flight
+    creating.current.add(item.id);
     startTransition(async () => {
-      const result = await removeListItem(entry.listItemId as number);
-      if (!result.ok) setError(result.error);
+      const result = await addListItem({ listId: list.id, itemId: item.id, quantity: 0, unitType });
+      creating.current.delete(item.id);
+      if (!result.ok) {
+        setError(result.error);
+        setEntries((current) => {
+          const next = { ...current };
+          delete next[item.id];
+          return next;
+        });
+        return;
+      }
+      // Pick up whatever the user has dialed in since this call started.
+      const latest = entriesRef.current[item.id] ?? { quantity: 0, unitType };
+      setEntries((current) => ({
+        ...current,
+        [item.id]: { listItemId: result.data.listItemId, quantity: latest.quantity, unitType: latest.unitType },
+      }));
+      if (latest.quantity !== 0 || latest.unitType !== unitType) {
+        await updateListItem({
+          listItemId: result.data.listItemId,
+          quantity: latest.quantity,
+          unitType: latest.unitType,
+        });
+      }
       router.refresh();
     });
   };
@@ -162,11 +185,6 @@ export function AddItemsPage({ list, items, shops }: AddItemsPageProps) {
   const changeQuantity = (item: MasterItemDTO, quantity: number, unitType: UnitType) => {
     const entry = entries[item.id];
     if (!entry) return;
-
-    if (quantity === 0) {
-      dropToZero(item, entry, unitType);
-      return;
-    }
 
     setEntries((current) => ({ ...current, [item.id]: { ...entry, quantity, unitType } }));
 
@@ -378,6 +396,11 @@ export function AddItemsPage({ list, items, shops }: AddItemsPageProps) {
                             {name.secondary}
                             {item.shopName ? ` · ${item.shopName}` : ""}
                           </p>
+                          {entry?.quantity === 0 ? (
+                            <span className="mt-0.5 inline-flex items-center rounded-full bg-ios-orange/15 px-2 py-0.5 text-[11px] font-medium text-ios-orange">
+                              Check availability
+                            </span>
+                          ) : null}
                           <button
                             type="button"
                             onClick={() => toggleExpanded(item)}
