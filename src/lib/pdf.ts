@@ -199,6 +199,31 @@ const TAMIL_FONT_STACK =
 
 const TAMIL_PAGE_MARGIN_MM = 14;
 
+/**
+ * The Tamil sheet is paginated by row count, not by measured height: every
+ * page carries exactly this many item rows (the last page holds the
+ * remainder). Shop headings ride along on the page of the items they
+ * introduce and don't consume one of the 25 slots.
+ */
+const TAMIL_ROWS_PER_PAGE = 25;
+
+/**
+ * Base row metrics, in the units they're written out in. A single fit
+ * factor (see fitScaleFor) multiplies all of them together when 25 rows
+ * would otherwise overflow the sheet — long wrapping names, or grouped
+ * prints where shop headings eat extra height.
+ */
+const TAMIL_METRICS = {
+  rowPaddingMm: 1.8,
+  headPaddingMm: 2,
+  shopPaddingMm: 1.6,
+  tablePt: 10.5,
+  subPt: 8,
+};
+
+/** Never shrink past this — below it the sheet stops being readable at arm's length. */
+const TAMIL_MIN_SCALE = 0.6;
+
 type TamilRow = { kind: "shop"; label: string } | { kind: "item"; item: PdfItem; serial: number };
 
 /** Same grouping as the English sheet's `rowFor`/shop-heading loop. */
@@ -220,35 +245,47 @@ function buildTamilRows(items: PdfItem[], grouped: boolean): TamilRow[] {
   return rows;
 }
 
-function tamilRowHtml(row: TamilRow, rowIndex: number): string {
+/**
+ * The item and English names share one line here — the two-line variant
+ * this replaced ran ~13mm a row, which no amount of shrinking fits 25 of
+ * onto a sheet at a readable size.
+ */
+function tamilRowHtml(row: TamilRow, rowIndex: number, scale: number): string {
+  const mm = (value: number) => `${(value * scale).toFixed(2)}mm`;
+  const pt = (value: number) => `${(value * scale).toFixed(2)}pt`;
+
   if (row.kind === "shop") {
-    return `<tr data-row="${rowIndex}"><td colspan="5" style="padding:2.2mm;background:#f2f2f7;font-weight:700;color:#333;">${escapeHtml(row.label)}</td></tr>`;
+    return `<tr data-row="${rowIndex}"><td colspan="5" style="padding:${mm(TAMIL_METRICS.shopPaddingMm)};background:#f2f2f7;font-weight:700;color:#333;">${escapeHtml(row.label)}</td></tr>`;
   }
   const { item, serial } = row;
   const display = displayUnitFor(item.quantity, item.unitType);
+  const pad = `padding:${mm(TAMIL_METRICS.rowPaddingMm)};`;
   return `<tr data-row="${rowIndex}" style="border-bottom:1px solid #ddd;">
-    <td style="padding:2.2mm; text-align:center;color:#666;">${serial}</td>
-    <td style="padding:2.2mm;">
-      <div style="font-weight:600;">${escapeHtml(item.nameTa)}</div>
-      <div style="font-size:9pt;color:#666;">${escapeHtml(item.nameEn)}</div>
+    <td style="${pad} text-align:center;color:#666;">${serial}</td>
+    <td style="${pad}">
+      <span style="font-weight:600;">${escapeHtml(item.nameTa)}</span>
+      <span style="font-size:${pt(TAMIL_METRICS.subPt)};color:#666;"> ${escapeHtml(item.nameEn)}</span>
     </td>
-    <td style="padding:2.2mm; text-align:right;">${escapeHtml(formatQtyValue(display.quantity, display.unit))}</td>
-    <td style="padding:2.2mm; text-align:center;">${escapeHtml(UNIT_LABEL[display.unit] || "nos")}</td>
-    <td style="padding:2.2mm;"></td>
+    <td style="${pad} text-align:right;">${escapeHtml(formatQtyValue(display.quantity, display.unit))}</td>
+    <td style="${pad} text-align:center;">${escapeHtml(UNIT_LABEL[display.unit] || "nos")}</td>
+    <td style="${pad}"></td>
   </tr>`;
 }
 
 /** Header row, styled to match the English sheet's dark, centered thead exactly. */
-const TAMIL_TABLE_HEAD = `
+function tamilTableHeadHtml(scale: number): string {
+  const pad = `padding:${(TAMIL_METRICS.headPaddingMm * scale).toFixed(2)}mm;`;
+  return `
   <thead>
     <tr style="background:#1c1c1e; color:#fff;">
-      <th style="padding:2.5mm; text-align:center; width:12mm;">வ.எண்</th>
-      <th style="padding:2.5mm; text-align:center;">பொருளின் பெயர்</th>
-      <th style="padding:2.5mm; text-align:center; width:20mm;">அளவு</th>
-      <th style="padding:2.5mm; text-align:center; width:18mm;">அலகு</th>
-      <th style="padding:2.5mm; text-align:center; width:30mm;">விலை</th>
+      <th style="${pad} text-align:center; width:12mm;">வ.எண்</th>
+      <th style="${pad} text-align:center;">பொருளின் பெயர்</th>
+      <th style="${pad} text-align:center; width:20mm;">அளவு</th>
+      <th style="${pad} text-align:center; width:18mm;">அலகு</th>
+      <th style="${pad} text-align:center; width:30mm;">விலை</th>
     </tr>
   </thead>`;
+}
 
 /** Mirrors the English sheet's title block — page 1 only. */
 function tamilTitleBlockHtml(options: PdfOptions): string {
@@ -301,8 +338,83 @@ function tamilPageHtml(bodyHtml: string, fixedHeight = false): string {
   </div>`;
 }
 
-function tamilTableHtml(rowsHtml: string): string {
-  return `<table style="width:100%; border-collapse:collapse; font-size:10.5pt;">${TAMIL_TABLE_HEAD}<tbody>${rowsHtml}</tbody></table>`;
+function tamilTableHtml(rowsHtml: string, scale: number): string {
+  const fontSize = (TAMIL_METRICS.tablePt * scale).toFixed(2);
+  return `<table style="width:100%; border-collapse:collapse; font-size:${fontSize}pt;">${tamilTableHeadHtml(scale)}<tbody>${rowsHtml}</tbody></table>`;
+}
+
+/**
+ * Splits the rows into pages of exactly TAMIL_ROWS_PER_PAGE item rows.
+ * Shop headings are carried on the page of the items beneath them and
+ * don't count against the limit, so every page holds the same number of
+ * items whether or not the print is grouped. A heading is never left
+ * stranded at the foot of a page: the page break happens before it.
+ */
+function paginateTamilRows(rows: TamilRow[]): number[][] {
+  const pages: number[][] = [[]];
+  let itemsOnPage = 0;
+
+  for (let index = 0; index < rows.length; index++) {
+    if (itemsOnPage === TAMIL_ROWS_PER_PAGE) {
+      pages.push([]);
+      itemsOnPage = 0;
+    }
+    pages[pages.length - 1].push(index);
+    if (rows[index].kind === "item") itemsOnPage++;
+  }
+
+  if (pages.length > 1 && pages[pages.length - 1].length === 0) pages.pop();
+  return pages;
+}
+
+function tamilPageBodyHtml(
+  rows: TamilRow[],
+  rowIndexes: number[],
+  options: PdfOptions,
+  itemCount: number,
+  page: number,
+  pageCount: number,
+  scale: number,
+): string {
+  return (
+    (page === 1 ? tamilTitleBlockHtml(options) : "") +
+    tamilTableHtml(rowIndexes.map((index) => tamilRowHtml(rows[index], index, scale)).join(""), scale) +
+    (page === pageCount ? tamilTotalLineHtml() : "") +
+    tamilFooterHtml(itemCount, page, pageCount)
+  );
+}
+
+/**
+ * Because the row count per page is now fixed, the sheet has to bend to
+ * the rows rather than the other way round. This renders every page
+ * off-screen at full size, finds the tallest, and returns the factor that
+ * pulls it back inside one A4 sheet. It re-measures after each estimate
+ * because text reflows as it shrinks — a name that wrapped onto two lines
+ * may unwrap — so a single height/budget ratio isn't reliably enough.
+ */
+function fitScaleFor(
+  probe: HTMLElement,
+  renderAt: (scale: number) => string,
+): number {
+  const measure = (scale: number): number => {
+    probe.innerHTML = renderAt(scale);
+    let tallest = 0;
+    probe.querySelectorAll("[data-page]").forEach((page) => {
+      tallest = Math.max(tallest, page.getBoundingClientRect().height);
+    });
+    return tallest;
+  };
+
+  // 2mm of slack keeps the footer clear of the hard clip at the page edge.
+  const budgetPx = (probe.getBoundingClientRect().width / A4_WIDTH_MM) * (A4_HEIGHT_MM - 2);
+
+  let scale = 1;
+  for (let pass = 0; pass < 3; pass++) {
+    const tallest = measure(scale);
+    if (tallest <= budgetPx || scale <= TAMIL_MIN_SCALE) break;
+    scale = Math.max(TAMIL_MIN_SCALE, scale * (budgetPx / tallest));
+  }
+  return scale;
 }
 
 /**
@@ -316,8 +428,9 @@ function tamilTableHtml(rowsHtml: string): string {
  * Pages are laid out the same way the English autoTable print does: the
  * table header repeats on every page, the title block only appears on
  * page 1, and a footer (item count / page number / contact) repeats on
- * every page. Row heights are measured from a real off-screen render so a
- * row is never sliced in half across a page break.
+ * every page. Every page carries exactly TAMIL_ROWS_PER_PAGE items; the
+ * row density is measured off-screen and scaled down if that many rows
+ * wouldn't otherwise fit the sheet.
  */
 async function buildTamilPdf(items: PdfItem[], options: PdfOptions): Promise<jsPDF> {
   const html2canvas = (await import("html2canvas")).default;
@@ -325,6 +438,10 @@ async function buildTamilPdf(items: PdfItem[], options: PdfOptions): Promise<jsP
 
   const grouped = Boolean(options.groupByShop && !options.shopName);
   const rows = buildTamilRows(items, grouped);
+  const pages = paginateTamilRows(rows);
+
+  const bodyFor = (page: number, scale: number) =>
+    tamilPageBodyHtml(rows, pages[page - 1], options, items.length, page, pages.length, scale);
 
   const probe = document.createElement("div");
   probe.style.position = "fixed";
@@ -332,73 +449,25 @@ async function buildTamilPdf(items: PdfItem[], options: PdfOptions): Promise<jsP
   probe.style.left = "-10000px";
   probe.style.width = `${A4_WIDTH_MM}mm`;
   probe.style.backgroundColor = "#ffffff";
-  probe.innerHTML = tamilPageHtml(
-    tamilTitleBlockHtml(options) +
-      tamilTableHtml(rows.map((row, index) => tamilRowHtml(row, index)).join("")) +
-      tamilTotalLineHtml() +
-      tamilFooterHtml(items.length, 1, 1),
-  );
   document.body.appendChild(probe);
 
-  let pxPerMm: number;
-  let titleHeightPx: number;
-  let theadHeightPx: number;
-  let rowHeightsPx: number[];
-  let totalLineHeightPx: number;
-  let footerHeightPx: number;
+  let scale: number;
   try {
-    pxPerMm = probe.getBoundingClientRect().width / A4_WIDTH_MM;
-    const height = (selector: string) => probe.querySelector(selector)?.getBoundingClientRect().height ?? 0;
-
-    titleHeightPx = height('[data-block="title"]');
-    theadHeightPx = height("thead");
-    rowHeightsPx = rows.map((_, index) => height(`[data-row="${index}"]`));
-    totalLineHeightPx = height('[data-block="total"]');
-    footerHeightPx = height('[data-block="footer"]');
+    scale = fitScaleFor(probe, (candidate) =>
+      pages
+        .map(
+          (_, index) =>
+            `<div data-page="${index}">${tamilPageHtml(bodyFor(index + 1, candidate))}</div>`,
+        )
+        .join(""),
+    );
   } finally {
     document.body.removeChild(probe);
   }
 
-  // getBoundingClientRect().height doesn't include an element's own CSS
-  // margin, so the gaps between blocks (title's margin-bottom, the total
-  // line's margin-top, the footer's margin-top) have to be added back in
-  // explicitly — these mirror the literal margin values set in
-  // tamilTitleBlockHtml/tamilTotalLineHtml/tamilFooterHtml below. Missing
-  // this originally under-budgeted every page and clipped the footer.
-  const titleGapPx = pxPerMm * 5;
-  const totalLineGapPx = pxPerMm * 8;
-  const footerGapPx = pxPerMm * 6;
-
-  // A few mm of slack for sub-pixel rounding differences between this
-  // measurement pass and the final per-page render — keeps the footer
-  // clear of the hard clip at the page edge instead of hugging it exactly.
-  const usableHeightPx = pxPerMm * (A4_HEIGHT_MM - 2 * TAMIL_PAGE_MARGIN_MM - 10);
-
-  // Walk the rows, closing a page whenever the next row (plus the footer,
-  // and the total line once we're on the last row) would overflow it.
-  const pages: number[][] = [[]];
-  let usedPx = titleHeightPx + titleGapPx + theadHeightPx;
-  for (let index = 0; index < rows.length; index++) {
-    const isLastRow = index === rows.length - 1;
-    const rowBudget = rowHeightsPx[index] + (isLastRow ? totalLineGapPx + totalLineHeightPx : 0);
-    if (usedPx + rowBudget + footerGapPx + footerHeightPx > usableHeightPx && pages[pages.length - 1].length > 0) {
-      pages.push([]);
-      usedPx = theadHeightPx;
-    }
-    pages[pages.length - 1].push(index);
-    usedPx += rowBudget;
-  }
-  if (pages.length > 1 && pages[pages.length - 1].length === 0) pages.pop();
-
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   for (let page = 0; page < pages.length; page++) {
-    const rowIndexes = pages[page];
-    const isLastPage = page === pages.length - 1;
-    const bodyHtml =
-      (page === 0 ? tamilTitleBlockHtml(options) : "") +
-      tamilTableHtml(rowIndexes.map((index) => tamilRowHtml(rows[index], index)).join("")) +
-      (isLastPage ? tamilTotalLineHtml() : "") +
-      tamilFooterHtml(items.length, page + 1, pages.length);
+    const bodyHtml = bodyFor(page + 1, scale);
 
     const container = document.createElement("div");
     container.style.position = "fixed";
