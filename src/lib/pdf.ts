@@ -203,22 +203,38 @@ const TAMIL_PAGE_MARGIN_MM = 14;
  * The Tamil sheet is paginated by row count, not by measured height: every
  * page carries exactly this many item rows (the last page holds the
  * remainder). Shop headings ride along on the page of the items they
- * introduce and don't consume one of the 25 slots.
+ * introduce and don't consume one of the slots.
  */
-const TAMIL_ROWS_PER_PAGE = 25;
+const TAMIL_ROWS_PER_PAGE = 30;
+
+/** The shop the Tamil sheet is always printed for — as fixed as the contact line. */
+const TAMIL_SHOP_NAME = "பாலமுருகன் மளிகை";
+
+/**
+ * Unit names spelled out in Tamil. Countable items print nothing at all
+ * (the English sheet's "nos" reads as noise here), which is why this is a
+ * separate map rather than a translation of UNIT_LABEL.
+ */
+const TAMIL_UNIT_LABEL: Record<UnitType, string> = {
+  KG: "கிலோ",
+  G: "கிராம்",
+  L: "லிட்டர்",
+  ML: "மில்லி",
+  RS: "ரூபாய்",
+  COUNT: "",
+};
 
 /**
  * Base row metrics, in the units they're written out in. A single fit
- * factor (see fitScaleFor) multiplies all of them together when 25 rows
- * would otherwise overflow the sheet — long wrapping names, or grouped
- * prints where shop headings eat extra height.
+ * factor (see fitScaleFor) multiplies all of them together when a full
+ * page of rows would otherwise overflow the sheet — long wrapping names,
+ * or grouped prints where shop headings eat extra height.
  */
 const TAMIL_METRICS = {
-  rowPaddingMm: 1.8,
-  headPaddingMm: 2,
-  shopPaddingMm: 1.6,
+  rowPaddingMm: 1.5,
+  headPaddingMm: 1.6,
+  shopPaddingMm: 1.4,
   tablePt: 10.5,
-  subPt: 8,
 };
 
 /** Never shrink past this — below it the sheet stops being readable at arm's length. */
@@ -246,13 +262,12 @@ function buildTamilRows(items: PdfItem[], grouped: boolean): TamilRow[] {
 }
 
 /**
- * The item and English names share one line here — the two-line variant
- * this replaced ran ~13mm a row, which no amount of shrinking fits 25 of
- * onto a sheet at a readable size.
+ * One line per item, Tamil name only — the English name the row used to
+ * carry alongside it is what made the row too tall to fit 30 of them on a
+ * sheet at a readable size.
  */
 function tamilRowHtml(row: TamilRow, rowIndex: number, scale: number): string {
   const mm = (value: number) => `${(value * scale).toFixed(2)}mm`;
-  const pt = (value: number) => `${(value * scale).toFixed(2)}pt`;
 
   if (row.kind === "shop") {
     return `<tr data-row="${rowIndex}"><td colspan="5" style="padding:${mm(TAMIL_METRICS.shopPaddingMm)};background:#f2f2f7;font-weight:700;color:#333;">${escapeHtml(row.label)}</td></tr>`;
@@ -262,12 +277,9 @@ function tamilRowHtml(row: TamilRow, rowIndex: number, scale: number): string {
   const pad = `padding:${mm(TAMIL_METRICS.rowPaddingMm)};`;
   return `<tr data-row="${rowIndex}" style="border-bottom:1px solid #ddd;">
     <td style="${pad} text-align:center;color:#666;">${serial}</td>
-    <td style="${pad}">
-      <span style="font-weight:600;">${escapeHtml(item.nameTa)}</span>
-      <span style="font-size:${pt(TAMIL_METRICS.subPt)};color:#666;"> ${escapeHtml(item.nameEn)}</span>
-    </td>
+    <td style="${pad} font-weight:600;">${escapeHtml(item.nameTa)}</td>
     <td style="${pad} text-align:right;">${escapeHtml(formatQtyValue(display.quantity, display.unit))}</td>
-    <td style="${pad} text-align:center;">${escapeHtml(UNIT_LABEL[display.unit] || "nos")}</td>
+    <td style="${pad} text-align:center;">${escapeHtml(TAMIL_UNIT_LABEL[display.unit])}</td>
     <td style="${pad}"></td>
   </tr>`;
 }
@@ -280,25 +292,25 @@ function tamilTableHeadHtml(scale: number): string {
     <tr style="background:#1c1c1e; color:#fff;">
       <th style="${pad} text-align:center; width:12mm;">வ.எண்</th>
       <th style="${pad} text-align:center;">பொருளின் பெயர்</th>
-      <th style="${pad} text-align:center; width:20mm;">அளவு</th>
-      <th style="${pad} text-align:center; width:18mm;">அலகு</th>
+      <th style="${pad} text-align:center; width:18mm;">அளவு</th>
+      <th style="${pad} text-align:center; width:22mm;">அலகு</th>
       <th style="${pad} text-align:center; width:30mm;">விலை</th>
     </tr>
   </thead>`;
 }
 
-/** Mirrors the English sheet's title block — page 1 only. */
+/**
+ * Mirrors the English sheet's title block — page 1 only, and deliberately
+ * more compact than that one: the sheet's height is spoken for by 30 rows,
+ * so the heading gives back everything it can. No print date.
+ */
 function tamilTitleBlockHtml(options: PdfOptions): string {
-  const shopLabel = options.shopName ? `கடை: ${options.shopName}` : "அனைத்து கடைகள்";
   return `
-    <div data-block="title" style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:1px solid #ccc; padding-bottom:5mm; margin-bottom:5mm;">
-      <div>
-        <div style="font-size:16pt; font-weight:700;">மாத மளிகை பட்டியல்</div>
-        <div style="font-size:11pt; color:#111; margin-top:1mm;">${escapeHtml(options.listName)}</div>
-      </div>
-      <div style="text-align:right;">
-        <div style="font-size:11pt;">${escapeHtml(shopLabel)}</div>
-        <div style="font-size:9pt; color:#888; margin-top:1mm;">அச்சிடப்பட்டது ${escapeHtml(formatToday("ta-IN"))}</div>
+    <div data-block="title" style="display:flex; justify-content:space-between; align-items:baseline; border-bottom:1px solid #ccc; padding-bottom:2.5mm; margin-bottom:3mm;">
+      <div style="font-size:12pt; font-weight:700;">மாத மளிகை பட்டியல்</div>
+      <div style="font-size:9.5pt; color:#333;">
+        <span>${escapeHtml(options.listName)}</span>
+        <span style="margin-left:5mm;">கடை: ${escapeHtml(TAMIL_SHOP_NAME)}</span>
       </div>
     </div>`;
 }
@@ -306,21 +318,23 @@ function tamilTitleBlockHtml(options: PdfOptions): string {
 /** Mirrors the English sheet's blank hand-filled total line — last page only. */
 function tamilTotalLineHtml(): string {
   return `
-    <div data-block="total" style="display:flex; justify-content:flex-end; margin-top:8mm;">
+    <div data-block="total" style="display:flex; justify-content:flex-end; align-items:baseline; margin-top:5mm; font-size:9.5pt;">
       <div style="font-weight:700; margin-right:4mm;">மொத்தம்</div>
       <div style="width:32mm; border-bottom:1px solid #888;"></div>
     </div>`;
 }
 
-/** Mirrors the English sheet's per-page footer (item count + page number + contact). */
+/**
+ * The English sheet's per-page footer (item count, contact, page number),
+ * squeezed onto a single line so it costs the table as little height as
+ * possible.
+ */
 function tamilFooterHtml(itemCount: number, page: number, pageCount: number): string {
   return `
-    <div data-block="footer" style="margin-top:6mm; padding-top:3mm; border-top:1px solid #eee; font-size:9pt; color:#666;">
-      <div style="display:flex; justify-content:space-between;">
-        <div>${itemCount} பொருட்கள்</div>
-        <div>பக்கம் ${page} / ${pageCount}</div>
-      </div>
-      <div style="margin-top:2mm;">${escapeHtml(CONTACT.ta)}</div>
+    <div data-block="footer" style="display:flex; justify-content:space-between; margin-top:3mm; padding-top:2mm; border-top:1px solid #eee; font-size:8pt; color:#666;">
+      <div>${itemCount} பொருட்கள்</div>
+      <div>${escapeHtml(CONTACT.ta)}</div>
+      <div>பக்கம் ${page} / ${pageCount}</div>
     </div>`;
 }
 
