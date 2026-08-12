@@ -60,7 +60,10 @@ app works out of the box. To load your actual spreadsheet:
 1. In Excel/Numbers/Sheets, **File → Save As / Export → CSV (UTF-8)**.
 2. Keep (or rename) the header row to include: `Grocery`, `Grocery.1`,
    `Type`, `Qty Type`, `From` (aliases like "English", "Category", "Unit
-   Type", "Shop" are also recognized — see `prisma/import-csv.ts`).
+   Type", "Shop" are also recognized — see `prisma/import-csv.ts`). An
+   optional `Tanglish` column carries the Tamil name in Latin script
+   ("Kadalai Paruppu"); rows that leave it blank get one transliterated
+   from their Tamil name.
 3. Run:
 
    ```bash
@@ -84,7 +87,8 @@ current set (synced from a supplementary spreadsheet).
 
 - **`Category`** — the `Type` column (Tamil + English name).
 - **`Shop`** — the `From` column ("Shop By").
-- **`Item`** — master catalogue: `Grocery`/`Grocery.1` names, `unitType`
+- **`Item`** — master catalogue: `Grocery`/`Grocery.1`/Tanglish names,
+  `unitType`
   (`KG | G | L | ML | RS | COUNT`, from `Qty Type`), default shop, default
   quantity, and `hasVariableUnit` — marks items sold in inconsistent pack
   sizes, which get a quantity/unit editor on the create/edit form and while
@@ -101,7 +105,7 @@ current set (synced from a supplementary spreadsheet).
 
 The Family Budget module adds `BudgetCategory`, `BudgetExpense` (the recurrence
 rule), `BudgetOccurrence` (sparse — only touched dates), `BudgetReminder` (the
-push dedupe log) and `PushSubscription`. See §5 for why occurrences are derived
+push dedupe log) and `PushSubscription`. See §7 for why occurrences are derived
 rather than materialized.
 
 Prisma 7 uses driver adapters instead of a bundled query engine binary —
@@ -133,7 +137,62 @@ drift into floating-point noise. The same module drives quantity display
 (`formatQty`), the master-item unit picker, and the CSV importer's
 `Qty Type → UnitType` mapping.
 
-## 4. PDF generation
+## 4. Three display languages
+
+Every item carries three names, and one app-wide toggle
+(`src/lib/language.tsx`, `LanguageToggle`) cycles between them:
+
+| Code | Field | Example |
+|---|---|---|
+| `ta` | `Item.nameTa` | கடலை பருப்பு |
+| `tl` | `Item.nameTl` | Kadalai Paruppu |
+| `en` | `Item.nameEn` | Bengal gram |
+
+`nameTl` ("Tanglish") is the Tamil name written in Latin script — for
+anyone who speaks Tamil but reads the script slowly. It is deliberately not
+the same thing as `nameEn`, which is a *translation* and isn't what you'd
+say at the shop.
+
+`displayName(item, language)` picks which name leads and which trails as
+the caption; Tanglish falls back to the Tamil name when an item hasn't been
+given one, so a half-filled catalogue still reads sensibly.
+
+Filling the field in:
+
+- The 106 spreadsheet items ship with hand-written Tanglish names in
+  `prisma/data/master-data.json` (`tanglish`), applied by `npm run db:seed`
+  / `db:resync` / `db:import`.
+- Anything typed in later gets one transliterated from its Tamil name by
+  `src/lib/tanglish.ts` — rule-based Tamil → Latin, with the voicing
+  conventions people actually write (கடலை is "kadalai", not "katalai";
+  பருப்பு keeps its doubled "pp").
+- The Master List screen shows a **Needs Tanglish** filter chip, an
+  editable field on the item form, and (for admins) a **Fill Tanglish
+  names** button that runs `fillTanglishNames()` over the catalogue.
+
+## 5. The shopping screen
+
+`ShoppingView` is what you actually hold in the shop, so it stays usable
+once the list has been finalized and reality starts diverging from the plan:
+
+- **Search** narrows the list as you type — Tamil, Tanglish, English,
+  category or shop name — on top of the shop and category chips.
+- **Quantity is editable inline.** Every un-bought row carries the same
+  unit-aware stepper the draft editor uses, so "actually, make it 2 kg" is
+  one tap rather than a trip back through *Edit list*. Changes are
+  optimistic and reconciled against the server (`updateListItem`, which
+  accepts `FINALIZED` lists and refuses only `COMPLETED` ones). Once an
+  item is checked off its quantity belongs to the purchase sheet, which
+  re-prices it, so the stepper drops away.
+- **Add item** (`ShopAddSheet`) covers what never made the list. It
+  searches the master catalogue server-side, and anything genuinely new can
+  be created on the spot — Tamil / Tanglish / English name, category, unit,
+  shop — which saves it to the master list and adds it to this one.
+  `addListItem` therefore allows `DRAFT` *and* `FINALIZED` lists: reopening
+  a finalized list just to add one item would throw away the shopping
+  progress.
+
+## 6. PDF generation
 
 `src/lib/pdf.ts` (`buildGroceryPdf` / `downloadGroceryPdf`) renders the
 traditional print sheet with `jspdf-autotable`:
@@ -151,8 +210,11 @@ traditional print sheet with `jspdf-autotable`:
   English-only rows.
 - Invoked from `ExportPdfButton` on the finalized list screen, filtered to
   whatever shop chip is currently selected.
+- Follows the display-language toggle. Tamil takes the html2canvas path
+  (jsPDF cannot shape Tamil); English *and* Tanglish are both Latin script,
+  so they take the crisp vector `jspdf-autotable` path.
 
-## 5. Family Budget module
+## 7. Family Budget module
 
 `/budget` tracks recurring household bills — rent, EB, insurance, internet,
 mobile — on a calendar and a list, covering both past and upcoming dates.
@@ -232,7 +294,7 @@ Trigger it once a day, either way:
 - **External scheduler** (free) — cron-job.org or a GitHub Actions
   `schedule` workflow POSTing the URL with the `x-cron-secret` header.
 
-## 6. Deploying to Railway
+## 8. Deploying to Railway
 
 1. **Push this repo to GitHub** (or connect your fork).
 2. In Railway: **New Project → Deploy from GitHub repo**, pick this repo.
@@ -244,7 +306,7 @@ Trigger it once a day, either way:
      `${{ MySQL.DATABASE_URL }}` in Railway's variable picker.
    - For Family Budget push reminders (optional — everything else works
      without them): `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
-     and `CRON_SECRET`. See §5 for how to generate the keys.
+     and `CRON_SECRET`. See §7 for how to generate the keys.
 5. **Build & start commands** (Railway auto-detects Next.js, but to be
    explicit under Settings → Deploy):
    - Build: `npm run build` (this runs `prisma generate` first)
@@ -294,11 +356,14 @@ src/
     Sheet.tsx                iOS bottom sheet (used for add-item, edit, purchase)
     PriceDelta.tsx           Green/red up-down price comparison badge
     AppNav.tsx               Bottom tab bar (mobile) / sidebar (iPad & desktop)
-    list/                    Draft editor, finalized list, shopping mode, PDF button
+    list/                    Draft editor, finalized list, shopping mode, PDF button,
+                             ShopAddSheet (add an item mid-shop)
     master/                  Master catalogue browser + editor sheet
     budget/                  Calendar grid, list view, expense + payment sheets
   lib/
     units.ts                 Stepper steps, formatting, Qty Type parsing
+    tanglish.ts               Tamil → Latin transliteration (Tanglish fallback)
+    language.tsx              Tamil/Tanglish/English toggle + displayName()
     pdf.ts                    Print-sheet PDF builder
     prisma.ts, queries.ts     DB client + read queries (Decimal → plain number)
     actions.ts                Server Actions (create/finalize lists, record purchases, …)

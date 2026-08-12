@@ -11,7 +11,7 @@ type ExportPdfButtonProps = {
   items: ListItemDTO[];
   /** Print shop headings when no single shop is selected. */
   groupByShop?: boolean;
-  /** Follows the app's Tamil/English display toggle — no separate prompt. */
+  /** Follows the app's Tamil/Tanglish/English display toggle — no separate prompt. */
   language: PdfLanguage;
   /** Icon-only for the header, next to the language toggle. */
   variant?: "full" | "icon";
@@ -43,6 +43,7 @@ export function ExportPdfButton({
         items.map((item) => ({
           nameEn: item.nameEn,
           nameTa: item.nameTa,
+          nameTl: item.nameTl,
           quantity: item.quantity,
           unitType: item.unitType,
           shopName: item.shopName,

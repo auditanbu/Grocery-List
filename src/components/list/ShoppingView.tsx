@@ -1,42 +1,93 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { CategoryFilter } from "@/components/list/CategoryFilter";
 import { PriceDelta } from "@/components/PriceDelta";
 import { PurchaseSheet } from "@/components/list/PurchaseSheet";
+import { ShopAddSheet } from "@/components/list/ShopAddSheet";
 import { Stepper } from "@/components/Stepper";
 import { groupByShop } from "@/components/list/DraftEditor";
-import { completeList } from "@/lib/actions";
-import { bilingualName, useLanguage } from "@/lib/language";
+import { completeList, updateListItem } from "@/lib/actions";
+import { displayName, useLanguage } from "@/lib/language";
 import { formatPrice, formatQty, projectPrice, unitGroup, type UnitType } from "@/lib/units";
-import type { ListDetailDTO, ListItemDTO } from "@/lib/types";
+import type { CategoryDTO, ListDetailDTO, ListItemDTO } from "@/lib/types";
 
 type ShoppingViewProps = {
   list: ListDetailDTO;
   items: ListItemDTO[];
+  /** Master categories, for creating an item that isn't in the catalogue yet. */
+  categories: CategoryDTO[];
 };
 
-export function ShoppingView({ list, items }: ShoppingViewProps) {
+export function ShoppingView({ list, items, categories }: ShoppingViewProps) {
   const router = useRouter();
   const { language } = useLanguage();
   const [active, setActive] = useState<ListItemDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [categoryId, setCategoryId] = useState<number | undefined>(undefined);
+  const [query, setQuery] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
 
   const [compareItemId, setCompareItemId] = useState<number | null>(null);
   const [compareState, setCompareState] = useState<
     Record<number, { quantity: number; unitType: UnitType }>
   >({});
 
+  // Optimistic quantity/unit, so the stepper stays responsive while the
+  // action runs — same approach as the draft editor's stepper.
+  const [overrides, setOverrides] = useState<Record<number, { quantity: number; unitType: UnitType }>>(
+    {},
+  );
+  const stateOf = (item: ListItemDTO) =>
+    overrides[item.id] ?? { quantity: item.quantity, unitType: item.unitType };
+
+  // Retire an override as soon as the server value agrees with it. Left in
+  // place it would shadow later changes made elsewhere — most visibly a
+  // variable-unit item resized from the purchase sheet and then unchecked.
+  useEffect(() => {
+    setOverrides((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const row of list.items) {
+        const override = next[row.id];
+        if (override && override.quantity === row.quantity && override.unitType === row.unitType) {
+          delete next[row.id];
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [list.items]);
+
+  const changeQuantity = (item: ListItemDTO, quantity: number, unitType: UnitType) => {
+    setError(null);
+    setOverrides((current) => ({ ...current, [item.id]: { quantity, unitType } }));
+    // Keep the "compare at this quantity" panel in step with the row it
+    // belongs to, unless it's already been dialled to something else.
+    setCompareState((current) =>
+      item.id in current ? current : { ...current, [item.id]: { quantity, unitType } },
+    );
+    startTransition(async () => {
+      const result = await updateListItem({ listItemId: item.id, quantity, unitType });
+      if (!result.ok) {
+        setError(result.error);
+        setOverrides((current) => {
+          const next = { ...current };
+          delete next[item.id];
+          return next;
+        });
+      }
+      router.refresh();
+    });
+  };
+
   const toggleCompare = (item: ListItemDTO, event: React.MouseEvent) => {
     event.stopPropagation();
     setCompareItemId((current) => (current === item.id ? null : item.id));
-    setCompareState((prev) =>
-      item.id in prev ? prev : { ...prev, [item.id]: { quantity: item.quantity, unitType: item.unitType } },
-    );
+    setCompareState((prev) => (item.id in prev ? prev : { ...prev, [item.id]: stateOf(item) }));
   };
 
   const categoryOptions = useMemo(() => {
@@ -52,10 +103,22 @@ export function ShoppingView({ list, items }: ShoppingViewProps) {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [items, language]);
 
-  const visibleItems = useMemo(
-    () => (categoryId === undefined ? items : items.filter((item) => item.categoryId === categoryId)),
-    [items, categoryId],
-  );
+  const visibleItems = useMemo(() => {
+    const trimmed = query.trim();
+    const needle = trimmed.toLowerCase();
+    return items.filter((item) => {
+      if (categoryId !== undefined && item.categoryId !== categoryId) return false;
+      if (!needle) return true;
+      return (
+        item.nameEn.toLowerCase().includes(needle) ||
+        item.nameTa.includes(trimmed) ||
+        (item.nameTl ?? "").toLowerCase().includes(needle) ||
+        item.categoryName.toLowerCase().includes(needle) ||
+        (item.categoryNameTa ?? "").includes(trimmed) ||
+        (item.shopName ?? "").toLowerCase().includes(needle)
+      );
+    });
+  }, [items, categoryId, query]);
 
   // Checked-off items sink to the bottom of their shop's section so the
   // remaining to-buy items stay at the top while shopping.
@@ -71,6 +134,7 @@ export function ShoppingView({ list, items }: ShoppingViewProps) {
   // "Finish shopping" completes the whole list, so it must reflect the
   // list's true completion — not just what the shop/category filters show.
   const allDone = list.items.length > 0 && list.items.every((item) => item.isPurchased);
+  const editable = list.status !== "COMPLETED";
 
   const complete = () => {
     startTransition(async () => {
@@ -99,6 +163,49 @@ export function ShoppingView({ list, items }: ShoppingViewProps) {
         </div>
       </div>
 
+      {editable ? (
+        <button
+          type="button"
+          onClick={() => setAddOpen(true)}
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-ios bg-ios-blue text-[17px] font-semibold text-white transition active:scale-[0.98]"
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+            <path d="M12 6v12M6 12h12" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
+          </svg>
+          Add item
+        </button>
+      ) : null}
+
+      <div className="relative">
+        <svg
+          viewBox="0 0 24 24"
+          className="pointer-events-none absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-ios-label-3"
+          aria-hidden
+        >
+          <circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" strokeWidth="2.1" />
+          <path d="M20 20l-4.3-4.3" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" />
+        </svg>
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search this list"
+          aria-label="Search this list"
+          className="h-11 w-full rounded-ios bg-ios-surface pl-10 pr-10 text-[17px] shadow-ios outline-none focus:ring-2 focus:ring-ios-blue"
+        />
+        {query ? (
+          <button
+            type="button"
+            onClick={() => setQuery("")}
+            aria-label="Clear search"
+            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-ios-label-3 active:opacity-60"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
+            </svg>
+          </button>
+        ) : null}
+      </div>
+
       <CategoryFilter
         options={categoryOptions}
         value={categoryId}
@@ -112,7 +219,7 @@ export function ShoppingView({ list, items }: ShoppingViewProps) {
 
       {visibleItems.length === 0 ? (
         <p className="ios-card p-6 text-center text-[15px] text-ios-label-2">
-          No items for this shop.
+          {query.trim() ? `Nothing on this list matched “${query.trim()}”.` : "No items for this shop."}
         </p>
       ) : (
         groupedByShop.map(([shopName, shopItems]) => (
@@ -122,9 +229,10 @@ export function ShoppingView({ list, items }: ShoppingViewProps) {
             </p>
             <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
               {shopItems.map((item) => {
-                const name = bilingualName(item.nameTa, item.nameEn, language);
+                const name = displayName(item, language);
                 const comparing = compareItemId === item.id;
-                const compare = compareState[item.id] ?? { quantity: item.quantity, unitType: item.unitType };
+                const current = stateOf(item);
+                const compare = compareState[item.id] ?? current;
                 const canProject =
                   item.lastPrice !== null && item.lastPriceQuantity !== null && item.lastPriceUnitType !== null;
                 const sameGroup = canProject && unitGroup(item.lastPriceUnitType as UnitType) === unitGroup(compare.unitType);
@@ -138,6 +246,10 @@ export function ShoppingView({ list, items }: ShoppingViewProps) {
                         compare.unitType,
                       )
                     : null;
+                // Quantity is editable right up until the item is checked
+                // off; after that it's a record of what was actually bought
+                // and belongs to the purchase sheet, which re-prices it.
+                const canEditQuantity = editable && !item.isPurchased;
                 return (
                 <li key={item.id}>
                   <div className="flex w-full items-center gap-3 px-4 py-3">
@@ -178,7 +290,10 @@ export function ShoppingView({ list, items }: ShoppingViewProps) {
                           {name.primary}
                         </span>
                         <span className="block truncate text-[13px] text-ios-label-2">
-                          {name.secondary} · {formatQty(item.quantity, item.unitType)}
+                          {name.secondary}
+                          {/* The stepper alongside already states the
+                              quantity — only spell it out when there isn't one. */}
+                          {canEditQuantity ? "" : ` · ${formatQty(item.quantity, item.unitType)}`}
                         </span>
                         {item.isPurchased ? (
                           <span className="mt-1 flex flex-wrap items-center gap-2">
@@ -206,11 +321,23 @@ export function ShoppingView({ list, items }: ShoppingViewProps) {
                       </span>
                     </button>
 
-                    {!item.isPurchased && item.lastPrice !== null ? (
+                    {canEditQuantity ? (
+                      <Stepper
+                        value={current.quantity}
+                        unit={current.unitType}
+                        size="compact"
+                        onChange={(quantity, unitType) => changeQuantity(item, quantity, unitType)}
+                        aria-label={`Quantity for ${item.nameEn}`}
+                      />
+                    ) : null}
+                  </div>
+
+                  {!item.isPurchased && item.lastPrice !== null ? (
+                    <div className="-mt-1 px-4 pb-3">
                       <button
                         type="button"
                         onClick={(event) => toggleCompare(item, event)}
-                        className={`h-8 flex-none rounded-full px-3 text-[13px] font-medium transition active:scale-95 ${
+                        className={`h-8 rounded-full px-3 text-[13px] font-medium transition active:scale-95 ${
                           comparing
                             ? "bg-ios-blue text-white"
                             : "bg-ios-surface-2 text-ios-blue ring-1 ring-inset ring-ios-separator"
@@ -218,8 +345,8 @@ export function ShoppingView({ list, items }: ShoppingViewProps) {
                       >
                         Compare
                       </button>
-                    ) : null}
-                  </div>
+                    </div>
+                  ) : null}
 
                   {comparing ? (
                     <div className="mx-4 mb-3 rounded-ios bg-ios-surface-2 p-3 ring-1 ring-inset ring-ios-separator">
@@ -271,6 +398,16 @@ export function ShoppingView({ list, items }: ShoppingViewProps) {
       ) : null}
 
       <PurchaseSheet item={active} onClose={() => setActive(null)} />
+
+      <ShopAddSheet
+        open={addOpen}
+        listId={list.id}
+        onListItemIds={list.items.map((row) => row.itemId)}
+        categories={categories}
+        shops={list.shops}
+        onClose={() => setAddOpen(false)}
+        onAdded={() => router.refresh()}
+      />
     </div>
   );
 }

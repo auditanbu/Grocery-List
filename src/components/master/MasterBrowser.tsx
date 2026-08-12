@@ -10,13 +10,14 @@ import { Stepper } from "@/components/Stepper";
 import {
   deleteCategory,
   deleteMasterItem,
+  fillTanglishNames,
   fixKnownTranslations,
   setMasterItemActive,
   updateCategory,
   upsertMasterItem,
 } from "@/lib/actions";
 import { useAdmin } from "@/lib/admin-context";
-import { bilingualName, useLanguage } from "@/lib/language";
+import { displayName, useLanguage } from "@/lib/language";
 import {
   UNIT_TYPES,
   formatPrice,
@@ -37,6 +38,7 @@ type Draft = {
   id?: number;
   nameEn: string;
   nameTa: string;
+  nameTl: string;
   categoryId: number;
   unitType: UnitType;
   shopId: number | null;
@@ -50,6 +52,11 @@ function needsTamil(item: MasterItemDTO): boolean {
   return item.nameTa.trim().toLowerCase() === item.nameEn.trim().toLowerCase();
 }
 
+/** True when nobody has supplied a Tanglish name for this item yet. */
+function needsTanglish(item: MasterItemDTO): boolean {
+  return !item.nameTl?.trim();
+}
+
 export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) {
   const router = useRouter();
   const { language } = useLanguage();
@@ -57,6 +64,7 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [needsTamilOnly, setNeedsTamilOnly] = useState(false);
+  const [needsTanglishOnly, setNeedsTanglishOnly] = useState(false);
   const [autoFixMessage, setAutoFixMessage] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,10 +82,12 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
     const matches = items.filter((item) => {
       if (categoryId && item.categoryId !== categoryId) return false;
       if (needsTamilOnly && !needsTamil(item)) return false;
+      if (needsTanglishOnly && !needsTanglish(item)) return false;
       if (!needle) return true;
       return (
         item.nameEn.toLowerCase().includes(needle) ||
         item.nameTa.includes(trimmed) ||
+        (item.nameTl ?? "").toLowerCase().includes(needle) ||
         item.categoryName.toLowerCase().includes(needle) ||
         (item.categoryNameTa ?? "").includes(trimmed) ||
         (item.shopName ?? "").toLowerCase().includes(needle)
@@ -94,9 +104,10 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
       else grouped.set(item.categoryId, { label, items: [item] });
     }
     return [...grouped.entries()];
-  }, [items, query, categoryId, needsTamilOnly, language]);
+  }, [items, query, categoryId, needsTamilOnly, needsTanglishOnly, language]);
 
   const needsTamilCount = useMemo(() => items.filter(needsTamil).length, [items]);
+  const needsTanglishCount = useMemo(() => items.filter(needsTanglish).length, [items]);
 
   const categoryItemCounts = useMemo(() => {
     const counts = new Map<number, number>();
@@ -110,6 +121,7 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
     setDraft({
       nameEn: "",
       nameTa: "",
+      nameTl: "",
       categoryId: categoryId ?? categories[0]?.id ?? 0,
       unitType: "COUNT",
       shopId: null,
@@ -123,6 +135,7 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
       id: item.id,
       nameEn: item.nameEn,
       nameTa: item.nameTa,
+      nameTl: item.nameTl ?? "",
       categoryId: item.categoryId,
       unitType: item.unitType,
       shopId: item.shopId,
@@ -214,6 +227,25 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
     });
   };
 
+  const runTanglishFill = () => {
+    setAutoFixMessage(null);
+    startTransition(async () => {
+      const result = await fillTanglishNames();
+      if (!result.ok) {
+        setAutoFixMessage(result.error);
+        return;
+      }
+      const { fromSpreadsheet, transliterated, remaining } = result.data;
+      const filled = fromSpreadsheet + transliterated;
+      setAutoFixMessage(
+        `Filled ${filled} Tanglish name${filled === 1 ? "" : "s"} ` +
+          `(${fromSpreadsheet} from the spreadsheet, ${transliterated} transliterated).` +
+          (remaining > 0 ? ` ${remaining} still need one by hand.` : ""),
+      );
+      router.refresh();
+    });
+  };
+
   const saveCategory = (categoryId: number) => {
     const categoryDraft = categoryDrafts[categoryId];
     if (!categoryDraft) return;
@@ -287,11 +319,20 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
           </div>
         </div>
 
-        {needsTamilCount > 0 || isAdmin ? (
+        {needsTamilCount > 0 || needsTanglishCount > 0 || isAdmin ? (
           <div className="flex flex-wrap items-center gap-2">
             {needsTamilCount > 0 ? (
               <FilterChip active={needsTamilOnly} onClick={() => setNeedsTamilOnly((v) => !v)} tone="warning">
                 Needs Tamil name · {needsTamilCount}
+              </FilterChip>
+            ) : null}
+            {needsTanglishCount > 0 ? (
+              <FilterChip
+                active={needsTanglishOnly}
+                onClick={() => setNeedsTanglishOnly((v) => !v)}
+                tone="warning"
+              >
+                Needs Tanglish · {needsTanglishCount}
               </FilterChip>
             ) : null}
             {isAdmin ? (
@@ -303,6 +344,17 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
                 className="h-9 flex-none rounded-full bg-ios-surface px-4 text-[14px] font-medium text-ios-blue shadow-ios transition active:scale-95 disabled:opacity-50"
               >
                 Auto-fix known names
+              </button>
+            ) : null}
+            {isAdmin && needsTanglishCount > 0 ? (
+              <button
+                type="button"
+                onClick={runTanglishFill}
+                disabled={pending}
+                title="Uses the spreadsheet's Tanglish column, and transliterates the Tamil name for anything it doesn't cover"
+                className="h-9 flex-none rounded-full bg-ios-surface px-4 text-[14px] font-medium text-ios-blue shadow-ios transition active:scale-95 disabled:opacity-50"
+              >
+                Fill Tanglish names
               </button>
             ) : null}
           </div>
@@ -331,7 +383,7 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
             </p>
             <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
               {group.items.map((item) => {
-                const name = bilingualName(item.nameTa, item.nameEn, language);
+                const name = displayName(item, language);
                 return (
                 <li key={item.id} className="flex items-center">
                   <button
@@ -358,6 +410,11 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
                         {needsTamil(item) ? (
                           <span className="ml-1.5 rounded-full bg-ios-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-ios-orange ring-1 ring-inset ring-ios-separator">
                             Needs Tamil
+                          </span>
+                        ) : null}
+                        {needsTanglish(item) ? (
+                          <span className="ml-1.5 rounded-full bg-ios-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-ios-orange ring-1 ring-inset ring-ios-separator">
+                            Needs Tanglish
                           </span>
                         ) : null}
                       </span>
@@ -417,6 +474,19 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
                 placeholder="துவரம் பருப்பு"
                 className="h-12 w-full rounded-ios bg-ios-surface-2 px-4 text-[17px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
               />
+            </Field>
+
+            <Field label="Tanglish name (Tamil in English letters)">
+              <input
+                value={draft.nameTl}
+                onChange={(event) => setDraft({ ...draft, nameTl: event.target.value })}
+                placeholder="Thuvaram Paruppu"
+                className="h-12 w-full rounded-ios bg-ios-surface-2 px-4 text-[17px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
+              />
+              <p className="pt-1.5 text-[12px] text-ios-label-3">
+                Leave blank to keep whatever is already saved — or, on a new item,
+                to have one worked out from the Tamil name above.
+              </p>
             </Field>
 
             <Field label="English name (Grocery.1)">

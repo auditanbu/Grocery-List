@@ -13,7 +13,7 @@ import {
   updateListItem,
   updateMasterItemQuick,
 } from "@/lib/actions";
-import { bilingualName, useLanguage } from "@/lib/language";
+import { displayName, useLanguage } from "@/lib/language";
 import { UNIT_TYPES, formatPrice, formatQty, unitOptionLabel, type UnitType } from "@/lib/units";
 import type { ListDetailDTO, MasterItemDTO, PriceHistoryDTO, ShopDTO } from "@/lib/types";
 
@@ -122,6 +122,7 @@ export function AddItemsPage({ list, items, shops }: AddItemsPageProps) {
       return (
         item.nameEn.toLowerCase().includes(needle) ||
         item.nameTa.includes(trimmed) ||
+        (item.nameTl ?? "").toLowerCase().includes(needle) ||
         item.categoryName.toLowerCase().includes(needle) ||
         (item.categoryNameTa ?? "").includes(trimmed)
       );
@@ -314,7 +315,7 @@ export function AddItemsPage({ list, items, shops }: AddItemsPageProps) {
           autoFocus
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search Tamil or English name"
+          placeholder="Search Tamil, Tanglish or English name"
           className="h-12 w-full rounded-ios bg-ios-surface px-4 text-[17px] shadow-ios outline-none focus:ring-2 focus:ring-ios-blue"
         />
       ) : null}
@@ -384,7 +385,7 @@ export function AddItemsPage({ list, items, shops }: AddItemsPageProps) {
               <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
                 {group.items.map((item) => {
                   const entry = entries[item.id];
-                  const name = bilingualName(item.nameTa, item.nameEn, language);
+                  const name = displayName(item, language);
                   const expanded = expandedItemId === item.id;
                   const history = historyByItem[item.id];
                   return (

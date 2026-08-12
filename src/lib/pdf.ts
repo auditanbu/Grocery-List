@@ -6,13 +6,15 @@ import { UNIT_LABEL, displayUnitFor, formatQtyValue, type UnitType } from "./uni
 export type PdfItem = {
   nameEn: string;
   nameTa: string;
+  /** Tamil name in Latin script; falls back to nameEn when absent. */
+  nameTl?: string | null;
   quantity: number;
   unitType: UnitType;
   shopName: string | null;
   categoryName: string | null;
 };
 
-export type PdfLanguage = "en" | "ta";
+export type PdfLanguage = "en" | "ta" | "tl";
 
 export type PdfOptions = {
   /** e.g. "Jul 2026" */
@@ -43,17 +45,19 @@ function formatToday(locale: string): string {
  *
  * The price column stays empty so it can be filled in by hand at the shop.
  * Tamil text needs a different rendering path — see buildTamilPdf below.
+ * Tanglish is Latin script, so it rides the Latin path and gets the same
+ * crisp vector text the English sheet does.
  */
 export async function buildGroceryPdf(items: PdfItem[], options: PdfOptions): Promise<jsPDF> {
-  return options.language === "ta" ? buildTamilPdf(items, options) : buildEnglishPdf(items, options);
+  return options.language === "ta" ? buildTamilPdf(items, options) : buildLatinPdf(items, options);
 }
 
 /**
  * Vector text via jsPDF-autotable — crisp, small file, searchable/selectable.
- * jsPDF's built-in fonts are Latin-only, which is fine here: English mode
- * only ever prints nameEn.
+ * jsPDF's built-in fonts are Latin-only, which is fine here: this path only
+ * ever prints nameEn or the Latin-script Tanglish name.
  */
-function buildEnglishPdf(items: PdfItem[], options: PdfOptions): jsPDF {
+function buildLatinPdf(items: PdfItem[], options: PdfOptions): jsPDF {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 14;
@@ -94,10 +98,10 @@ function buildEnglishPdf(items: PdfItem[], options: PdfOptions): jsPDF {
           styles: { fontStyle: "bold", fillColor: [242, 242, 247], textColor: 40 },
         },
       ]);
-      shopItems.forEach((item, index) => body.push(rowFor(item, index + 1)));
+      shopItems.forEach((item, index) => body.push(rowFor(item, index + 1, options.language)));
     }
   } else {
-    items.forEach((item, index) => body.push(rowFor(item, index + 1)));
+    items.forEach((item, index) => body.push(rowFor(item, index + 1, options.language)));
   }
 
   autoTable(doc, {
@@ -155,11 +159,12 @@ function buildEnglishPdf(items: PdfItem[], options: PdfOptions): jsPDF {
   return doc;
 }
 
-function rowFor(item: PdfItem, serial: number): string[] {
+function rowFor(item: PdfItem, serial: number, language: PdfLanguage): string[] {
   const display = displayUnitFor(item.quantity, item.unitType);
+  const name = language === "tl" ? (item.nameTl?.trim() || item.nameEn) : item.nameEn;
   return [
     String(serial),
-    item.nameEn,
+    name,
     formatQtyValue(display.quantity, display.unit),
     UNIT_LABEL[display.unit] || "nos",
     "",

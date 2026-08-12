@@ -57,6 +57,7 @@
     {
       "grocery": "பச்சை பயறு",
       "groceryEn": "Green gram dal",
+      "tanglish": "Pachai Payaru",
       "type": "பயறு வகை",
       "qtyType": "Kg",
       "from": "Balamurugan"
@@ -64,6 +65,7 @@
     {
       "grocery": "வெள்ளை சுண்டல்",
       "groceryEn": "White Chenna",
+      "tanglish": "Vellai Sundal",
       "type": "பருப்பு வகை",
       "qtyType": "Kg",
       "from": "Balamurugan"
@@ -71,6 +73,7 @@
     {
       "grocery": "3 ரோசஸ் டீ தூள் - 500g",
       "groceryEn": "Red label - Natural care - 500g",
+      "tanglish": "3 Roses Tea Thool - 500g",
       "type": "பானம்",
       "qtyType": "g",
       "from": "Balamurugan",
@@ -80,6 +83,7 @@
     {
       "grocery": "TT பெருங்காயத்தூள்",
       "groceryEn": "Hing",
+      "tanglish": "TT Perungaaya Thool",
       "type": "வாசனை பொருள்",
       "qtyType": "Countable",
       "from": "Balamurugan"
@@ -87,6 +91,7 @@
     {
       "grocery": "கொள்ளு",
       "groceryEn": "Horse gram",
+      "tanglish": "Kollu",
       "type": "பருப்பு வகை",
       "qtyType": "Kg",
       "from": "Balamurugan"
@@ -94,6 +99,7 @@
     {
       "grocery": "கஸ்தூரி மஞ்சள்",
       "groceryEn": "Kasthoori manjal",
+      "tanglish": "Kasthoori Manjal",
       "type": "அழகுசாதன பொருள்",
       "qtyType": "Countable",
       "from": "Balamurugan"
@@ -101,6 +107,7 @@
     {
       "grocery": "பாசி பருப்பு",
       "groceryEn": "Moong dal",
+      "tanglish": "Paasi Paruppu",
       "type": "பருப்பு வகை",
       "qtyType": "Kg",
       "from": "Balamurugan"
@@ -108,6 +115,7 @@
     {
       "grocery": "கடலை பருப்பு",
       "groceryEn": "Bengal gram",
+      "tanglish": "Kadalai Paruppu",
       "type": "பருப்பு வகை",
       "qtyType": "Kg",
       "from": "Balamurugan"
@@ -115,6 +123,7 @@
     {
       "grocery": "பொட்டு கடலை",
       "groceryEn": "Roasted bengal gram",
+      "tanglish": "Pottu Kadalai",
       "type": "பருப்பு வகை",
       "qtyType": "Kg",
       "from": "Balamurugan"
@@ -122,6 +131,7 @@
     {
       "grocery": "புளி",
       "groceryEn": "Tamarind",
+      "tanglish": "Puli",
       "type": "மற்றவை",
       "qtyType": "Kg",
       "from": "Balamurugan"
@@ -129,6 +139,7 @@
     {
       "grocery": "கோகுல் சாண்டல் சோப் - 75g",
       "groceryEn": "Gokul sandal soap - 75g",
+      "tanglish": "Gokul Sandal Soap - 75g",
       "type": "சுத்திகரிப்பு பொருள்",
       "qtyType": "g",
       "from": "Balamurugan",
@@ -138,6 +149,7 @@
     {
       "grocery": "பிரியாணி இலை",
       "groceryEn": "Briyani leaf",
+      "tanglish": "Briyani Ilai",
       "type": "வாசனை பொருள்",
       "qtyType": "Rs",
       "from": "Balamurugan"
@@ -145,6 +157,7 @@
     {
       "grocery": "அன்னாசி மொக்கு",
       "groceryEn": "Annasi mokku",
+      "tanglish": "Annasi Mokku",
       "type": "வாசனை பொருள்",
       "qtyType": "Rs",
       "from": "Balamurugan"
@@ -152,6 +165,7 @@
     {
       "grocery": "கசகசா",
       "groceryEn": "Kasakasaa",
+      "tanglish": "Kasakasaa",
       "type": "வாசனை பொருள்",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -159,6 +173,7 @@
     {
       "grocery": "ஏலக்காய்",
       "groceryEn": "Cardamom",
+      "tanglish": "Elakkai",
       "type": "வாசனை பொருள்",
       "qtyType": "Rs",
       "from": "Balamurugan"
@@ -166,6 +181,7 @@
     {
       "grocery": "மீல் மேக்கர் (பெரியது)",
       "groceryEn": "Meal Maker",
+      "tanglish": "Meal Maker (Periyathu)",
       "type": "மற்றவை",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -173,6 +189,7 @@
     {
       "grocery": "பச்சை பட்டாணி",
       "groceryEn": "Green peas",
+      "tanglish": "Pachai Pattani",
       "type": "பருப்பு வகை",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -180,6 +197,7 @@
     {
       "grocery": "அவரை கொட்டை",
       "groceryEn": "Hyacinth bean",
+      "tanglish": "Avarai Kottai",
       "type": "மற்றவை",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -187,6 +205,7 @@
     {
       "grocery": "தட்டை பயறு",
       "groceryEn": "Cowpeas",
+      "tanglish": "Thattai Payaru",
       "type": "பயறு வகை",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -194,6 +213,7 @@
     {
       "grocery": "முந்திரி",
       "groceryEn": "Cashew nuts",
+      "tanglish": "Munthiri",
       "type": "உலர் பழங்கள்",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -201,6 +221,7 @@
     {
       "grocery": "மிளகு",
       "groceryEn": "Pepper",
+      "tanglish": "Milagu",
       "type": "வாசனை பொருள்",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -208,6 +229,7 @@
     {
       "grocery": "வெந்தயம்",
       "groceryEn": "Fenugreek",
+      "tanglish": "Vendhayam",
       "type": "மற்றவை",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -215,6 +237,7 @@
     {
       "grocery": "வர மிளகாய்",
       "groceryEn": "Dry red chilli",
+      "tanglish": "Vara Milagai",
       "type": "மற்றவை",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -222,6 +245,7 @@
     {
       "grocery": "கடுகு",
       "groceryEn": "Musturd",
+      "tanglish": "Kadugu",
       "type": "வாசனை பொருள்",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -229,6 +253,7 @@
     {
       "grocery": "கண்ணன் உளுந்து",
       "groceryEn": "Nandi urid dal",
+      "tanglish": "Kannan Ulundhu",
       "type": "பருப்பு வகை",
       "qtyType": "Kg",
       "from": "Balamurugan"
@@ -236,6 +261,7 @@
     {
       "grocery": "உடைத்த உளுந்து (வெள்ளை)",
       "groceryEn": "Urid dal",
+      "tanglish": "Udaitha Ulundhu (Vellai)",
       "type": "பருப்பு வகை",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -243,6 +269,7 @@
     {
       "grocery": "நிலக்கடலை - பச்சை",
       "groceryEn": "Ground nuts",
+      "tanglish": "Nilakkadalai - Pachai",
       "type": "உலர் பழங்கள்",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -250,6 +277,7 @@
     {
       "grocery": "டாபர் ரெட் பேஸ்ட் - 200g",
       "groceryEn": "Dabar Red paste - 200g",
+      "tanglish": "Dabur Red Paste - 200g",
       "type": "அழகுசாதன பொருள்",
       "qtyType": "g",
       "from": "D Mart",
@@ -259,6 +287,7 @@
     {
       "grocery": "சென்ஸுடன் பேஸ்ட் கிரீன் - 150g",
       "groceryEn": "Sensodyne paste - Green - 150g",
+      "tanglish": "Sensodyne Paste Green - 150g",
       "type": "அழகுசாதன பொருள்",
       "qtyType": "g",
       "from": "D Mart",
@@ -268,6 +297,7 @@
     {
       "grocery": "காதி சோப் - சந்தனம்",
       "groceryEn": "Khadi soap",
+      "tanglish": "Khadi Soap - Santhanam",
       "type": "அழகுசாதன பொருள்",
       "qtyType": "Countable",
       "from": "D Mart"
@@ -275,6 +305,7 @@
     {
       "grocery": "கொல்டு வின்னர்",
       "groceryEn": "Gold winner",
+      "tanglish": "Gold Winner",
       "type": "எண்ணெய் வகை",
       "qtyType": "Ltr",
       "from": "D Mart"
@@ -282,6 +313,7 @@
     {
       "grocery": "விம் டிராப் - 500ml",
       "groceryEn": "Vim liquid - 500ml",
+      "tanglish": "Vim Drop - 500ml",
       "type": "சுத்திகரிப்பு பொருள்",
       "qtyType": "ml",
       "from": "D Mart",
@@ -291,6 +323,7 @@
     {
       "grocery": "உஜாலா நீளம்",
       "groceryEn": "Ujala",
+      "tanglish": "Ujala Neelam",
       "type": "சுத்திகரிப்பு பொருள்",
       "qtyType": "Countable",
       "from": "D Mart"
@@ -298,6 +331,7 @@
     {
       "grocery": "குட் நைட்",
       "groceryEn": "Good night - Mosquito repellant",
+      "tanglish": "Good Night",
       "type": "சுத்திகரிப்பு பொருள்",
       "qtyType": "Countable",
       "from": "D Mart"
@@ -305,6 +339,7 @@
     {
       "grocery": "சர்ப் எக்செல் சோப் - 250கிராம்",
       "groceryEn": "Surf Excel soap - 250g",
+      "tanglish": "Surf Excel Soap - 250 Gram",
       "type": "சுத்திகரிப்பு பொருள்",
       "qtyType": "g",
       "from": "D Mart",
@@ -314,6 +349,7 @@
     {
       "grocery": "கிளினிக் பிளஸ் ஷாம்பு - 650ml",
       "groceryEn": "Clinic Plus Shampoo - 650ml",
+      "tanglish": "Clinic Plus Shampoo - 650ml",
       "type": "சுத்திகரிப்பு பொருள்",
       "qtyType": "ml",
       "from": "D Mart",
@@ -323,6 +359,7 @@
     {
       "grocery": "கை கழுவி",
       "groceryEn": "Handwash",
+      "tanglish": "Kai Kazhuvi",
       "type": "சுத்திகரிப்பு பொருள்",
       "qtyType": "Countable",
       "from": "D Mart"
@@ -330,6 +367,7 @@
     {
       "grocery": "லைசால் - மஞ்சள் - 500ml",
       "groceryEn": "Lizol - yellow - 500ml",
+      "tanglish": "Lizol - Manjal - 500ml",
       "type": "சுத்திகரிப்பு பொருள்",
       "qtyType": "ml",
       "from": "D Mart",
@@ -339,6 +377,7 @@
     {
       "grocery": "விம் சோப் - 500g",
       "groceryEn": "Vim soap - 500g",
+      "tanglish": "Vim Soap - 500g",
       "type": "சுத்திகரிப்பு பொருள்",
       "qtyType": "g",
       "from": "D Mart",
@@ -348,6 +387,7 @@
     {
       "grocery": "டெட்டால் சொப் - 150g",
       "groceryEn": "Dettol soap (lemon) - 150g",
+      "tanglish": "Dettol Soap - 150g",
       "type": "சுத்திகரிப்பு பொருள்",
       "qtyType": "g",
       "from": "D Mart",
@@ -357,6 +397,7 @@
     {
       "grocery": "கருப்பு சுண்டல் (மூக்கு)",
       "groceryEn": "Black Chenna",
+      "tanglish": "Karuppu Sundal (Mookku)",
       "type": "பருப்பு வகை",
       "qtyType": "g",
       "from": "D Mart"
@@ -364,6 +405,7 @@
     {
       "grocery": "புரு காப்பி தூள் - ரூ.2",
       "groceryEn": "Bru coffee powder - Rs.2",
+      "tanglish": "Bru Coffee Thool - Rs.2",
       "type": "பானம்",
       "qtyType": "Countable",
       "from": "D Mart",
@@ -372,6 +414,7 @@
     {
       "grocery": "கறி மசாலா",
       "groceryEn": "Curry masala",
+      "tanglish": "Kari Masala",
       "type": "மசாலா",
       "qtyType": "g",
       "from": "Amma Store"
@@ -379,6 +422,7 @@
     {
       "grocery": "இட்லி பொடி",
       "groceryEn": "idli powder",
+      "tanglish": "Idli Podi",
       "type": "மசாலா",
       "qtyType": "g",
       "from": "Amma Store"
@@ -386,6 +430,7 @@
     {
       "grocery": "சாம்பார் மசாலா - சக்தி",
       "groceryEn": "Sambar masala - Sakthi",
+      "tanglish": "Sambar Masala - Sakthi",
       "type": "மசாலா",
       "qtyType": "g",
       "from": "Amma Store"
@@ -393,6 +438,7 @@
     {
       "grocery": "அணில் சேமியா - 450g",
       "groceryEn": "Anil Semiya (Vermicelli) - 450g",
+      "tanglish": "Anil Semiya - 450g",
       "type": "மற்றவை",
       "qtyType": "g",
       "from": "D Mart",
@@ -402,6 +448,7 @@
     {
       "grocery": "ராகி சேமியா - 450g",
       "groceryEn": "Ragi Semiya (Vermicelli) - 450g",
+      "tanglish": "Ragi Semiya - 450g",
       "type": "மற்றவை",
       "qtyType": "g",
       "from": "D Mart",
@@ -411,6 +458,7 @@
     {
       "grocery": "இடியாப்ப மாவு",
       "groceryEn": "Idiyappa flour",
+      "tanglish": "Idiyappa Maavu",
       "type": "மற்றவை",
       "qtyType": "Kg",
       "from": "D Mart"
@@ -418,6 +466,7 @@
     {
       "grocery": "டாடா உப்பு",
       "groceryEn": "Tata salt",
+      "tanglish": "Tata Uppu",
       "type": "மற்றவை",
       "qtyType": "Kg",
       "from": "D Mart"
@@ -425,6 +474,7 @@
     {
       "grocery": "நூடுல்ஸ் - Maggi - 420g",
       "groceryEn": "Noodles - Maggi - 420g",
+      "tanglish": "Noodles - Maggi - 420g",
       "type": "மற்றவை",
       "qtyType": "g",
       "from": "D Mart",
@@ -434,6 +484,7 @@
     {
       "grocery": "ரவை - அணில்",
       "groceryEn": "Rava - Anil",
+      "tanglish": "Ravai - Anil",
       "type": "மற்றவை",
       "qtyType": "Kg",
       "from": "D Mart"
@@ -441,6 +492,7 @@
     {
       "grocery": "ஆசீர்வாத் கோதுமை மாவு",
       "groceryEn": "Ashirvad Atta",
+      "tanglish": "Aashirvaad Kothumai Maavu",
       "type": "மாவு வகை",
       "qtyType": "Kg",
       "from": "D Mart"
@@ -448,6 +500,7 @@
     {
       "grocery": "மிளகாய் தூள்",
       "groceryEn": "Chilli powder",
+      "tanglish": "Milagai Thool",
       "type": "மசாலா",
       "qtyType": "g",
       "from": "Amma Store"
@@ -455,6 +508,7 @@
     {
       "grocery": "மஞ்சள் தூள்",
       "groceryEn": "Turmeric powder",
+      "tanglish": "Manjal Thool",
       "type": "மசாலா",
       "qtyType": "g",
       "from": "Amma Store"
@@ -462,6 +516,7 @@
     {
       "grocery": "பஜ்ஜி மிக்ஸ் - 200g",
       "groceryEn": "Bajji mix - 200g",
+      "tanglish": "Bajji Mix - 200g",
       "type": "மாவு வகை",
       "qtyType": "g",
       "from": "D Mart",
@@ -471,6 +526,7 @@
     {
       "grocery": "காது குடைப்பான்",
       "groceryEn": "Ear buds",
+      "tanglish": "Kaadhu Kudaippaan",
       "type": "மற்றவை",
       "qtyType": "Countable",
       "from": "D Mart"
@@ -478,6 +534,7 @@
     {
       "grocery": "பேர் & லவ்லீ - 25g",
       "groceryEn": "Fair and lovely - 25g",
+      "tanglish": "Fair & Lovely - 25g",
       "type": "அழகுசாதன பொருள்",
       "qtyType": "g",
       "from": "D Mart",
@@ -487,6 +544,7 @@
     {
       "grocery": "கிமியா பேரிச்சை",
       "groceryEn": "Kimiya dates",
+      "tanglish": "Kimiya Perichai",
       "type": "உலர் பழங்கள்",
       "qtyType": "Countable",
       "from": "D Mart"
@@ -494,6 +552,7 @@
     {
       "grocery": "மல்லி",
       "groceryEn": "Coriander",
+      "tanglish": "Malli",
       "type": "பயறு வகை",
       "qtyType": "Kg",
       "from": "Balamurugan"
@@ -501,6 +560,7 @@
     {
       "grocery": "சோம்பு",
       "groceryEn": "Fennel",
+      "tanglish": "Sombu",
       "type": "வாசனை பொருள்",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -508,6 +568,7 @@
     {
       "grocery": "சீரகம்",
       "groceryEn": "Cumin",
+      "tanglish": "Seeragam",
       "type": "வாசனை பொருள்",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -515,6 +576,7 @@
     {
       "grocery": "தீப்பெட்டி - பெரியது",
       "groceryEn": "Match box",
+      "tanglish": "Theeppetti - Periyathu",
       "type": "மற்றவை",
       "qtyType": "Countable",
       "from": "Balamurugan"
@@ -522,6 +584,7 @@
     {
       "grocery": "எள்ளு - கருப்பு",
       "groceryEn": "Black Sesame",
+      "tanglish": "Ellu - Karuppu",
       "type": "வாசனை பொருள்",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -529,6 +592,7 @@
     {
       "grocery": "எள்ளு - வெள்ளை",
       "groceryEn": "White Sesame",
+      "tanglish": "Ellu - Vellai",
       "type": "வாசனை பொருள்",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -536,6 +600,7 @@
     {
       "grocery": "பாதாம் பருப்பு",
       "groceryEn": "Badam",
+      "tanglish": "Baadhaam Paruppu",
       "type": "உலர் பழங்கள்",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -543,6 +608,7 @@
     {
       "grocery": "பட்டை",
       "groceryEn": "Pattai",
+      "tanglish": "Pattai",
       "type": "வாசனை பொருள்",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -550,6 +616,7 @@
     {
       "grocery": "சிக்கன் மசாலா",
       "groceryEn": "Chicken masala",
+      "tanglish": "Chicken Masala",
       "type": "மசாலா",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -557,6 +624,7 @@
     {
       "grocery": "அரிசி மாவு",
       "groceryEn": "Rice flour",
+      "tanglish": "Arisi Maavu",
       "type": "மாவு வகை",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -564,6 +632,7 @@
     {
       "grocery": "மட்டன் மசாலா",
       "groceryEn": "Mutton masala",
+      "tanglish": "Mutton Masala",
       "type": "மசாலா",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -571,6 +640,7 @@
     {
       "grocery": "நாட்டு சர்க்கரை",
       "groceryEn": "Jaggery",
+      "tanglish": "Naattu Sarkkarai",
       "type": "மற்றவை",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -578,6 +648,7 @@
     {
       "grocery": "கருப்பு பீன்ஸ்",
       "groceryEn": "Black beans",
+      "tanglish": "Karuppu Beans",
       "type": "பருப்பு வகை",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -585,6 +656,7 @@
     {
       "grocery": "ராஜ்மா",
       "groceryEn": "Rajma",
+      "tanglish": "Rajma",
       "type": "பருப்பு வகை",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -592,6 +664,7 @@
     {
       "grocery": "கல்பாசி",
       "groceryEn": "Dagad Phool",
+      "tanglish": "Kalpaasi",
       "type": "மற்றவை",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -599,6 +672,7 @@
     {
       "grocery": "டவ் ஷாம்பு - 650ml",
       "groceryEn": "Dove shampoo - 650ml",
+      "tanglish": "Dove Shampoo - 650ml",
       "type": "அழகுசாதன பொருள்",
       "qtyType": "ml",
       "from": "D Mart",
@@ -608,6 +682,7 @@
     {
       "grocery": "சென்சோடைன் பிரஷ்",
       "groceryEn": "Sensodyne brush - 3",
+      "tanglish": "Sensodyne Brush",
       "type": "சுத்திகரிப்பு பொருள்",
       "qtyType": "Countable",
       "from": "D Mart",
@@ -617,6 +692,7 @@
     {
       "grocery": "டெட்டால் சொப் - 100g",
       "groceryEn": "Dettol soap (lemon) - 100g",
+      "tanglish": "Dettol Soap - 100g",
       "type": "சுத்திகரிப்பு பொருள்",
       "qtyType": "g",
       "from": "D Mart",
@@ -626,6 +702,7 @@
     {
       "grocery": "சோபி பேட் - பெரியது",
       "groceryEn": "Sofy pad - Big",
+      "tanglish": "Sofy Pad - Periyathu",
       "type": "மற்றவை",
       "qtyType": "Countable",
       "from": "D Mart"
@@ -633,6 +710,7 @@
     {
       "grocery": "பீதாம்பரி பவுடர்",
       "groceryEn": "Pitambari powder",
+      "tanglish": "Pitambari Powder",
       "type": "சுத்திகரிப்பு பொருள்",
       "qtyType": "Countable",
       "from": "D Mart"
@@ -640,6 +718,7 @@
     {
       "grocery": "பனங்கற்கண்டு (திடம்)",
       "groceryEn": "Palm sugar",
+      "tanglish": "Panangkarkandu (Thidam)",
       "type": "உலர் பழங்கள்",
       "qtyType": "g",
       "from": "Rajan Nellai Store"
@@ -647,6 +726,7 @@
     {
       "grocery": "தீப எண்ணெய்",
       "groceryEn": "Lamp oil",
+      "tanglish": "Deepa Ennai",
       "type": "எண்ணெய் வகை",
       "qtyType": "Ltr",
       "from": "D Mart"
@@ -654,6 +734,7 @@
     {
       "grocery": "சில்வர் நார்",
       "groceryEn": "Silver scrub",
+      "tanglish": "Silver Naar",
       "type": "சுத்திகரிப்பு பொருள்",
       "qtyType": "Countable",
       "from": "D Mart"
@@ -661,6 +742,7 @@
     {
       "grocery": "ஸ்கிராட்ச் பிரைட் நார்",
       "groceryEn": "Scartch brite scrub",
+      "tanglish": "Scotch Brite Naar",
       "type": "சுத்திகரிப்பு பொருள்",
       "qtyType": "Countable",
       "from": "D Mart"
@@ -668,6 +750,7 @@
     {
       "grocery": "மக்கானா",
       "groceryEn": "Makhana",
+      "tanglish": "Makkaanaa",
       "type": "மற்றவை",
       "qtyType": "g",
       "from": "D Mart"
@@ -675,6 +758,7 @@
     {
       "grocery": "குதிரைவாலி அரிசி",
       "groceryEn": "Kuthiraivaali rice",
+      "tanglish": "Kuthiraivaali Arisi",
       "type": "மாவு வகை",
       "qtyType": "g",
       "from": "D Mart"
@@ -682,6 +766,7 @@
     {
       "grocery": "கடலை மாவு",
       "groceryEn": "Gram flour",
+      "tanglish": "Kadalai Maavu",
       "type": "மாவு வகை",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -689,6 +774,7 @@
     {
       "grocery": "ராகி மாவு",
       "groceryEn": "Raagi flour",
+      "tanglish": "Ragi Maavu",
       "type": "மாவு வகை",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -696,6 +782,7 @@
     {
       "grocery": "உலர்திராட்சை",
       "groceryEn": "Raisin",
+      "tanglish": "Ular Thiraatchai",
       "type": "உலர் பழங்கள்",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -703,6 +790,7 @@
     {
       "grocery": "சன்னா மசாலா - 50கிராம்",
       "groceryEn": "Channa masala - 50g",
+      "tanglish": "Channa Masala - 50 Gram",
       "type": "மசாலா",
       "qtyType": "g",
       "from": "Balamurugan",
@@ -712,6 +800,7 @@
     {
       "grocery": "வரகு சேமியா - 180g",
       "groceryEn": "KODO millet semiya - 180g",
+      "tanglish": "Varagu Semiya - 180g",
       "type": "மற்றவை",
       "qtyType": "g",
       "from": "D Mart",
@@ -721,6 +810,7 @@
     {
       "grocery": "மராட்டி மொக்கு",
       "groceryEn": "Maratti mokku",
+      "tanglish": "Maratti Mokku",
       "type": "வாசனை பொருள்",
       "qtyType": "Rs",
       "from": "Balamurugan"
@@ -728,6 +818,7 @@
     {
       "grocery": "மாப்பிள்ளை சம்பா",
       "groceryEn": "Mappillai samba",
+      "tanglish": "Maappillai Samba",
       "type": "மாவு வகை",
       "qtyType": "g",
       "from": "D Mart"
@@ -735,6 +826,7 @@
     {
       "grocery": "ராகி",
       "groceryEn": "Raagi",
+      "tanglish": "Ragi",
       "type": "மாவு வகை",
       "qtyType": "g",
       "from": "D Mart"
@@ -742,6 +834,7 @@
     {
       "grocery": "கம்பு",
       "groceryEn": "Kambu",
+      "tanglish": "Kambu",
       "type": "மாவு வகை",
       "qtyType": "g",
       "from": "D Mart"
@@ -749,6 +842,7 @@
     {
       "grocery": "ஹார்பிக் - 1ltr",
       "groceryEn": "Harpic - 1ltr",
+      "tanglish": "Harpic - 1ltr",
       "type": "சுத்திகரிப்பு பொருள்",
       "qtyType": "ltr",
       "from": "D Mart",
@@ -758,6 +852,7 @@
     {
       "grocery": "பிரஷ் - குழந்தைகள்",
       "groceryEn": "Kids brush",
+      "tanglish": "Brush - Kuzhandhaigal",
       "type": "சுத்திகரிப்பு பொருள்",
       "qtyType": "Countable",
       "from": "D Mart"
@@ -765,6 +860,7 @@
     {
       "grocery": "பிரியாணி சாமான்",
       "groceryEn": "Briyani spices",
+      "tanglish": "Briyani Saamaan",
       "type": "வாசனை பொருள்",
       "qtyType": "Rs",
       "from": "D Mart"
@@ -772,6 +868,7 @@
     {
       "grocery": "சோளம் சேமியா",
       "groceryEn": "Millet Semiya (Vermicelli)",
+      "tanglish": "Solam Semiya",
       "type": "மற்றவை",
       "qtyType": "Countable",
       "from": "D Mart"
@@ -779,6 +876,7 @@
     {
       "grocery": "சுக்கு",
       "groceryEn": "Sukku",
+      "tanglish": "Sukku",
       "type": "வாசனை பொருள்",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -786,6 +884,7 @@
     {
       "grocery": "கரம் மசாலா",
       "groceryEn": "Garam masala",
+      "tanglish": "Garam Masala",
       "type": "மசாலா",
       "qtyType": "g",
       "from": "Amma Store"
@@ -793,6 +892,7 @@
     {
       "grocery": "பாப் கார்ன்",
       "groceryEn": "Pop Corn - Act II",
+      "tanglish": "Pop Corn",
       "type": "மற்றவை",
       "qtyType": "Countable",
       "from": "Amazon Fresh"
@@ -800,6 +900,7 @@
     {
       "grocery": "மைதா",
       "groceryEn": "Maida",
+      "tanglish": "Maida",
       "type": "மாவு வகை",
       "qtyType": "Kg",
       "from": "Balamurugan"
@@ -807,6 +908,7 @@
     {
       "grocery": "கருப்பு உளுந்து",
       "groceryEn": "Black urid dal",
+      "tanglish": "Karuppu Ulundhu",
       "type": "பருப்பு வகை",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -814,6 +916,7 @@
     {
       "grocery": "பூண்டு",
       "groceryEn": "Garlic",
+      "tanglish": "Poondu",
       "type": "வாசனை பொருள்",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -821,6 +924,7 @@
     {
       "grocery": "கார்ன் பிளவர்",
       "groceryEn": "Cornflower",
+      "tanglish": "Corn Flour",
       "type": "மாவு வகை",
       "qtyType": "g",
       "from": "Balamurugan"
@@ -828,6 +932,7 @@
     {
       "grocery": "கோகுல் சாண்டல் பௌடர்",
       "groceryEn": "Gokul sandal powder",
+      "tanglish": "Gokul Sandal Powder",
       "type": "அழகுசாதன பொருள்",
       "qtyType": "Countable",
       "from": "Balamurugan"
@@ -835,6 +940,7 @@
     {
       "grocery": "துவரம் பருப்பு",
       "groceryEn": "Toor dal",
+      "tanglish": "Thuvaram Paruppu",
       "type": "பருப்பு வகை",
       "qtyType": "Countable",
       "from": "Balamurugan"

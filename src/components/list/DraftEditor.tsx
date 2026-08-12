@@ -8,7 +8,7 @@ import { Sheet } from "@/components/Sheet";
 import { ShopFilter } from "@/components/list/ShopFilter";
 import { Stepper } from "@/components/Stepper";
 import { finalizeList, getItemPriceHistory, removeListItem, updateListItem } from "@/lib/actions";
-import { bilingualName, useLanguage } from "@/lib/language";
+import { displayName, displayNameLine, useLanguage } from "@/lib/language";
 import { formatPrice, formatQty, type UnitType } from "@/lib/units";
 import type { ListDetailDTO, ListItemDTO, PriceHistoryDTO, ShopDTO } from "@/lib/types";
 
@@ -161,7 +161,7 @@ export function DraftEditor({ list }: DraftEditorProps) {
               </p>
               <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
                 {items.map((item) => {
-                  const name = bilingualName(item.nameTa, item.nameEn, language);
+                  const name = displayName(item, language);
                   const expanded = expandedItemId === item.id;
                   const history = historyByItem[item.itemId];
                   return (
@@ -274,6 +274,7 @@ export function DraftEditor({ list }: DraftEditorProps) {
       <ShopPickerSheet
         item={shopPickerFor}
         shops={list.shops}
+        subtitle={shopPickerFor ? displayNameLine(shopPickerFor, language) : undefined}
         onClose={() => setShopPickerFor(null)}
         onPick={changeShop}
       />
@@ -284,21 +285,18 @@ export function DraftEditor({ list }: DraftEditorProps) {
 function ShopPickerSheet({
   item,
   shops,
+  subtitle,
   onClose,
   onPick,
 }: {
   item: ListItemDTO | null;
   shops: ShopDTO[];
+  subtitle?: string;
   onClose: () => void;
   onPick: (item: ListItemDTO, shopId: number | null) => void;
 }) {
   return (
-    <Sheet
-      open={item !== null}
-      onClose={onClose}
-      title="Shop by"
-      subtitle={item ? `${item.nameEn} · ${item.nameTa}` : undefined}
-    >
+    <Sheet open={item !== null} onClose={onClose} title="Shop by" subtitle={subtitle}>
       {item ? (
         <ul className="divide-y divide-ios-separator overflow-hidden rounded-ios bg-ios-surface-2">
           {shops.map((shop) => (

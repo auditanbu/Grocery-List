@@ -66,6 +66,9 @@ function parseCsv(text: string): string[][] {
 const HEADER_ALIASES: Record<keyof MasterRow, string[]> = {
   grocery: ["grocery", "tamil", "tamil name", "item"],
   groceryEn: ["grocery.1", "grocery1", "english", "english name", "item name"],
+  // Optional — the Tanglish name (Tamil in Latin script). Absent from the
+  // original spreadsheet export; blank rows are transliterated on import.
+  tanglish: ["tanglish", "tanglish name", "roman", "romanised", "romanized"],
   type: ["type", "category"],
   qtyType: ["qty type", "qtytype", "unit type", "uom"],
   from: ["from", "shop", "shop by", "store"],
@@ -76,7 +79,13 @@ const HEADER_ALIASES: Record<keyof MasterRow, string[]> = {
   unit: ["unit", "pack size", "pack qty", "size"],
   variableUnit: ["variable unit", "has variable unit", "variable size"],
 };
-const OPTIONAL_COLUMNS: (keyof MasterRow)[] = ["grocery", "from", "unit", "variableUnit"];
+const OPTIONAL_COLUMNS: (keyof MasterRow)[] = [
+  "grocery",
+  "tanglish",
+  "from",
+  "unit",
+  "variableUnit",
+];
 
 function columnIndexes(header: string[]) {
   const normalized = header.map((h) => h.trim().toLowerCase());
@@ -121,6 +130,7 @@ async function main() {
     return {
       grocery: at(row, indexes.grocery),
       groceryEn: at(row, indexes.groceryEn),
+      tanglish: at(row, indexes.tanglish),
       type: at(row, indexes.type),
       qtyType: at(row, indexes.qtyType),
       from: at(row, indexes.from),

@@ -39,6 +39,7 @@ export default async function ItemHistoryPage({ params }: { params: Promise<{ id
       <header>
         <h1 className="text-[30px] font-bold leading-tight tracking-tight">{item.nameTa}</h1>
         <p className="text-[15px] text-ios-label-2">
+          {item.nameTl ? `${item.nameTl} · ` : ""}
           {item.nameEn} · {item.categoryName}
           {item.shopName ? ` · ${item.shopName}` : ""}
         </p>

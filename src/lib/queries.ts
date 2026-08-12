@@ -90,7 +90,11 @@ export async function getMasterItems(options?: {
       // (unlike Postgres).
       ...(search
         ? {
-            OR: [{ nameEn: { contains: search } }, { nameTa: { contains: search } }],
+            OR: [
+              { nameEn: { contains: search } },
+              { nameTa: { contains: search } },
+              { nameTl: { contains: search } },
+            ],
           }
         : {}),
     },
@@ -105,6 +109,7 @@ export async function getMasterItems(options?: {
     id: item.id,
     nameEn: item.nameEn,
     nameTa: item.nameTa,
+    nameTl: item.nameTl,
     unitType: item.unitType,
     defaultQty: num(item.defaultQty),
     categoryId: item.categoryId,
@@ -173,6 +178,7 @@ export async function getList(id: number): Promise<ListDetailDTO | null> {
       itemId: row.itemId,
       nameEn: row.item.nameEn,
       nameTa: row.item.nameTa,
+      nameTl: row.item.nameTl,
       categoryId: row.item.categoryId,
       categoryName: row.item.category.nameEn,
       categoryNameTa: row.item.category.nameTa,

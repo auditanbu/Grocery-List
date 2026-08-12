@@ -23,6 +23,8 @@ export type MasterItemDTO = {
   id: number;
   nameEn: string;
   nameTa: string;
+  /** Tamil name in Latin script ("Kadalai Paruppu"); null when not supplied yet. */
+  nameTl: string | null;
   unitType: UnitType;
   defaultQty: number;
   categoryId: number;
@@ -43,6 +45,8 @@ export type ListItemDTO = {
   itemId: number;
   nameEn: string;
   nameTa: string;
+  /** Tamil name in Latin script ("Kadalai Paruppu"); null when not supplied yet. */
+  nameTl: string | null;
   categoryId: number;
   categoryName: string;
   categoryNameTa: string | null;
