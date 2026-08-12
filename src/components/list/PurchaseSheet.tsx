@@ -14,23 +14,29 @@ import type { ListItemDTO, PriceHistoryDTO } from "@/lib/types";
 
 type PurchaseSheetProps = {
   item: ListItemDTO | null;
+  /** False on a closed list — the quantity is then a historical record. */
+  editable?: boolean;
   onClose: () => void;
 };
 
 /**
  * Prompted when an item is checked off while shopping: capture what was
- * actually paid and show live how it compares with last month. Items
- * marked `hasVariableUnit` (sold in inconsistent pack sizes) also let the
- * shopper adjust the quantity/unit here — e.g. the list wants 200 g but the
- * store only has 150 g, or a 3-pack becomes a 4-pack of a different size.
+ * actually paid and show live how it compares with last month.
+ *
+ * The quantity can be corrected here too, behind a small edit button —
+ * what you meant to buy and what you walked out with often differ (the
+ * store had 150 g not 200 g; you grabbed two). Items marked
+ * `hasVariableUnit` (sold in inconsistent pack sizes) open with the editor
+ * already showing, since those are expected to need it.
  */
-export function PurchaseSheet({ item, onClose }: PurchaseSheetProps) {
+export function PurchaseSheet({ item, editable = true, onClose }: PurchaseSheetProps) {
   const router = useRouter();
   const { language } = useLanguage();
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState(0);
   const [unitType, setUnitType] = useState<UnitType>("COUNT");
   const [history, setHistory] = useState<PriceHistoryDTO[] | null>(null);
+  const [editingQuantity, setEditingQuantity] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -38,6 +44,7 @@ export function PurchaseSheet({ item, onClose }: PurchaseSheetProps) {
     setPrice(item?.purchasePrice != null ? String(item.purchasePrice) : "");
     setQuantity(item?.quantity ?? 0);
     setUnitType(item?.unitType ?? "COUNT");
+    setEditingQuantity(item?.hasVariableUnit ?? false);
     setError(null);
     setHistory(null);
     if (item) {
@@ -61,7 +68,7 @@ export function PurchaseSheet({ item, onClose }: PurchaseSheetProps) {
       return;
     }
     startTransition(async () => {
-      if (item.hasVariableUnit && sizeChanged) {
+      if (sizeChanged) {
         const sizeResult = await updateListItem({ listItemId: item.id, quantity, unitType });
         if (!sizeResult.ok) {
           setError(sizeResult.error);
@@ -90,14 +97,20 @@ export function PurchaseSheet({ item, onClose }: PurchaseSheetProps) {
     });
   };
 
+  // The quantity row below carries the amount whenever it's editable, so the
+  // subtitle only spells it out when that row is hidden.
   return (
     <Sheet
       open
       onClose={onClose}
       title={name.primary}
-      subtitle={`${name.secondary} · List wants ${formatQty(item.quantity, item.unitType)}${
-        item.shopName ? ` · ${item.shopName}` : ""
-      }`}
+      subtitle={[
+        name.secondary,
+        editable ? null : `List wants ${formatQty(item.quantity, item.unitType)}`,
+        item.shopName,
+      ]
+        .filter(Boolean)
+        .join(" · ")}
       footer={
         <div className="space-y-2">
           <button
@@ -122,32 +135,58 @@ export function PurchaseSheet({ item, onClose }: PurchaseSheetProps) {
       }
     >
       <div className="space-y-4 pb-3">
-        {item.hasVariableUnit ? (
-          <label className="block">
-            <span className="text-[13px] font-medium text-ios-label-2">
-              Quantity &amp; size bought
-              {sizeChanged ? (
-                <span className="ml-1.5 font-normal text-ios-blue">
-                  (list wanted {formatQty(item.quantity, item.unitType)})
-                </span>
-              ) : null}
-            </span>
-            <div className="mt-1.5">
-              <Stepper
-                value={quantity}
-                unit={unitType}
-                onChange={(nextQuantity, nextUnit) => {
-                  setQuantity(nextQuantity);
-                  setUnitType(nextUnit);
-                }}
-                aria-label={`Quantity for ${item.nameEn}`}
-              />
+        {editable ? (
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[13px] font-medium text-ios-label-2">
+                Quantity bought
+                {sizeChanged ? (
+                  <span className="ml-1.5 font-normal text-ios-blue">
+                    (list wanted {formatQty(item.quantity, item.unitType)})
+                  </span>
+                ) : null}
+              </span>
+              {editingQuantity ? null : (
+                <button
+                  type="button"
+                  onClick={() => setEditingQuantity(true)}
+                  aria-label={`Edit quantity, currently ${formatQty(quantity, unitType)}`}
+                  className="flex h-8 flex-none items-center gap-1.5 rounded-full bg-ios-surface-2 px-3 text-[14px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator transition active:scale-95"
+                >
+                  <span className="tabular-nums">{formatQty(quantity, unitType)}</span>
+                  <svg viewBox="0 0 24 24" className="h-4 w-4 flex-none" aria-hidden>
+                    <path
+                      d="M4 20l.9-4.2L15.6 5.1a1.6 1.6 0 0 1 2.3 0l1 1a1.6 1.6 0 0 1 0 2.3L8.2 19.1 4 20zM14.8 6l3.2 3.2"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              )}
             </div>
-            <span className="mt-1.5 block text-[12px] text-ios-label-3">
-              Store had a different size or pack? Adjust it here — the price
-              comparison accounts for the change.
-            </span>
-          </label>
+
+            {editingQuantity ? (
+              <div className="mt-1.5">
+                <Stepper
+                  value={quantity}
+                  unit={unitType}
+                  onChange={(nextQuantity, nextUnit) => {
+                    setQuantity(nextQuantity);
+                    setUnitType(nextUnit);
+                  }}
+                  aria-label={`Quantity for ${item.nameEn}`}
+                />
+                <span className="mt-1.5 block text-[12px] text-ios-label-3">
+                  {item.hasVariableUnit
+                    ? "Store had a different size or pack? Adjust it here — the price comparison accounts for the change."
+                    : "Bought a different amount? Adjust it here — the price you enter below is taken as the price for this quantity."}
+                </span>
+              </div>
+            ) : null}
+          </div>
         ) : null}
 
         <label className="block">

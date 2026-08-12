@@ -182,8 +182,17 @@ once the list has been finalized and reality starts diverging from the plan:
   one tap rather than a trip back through *Edit list*. Changes are
   optimistic and reconciled against the server (`updateListItem`, which
   accepts `FINALIZED` lists and refuses only `COMPLETED` ones). Once an
-  item is checked off its quantity belongs to the purchase sheet, which
-  re-prices it, so the stepper drops away.
+  item is checked off the row's stepper drops away — its quantity is then
+  the purchase sheet's business, because changing it has to re-price the
+  item too.
+- **The purchase sheet can correct the quantity as well.** What you meant
+  to buy and what you walked out with often differ, and you usually only
+  notice at the till — so `PurchaseSheet` shows the amount next to a small
+  edit button, which reveals the same stepper. Saving applies the size
+  change before `recordPurchase`, so the price you type is recorded against
+  the quantity you actually bought and the `PriceHistory` row snapshots
+  both together. Items marked `hasVariableUnit` open with the editor
+  already showing, since those are expected to need it.
 - **Add item** (`ShopAddSheet`) covers what never made the list. It
   searches the master catalogue server-side, and anything genuinely new can
   be created on the spot — Tamil / Tanglish / English name, category, unit,
