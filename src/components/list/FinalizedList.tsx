@@ -1,7 +1,7 @@
 "use client";
 
 import { groupByShop } from "@/components/list/DraftEditor";
-import { bilingualName, useLanguage } from "@/lib/language";
+import { displayName, useLanguage } from "@/lib/language";
 import { formatPrice, formatQty, projectPrice, unitGroup } from "@/lib/units";
 import type { ListItemDTO } from "@/lib/types";
 
@@ -64,7 +64,7 @@ export function FinalizedList({ items, shopName }: FinalizedListProps) {
             <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
               {groupItems.map((item) => {
                 serial += 1;
-                const name = bilingualName(item.nameTa, item.nameEn, language);
+                const name = displayName(item, language);
                 return (
                   <li key={item.id} className="ios-row">
                     <span className="w-6 flex-none text-[14px] tabular-nums text-ios-label-3">

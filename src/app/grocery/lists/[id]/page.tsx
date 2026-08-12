@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { ListScreen } from "@/components/list/ListScreen";
-import { getList } from "@/lib/queries";
+import { getCategories, getList } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -13,5 +13,7 @@ export default async function ListPage({ params }: { params: Promise<{ id: strin
   const list = await getList(listId);
   if (!list) notFound();
 
-  return <ListScreen list={list} />;
+  const categories = await getCategories();
+
+  return <ListScreen list={list} categories={categories} />;
 }

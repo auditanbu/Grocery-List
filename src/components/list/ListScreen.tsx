@@ -14,10 +14,12 @@ import { ShoppingView } from "@/components/list/ShoppingView";
 import { reopenList } from "@/lib/actions";
 import { monthKeyToLabel } from "@/lib/dates";
 import { useLanguage } from "@/lib/language";
-import type { ListDetailDTO } from "@/lib/types";
+import type { CategoryDTO, ListDetailDTO } from "@/lib/types";
 
 type ListScreenProps = {
   list: ListDetailDTO;
+  /** Master categories — needed to create an item from the shopping view. */
+  categories: CategoryDTO[];
 };
 
 type Mode = "list" | "shopping";
@@ -28,7 +30,7 @@ const STATUS_LABEL = {
   COMPLETED: "Completed",
 } as const;
 
-export function ListScreen({ list }: ListScreenProps) {
+export function ListScreen({ list, categories }: ListScreenProps) {
   const router = useRouter();
   const { language } = useLanguage();
   const [mode, setMode] = useState<Mode>(list.status === "COMPLETED" ? "shopping" : "list");
@@ -147,7 +149,7 @@ export function ListScreen({ list }: ListScreenProps) {
           {mode === "list" ? (
             <FinalizedList items={visibleItems} shopName={selectedShopName} />
           ) : (
-            <ShoppingView list={list} items={visibleItems} />
+            <ShoppingView list={list} items={visibleItems} categories={categories} />
           )}
         </>
       )}

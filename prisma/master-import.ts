@@ -1,5 +1,6 @@
 import { PrismaClient } from "../src/generated/prisma/client.js";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+import { hasTamilScript, toTanglish } from "../src/lib/tanglish.js";
 import { parseUnitType } from "../src/lib/units.js";
 
 /** One spreadsheet row from "Grocery database.xlsx". */
@@ -8,6 +9,12 @@ export type MasterRow = {
   grocery: string;
   /** "Grocery.1" — English name */
   groceryEn: string;
+  /**
+   * Tanglish — the Tamil name in Latin script ("Kadalai Paruppu"). Not a
+   * spreadsheet column; hand-written in master-data.json. Omitted rows are
+   * transliterated from the Tamil name on import.
+   */
+  tanglish?: string;
   /** "Type" — category, matched against Category.nameEn or nameTa */
   type: string;
   /** "Qty Type" — kg | g | L | ml | Rs | blank */
@@ -93,6 +100,8 @@ export async function importMasterData(prisma: PrismaClient, data: MasterData) {
     const nameEn = row.groceryEn?.trim();
     const nameTa = row.grocery?.trim();
     const categoryId = categoryIds.get(row.type?.trim() ?? "");
+    const nameTl =
+      row.tanglish?.trim() || (nameTa && hasTamilScript(nameTa) ? toTanglish(nameTa) : nameEn);
 
     if (!nameEn || !categoryId) {
       skipped.push(`${nameTa || nameEn || "(unnamed)"} — missing English name or category`);
@@ -117,6 +126,7 @@ export async function importMasterData(prisma: PrismaClient, data: MasterData) {
       // current.
       update: {
         nameTa: nameTa || nameEn,
+        nameTl,
         unitType,
         shopId,
         isActive: true,
@@ -126,6 +136,7 @@ export async function importMasterData(prisma: PrismaClient, data: MasterData) {
       create: {
         nameEn,
         nameTa: nameTa || nameEn,
+        nameTl,
         unitType,
         categoryId,
         shopId,

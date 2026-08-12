@@ -7,6 +7,7 @@ import masterData from "../../prisma/data/master-data.json";
 import { isAdminSession } from "./admin";
 import { prisma } from "./prisma";
 import { listNameFor, monthKeyOf } from "./dates";
+import { hasTamilScript, toTanglish } from "./tanglish";
 import { normalizeQty, type UnitType } from "./units";
 
 export type ActionResult<T = undefined> =
@@ -78,6 +79,13 @@ export async function deleteList(listId: number): Promise<ActionResult> {
   return { ok: true };
 }
 
+/**
+ * Adds a master item to a list. Allowed on a DRAFT list (the Add items
+ * page) and on a FINALIZED one — you routinely spot something at the shop
+ * that never made it onto the list, and reopening to a draft just to add it
+ * would throw away the shopping progress. A COMPLETED list is a closed
+ * record and stays closed.
+ */
 export async function addListItem(input: {
   listId: number;
   itemId: number;
@@ -88,7 +96,7 @@ export async function addListItem(input: {
 }): Promise<ActionResult<{ listItemId: number }>> {
   const list = await prisma.groceryList.findUnique({ where: { id: input.listId } });
   if (!list) return fail("List not found.");
-  if (list.status !== "DRAFT") return fail("Reopen the list before adding items.");
+  if (list.status === "COMPLETED") return fail("This list is closed.");
 
   const item = await prisma.item.findUnique({ where: { id: input.itemId } });
   if (!item) return fail("Item not found.");
@@ -309,6 +317,8 @@ export async function upsertMasterItem(input: {
   id?: number;
   nameEn: string;
   nameTa: string;
+  /** Tanglish. Blank derives one from the Tamil name rather than storing nothing. */
+  nameTl?: string;
   categoryId: number;
   unitType: UnitType;
   shopId: number | null;
@@ -334,6 +344,21 @@ export async function upsertMasterItem(input: {
     }
   }
 
+  // Same reasoning as nameTa above: a blank field must not wipe a Tanglish
+  // name that's already stored. When there's nothing to preserve, one is
+  // transliterated from the Tamil name so the field is never left empty.
+  let nameTl = input.nameTl?.trim() ?? "";
+  if (!nameTl) {
+    if (input.id) {
+      const existing = await prisma.item.findUnique({
+        where: { id: input.id },
+        select: { nameTl: true },
+      });
+      nameTl = existing?.nameTl?.trim() || "";
+    }
+    if (!nameTl) nameTl = hasTamilScript(nameTa) ? toTanglish(nameTa) : nameEn;
+  }
+
   const defaultQty = normalizeQty(input.defaultQty ?? 1, input.unitType);
 
   const clash = await prisma.item.findFirst({
@@ -349,6 +374,7 @@ export async function upsertMasterItem(input: {
   const data = {
     nameEn,
     nameTa,
+    nameTl,
     categoryId: input.categoryId,
     unitType: input.unitType,
     shopId: input.shopId,
@@ -479,7 +505,59 @@ export async function updateCategory(input: {
   return { ok: true };
 }
 
-type KnownTranslationRow = { grocery: string; groceryEn: string };
+type KnownTranslationRow = { grocery: string; groceryEn: string; tanglish?: string };
+
+/**
+ * Fills in Tanglish names for every item still missing one. The
+ * spreadsheet's hand-written `tanglish` column wins where it has an entry;
+ * anything else (items typed in by hand, at the shop or in the master
+ * list) is transliterated from its Tamil name.
+ *
+ * `overwrite` re-derives names that are already stored too — useful after
+ * the spreadsheet gains better spellings, but it discards manual edits, so
+ * it isn't the default.
+ */
+export async function fillTanglishNames(
+  options?: { overwrite?: boolean },
+): Promise<ActionResult<{ fromSpreadsheet: number; transliterated: number; remaining: number }>> {
+  if (!(await isAdminSession())) return fail("Admin only.");
+
+  const lookup = new Map<string, string>();
+  for (const row of (masterData.items as KnownTranslationRow[]) ?? []) {
+    const key = row.groceryEn.trim().toLowerCase();
+    const value = row.tanglish?.trim();
+    if (key && value && !lookup.has(key)) lookup.set(key, value);
+  }
+
+  const items = await prisma.item.findMany({
+    select: { id: true, nameEn: true, nameTa: true, nameTl: true },
+  });
+
+  let fromSpreadsheet = 0;
+  let transliterated = 0;
+  let remaining = 0;
+  for (const item of items) {
+    const current = item.nameTl?.trim() ?? "";
+    if (current && !options?.overwrite) continue;
+
+    const known = lookup.get(item.nameEn.trim().toLowerCase());
+    const derived = known ?? (hasTamilScript(item.nameTa) ? toTanglish(item.nameTa) : null);
+    if (!derived) {
+      // Nothing in the spreadsheet and no Tamil script to work from — the
+      // name has to be typed in by hand.
+      if (!current) remaining += 1;
+      continue;
+    }
+    if (derived === current) continue;
+
+    await prisma.item.update({ where: { id: item.id }, data: { nameTl: derived } });
+    if (known) fromSpreadsheet += 1;
+    else transliterated += 1;
+  }
+
+  revalidatePath("/grocery/master");
+  return { ok: true, data: { fromSpreadsheet, transliterated, remaining } };
+}
 
 /**
  * Fixes two kinds of Tamil drift against the original spreadsheet (bundled

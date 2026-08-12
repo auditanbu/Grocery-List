@@ -4,6 +4,7 @@
 // Mirrors the master data exported from "Grocery database.xlsx":
 //   Grocery    -> Item.nameTa   (Tamil name)
 //   Grocery.1  -> Item.nameEn   (English name)
+//   (added)    -> Item.nameTl   (Tanglish — the Tamil name in Latin script)
 //   Type       -> Category      (e.g. பருப்பு வகை / Dals)
 //   Qty Type   -> Item.unitType (kg, g, L, ml, Rs, or blank = countable)
 //   From       -> Shop          (e.g. D Mart, Balamurugan, Jio Mart)
@@ -81,6 +82,12 @@ model Item {
   id              Int      @id @default(autoincrement())
   nameTa          String
   nameEn          String
+  /// "Tanglish" — the Tamil name written in Latin script
+  /// (கடலை பருப்பு -> "Kadalai Paruppu"). Optional: null means nobody has
+  /// supplied one yet, and the UI falls back to the Tamil name. Kept
+  /// separate from nameEn because the English name is a *translation*
+  /// ("Bengal gram"), not something you can read out loud at the shop.
+  nameTl          String?
   unitType        UnitType @default(COUNT)
   /// Quantity pre-filled when the item is added to a list.
   defaultQty      Decimal  @default(1) @db.Decimal(10, 2)

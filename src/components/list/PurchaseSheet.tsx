@@ -8,6 +8,7 @@ import { PriceDelta } from "@/components/PriceDelta";
 import { Sheet } from "@/components/Sheet";
 import { Stepper } from "@/components/Stepper";
 import { getItemPriceHistory, recordPurchase, undoPurchase, updateListItem } from "@/lib/actions";
+import { displayName, useLanguage } from "@/lib/language";
 import { formatPrice, formatQty, type UnitType } from "@/lib/units";
 import type { ListItemDTO, PriceHistoryDTO } from "@/lib/types";
 
@@ -25,6 +26,7 @@ type PurchaseSheetProps = {
  */
 export function PurchaseSheet({ item, onClose }: PurchaseSheetProps) {
   const router = useRouter();
+  const { language } = useLanguage();
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState(0);
   const [unitType, setUnitType] = useState<UnitType>("COUNT");
@@ -45,6 +47,7 @@ export function PurchaseSheet({ item, onClose }: PurchaseSheetProps) {
 
   if (!item) return null;
 
+  const name = displayName(item, language);
   const sizeChanged = quantity !== item.quantity || unitType !== item.unitType;
   const reference = item.purchasePrice != null ? item.previousPrice : item.lastPrice;
   const referenceQuantity = item.purchasePrice != null ? item.previousQuantity : item.lastPriceQuantity;
@@ -91,8 +94,8 @@ export function PurchaseSheet({ item, onClose }: PurchaseSheetProps) {
     <Sheet
       open
       onClose={onClose}
-      title={item.nameTa}
-      subtitle={`${item.nameEn} · List wants ${formatQty(item.quantity, item.unitType)}${
+      title={name.primary}
+      subtitle={`${name.secondary} · List wants ${formatQty(item.quantity, item.unitType)}${
         item.shopName ? ` · ${item.shopName}` : ""
       }`}
       footer={
