@@ -6,6 +6,7 @@ import { PrismaClientKnownRequestError } from "@/generated/prisma/internal/prism
 import masterData from "../../prisma/data/master-data.json";
 import { isAdminSession } from "./admin";
 import { prisma } from "./prisma";
+import { COPYABLE_ITEM, getCopySource } from "./queries";
 import { listNameFor, monthKeyOf } from "./dates";
 import { hasTamilScript, toTanglish } from "./tanglish";
 import { normalizeQty, type UnitType } from "./units";
@@ -134,6 +135,83 @@ export async function addListItem(input: {
 
   revalidateList(input.listId);
   return { ok: true, data: { listItemId: created.id } };
+}
+
+/**
+ * Seeds a draft from last month — the single most repetitive part of planning
+ * a monthly list, since the staples barely change.
+ *
+ * Copies quantity, unit and shop as they stood at the end of the source list,
+ * so an amount corrected mid-shop ("actually, 2 kg") is what carries forward,
+ * not what was originally planned. It is additive and safe to re-run: anything
+ * already on the draft is left exactly as it is.
+ */
+export async function copyPreviousList(input: {
+  listId: number;
+  /** Defaults to the newest earlier list — pass an id to copy a specific one. */
+  sourceListId?: number;
+}): Promise<ActionResult<{ copied: number; skipped: number; sourceName: string }>> {
+  const list = await prisma.groceryList.findUnique({ where: { id: input.listId } });
+  if (!list) return fail("List not found.");
+  if (list.status !== "DRAFT") return fail("Only a draft can be filled from an earlier list.");
+
+  const source =
+    input.sourceListId === undefined
+      ? await getCopySource(list.monthKey)
+      : await prisma.groceryList.findUnique({ where: { id: input.sourceListId } });
+
+  if (!source) return fail("No earlier list to copy from.");
+  if (source.id === list.id) return fail("A list cannot be copied onto itself.");
+
+  const sourceItems = await prisma.groceryListItem.findMany({
+    where: { listId: source.id, ...COPYABLE_ITEM },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+    select: { itemId: true, quantity: true, unitType: true, shopId: true },
+  });
+
+  const existing = await prisma.groceryListItem.findMany({
+    where: { listId: list.id },
+    select: { itemId: true, shopId: true },
+  });
+
+  // Same key addListItem dedupes on, so copying twice can't double a row.
+  const taken = new Set(existing.map((row) => `${row.itemId}:${row.shopId}`));
+  const rows: {
+    listId: number;
+    itemId: number;
+    quantity: number;
+    unitType: UnitType;
+    shopId: number | null;
+    sortOrder: number;
+  }[] = [];
+
+  for (const row of sourceItems) {
+    const key = `${row.itemId}:${row.shopId}`;
+    if (taken.has(key)) continue;
+    taken.add(key);
+    rows.push({
+      listId: list.id,
+      itemId: row.itemId,
+      quantity: normalizeQty(Number(row.quantity), row.unitType as UnitType),
+      unitType: row.unitType as UnitType,
+      shopId: row.shopId,
+      sortOrder: existing.length + rows.length,
+    });
+  }
+
+  if (rows.length > 0) {
+    await prisma.groceryListItem.createMany({ data: rows });
+    revalidateList(list.id);
+  }
+
+  return {
+    ok: true,
+    data: {
+      copied: rows.length,
+      skipped: sourceItems.length - rows.length,
+      sourceName: source.name,
+    },
+  };
 }
 
 export async function updateListItem(input: {
