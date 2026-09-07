@@ -253,7 +253,7 @@ Due dates are `"YYYY-MM-DD"` `CHAR(10)` columns, extending the existing
 lexicographically, and nothing round-trips through a `Date` whose timezone
 could shift it a day. The only place the real clock is read is
 `todayDateKey()` in `src/lib/dates.ts`, which applies India's fixed +5:30 so
-"today" is correct even though Railway runs UTC.
+"today" is correct even though the container runs UTC.
 
 ### Reminders
 
@@ -286,45 +286,107 @@ what would fire. The sweep is **idempotent**: it writes a `BudgetReminder` row
 before sending, and that row's unique key on `(expenseId, dueDate, kind)` means
 a re-run sends nothing. Dead endpoints (HTTP 404/410) are pruned automatically.
 
-Trigger it once a day, either way:
+Trigger it once a day, any of these ways:
 
-- **Railway cron service** — a second service from this repo, Start Command
-  `npm run cron:reminders`, Cron Schedule `30 3 * * *` (09:00 IST), with
-  `APP_URL` and `CRON_SECRET` set.
+- **Coolify scheduled task** (recommended) — on the application, add a
+  Scheduled Task with frequency `30 3 * * *` (09:00 IST) and command:
+
+  ```bash
+  curl -fsS -X POST -H "x-cron-secret: $CRON_SECRET" \
+    http://127.0.0.1:3000/api/budget/reminders
+  ```
+
+  It runs inside the app container, so the request never leaves the host and
+  needs no `APP_URL`. `curl` is installed by the Dockerfile for exactly this.
+- **`npm run cron:reminders`** — the same thing over the public URL, for a
+  scheduler that runs outside the container. Needs `APP_URL` and `CRON_SECRET`.
 - **External scheduler** (free) — cron-job.org or a GitHub Actions
   `schedule` workflow POSTing the URL with the `x-cron-secret` header.
 
-## 8. Deploying to Railway
+## 8. Deploying to Coolify
 
-1. **Push this repo to GitHub** (or connect your fork).
-2. In Railway: **New Project → Deploy from GitHub repo**, pick this repo.
-3. **Add a MySQL plugin**: New → Database → Add MySQL (not Postgres —
-   the schema's `datasource` provider is `mysql`). Railway creates
-   `DATABASE_URL` and friends on that service automatically.
-4. On the **web service**, add environment variables:
-   - `DATABASE_URL` → reference the MySQL plugin's URL, e.g.
-     `${{ MySQL.DATABASE_URL }}` in Railway's variable picker.
-   - For Family Budget push reminders (optional — everything else works
-     without them): `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
-     and `CRON_SECRET`. See §7 for how to generate the keys.
-5. **Build & start commands** (Railway auto-detects Next.js, but to be
-   explicit under Settings → Deploy):
-   - Build: `npm run build` (this runs `prisma generate` first)
-   - Start: `npm run start`
-6. **Run migrations against the Railway database** once, either via
-   Railway's shell (`railway run npm run db:deploy`) or by adding a
-   **Release Command** of `npm run db:deploy` under Settings → Deploy —
-   Railway runs it before each deploy goes live.
-7. **Seed master data** the same way: `railway run npm run db:seed`, or
-   `railway run npm run db:import -- "./Grocery database.csv"` for your
-   real spreadsheet.
-8. Railway assigns a public domain automatically (Settings → Networking →
-   Generate Domain). Because the manifest's `start_url` is relative, no
-   further config is needed for "Add to Home Screen" to work on that
-   domain.
+The app ships a `Dockerfile`, so Coolify builds and runs it the same way on
+any host. Three files do the work:
 
-Local MySQL alternative for development, if you don't want to depend on
-Railway while iterating:
+| File | Role |
+|---|---|
+| `Dockerfile` | Two-stage build; installs `curl`, runs as the `node` user |
+| `docker-entrypoint.sh` | `prisma migrate deploy`, then `npm run start` |
+| `src/app/api/health/route.ts` | Liveness probe for the health check |
+
+The image keeps the full `node_modules` rather than using Next's
+`output: "standalone"`, because the container needs the `prisma` CLI to run
+migrations on boot and `tsx` to run `db:import` / `db:seed` from Coolify's
+terminal. See the comment at the top of the `Dockerfile`.
+
+### Steps
+
+1. **Create the database** — New Resource → **MySQL** (not Postgres; the
+   schema's `datasource` provider is `mysql`). Note the generated user,
+   password, database name, and the **internal** hostname.
+2. **Create the application** — New Resource → Public/Private Repository,
+   point it at this repo, and set **Build Pack: Dockerfile**. Coolify picks
+   up the `Dockerfile` at the repo root; leave the port at `3000`.
+3. **Environment variables** on the application:
+
+   | Variable | Value |
+   |---|---|
+   | `DATABASE_URL` | `mysql://<user>:<pass>@<internal-host>:3306/<db>` |
+   | `APP_URL` | `https://your-domain` |
+   | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | see §7 |
+   | `CRON_SECRET` | any random string |
+
+   Mark the two VAPID secrets and `CRON_SECRET` as secret values. All of
+   them are read at request time, so none is baked into the image and
+   changing one only needs a restart, not a rebuild.
+4. **Domain** — set it in Coolify (Configuration → Domains) and point an `A`
+   record at the host. Coolify's proxy issues the Let's Encrypt certificate.
+   Because the manifest's `start_url` is relative, "Add to Home Screen"
+   works on the new domain with no further config.
+5. **Health check** — path `/api/health`, port `3000`. The endpoint returns
+   200 whenever the process is alive and reports the database separately in
+   its body; see the comment in the route for why it does not fail on a
+   database outage.
+6. **Deploy.** Migrations apply automatically — `docker-entrypoint.sh` runs
+   `prisma migrate deploy` before the server starts, and aborts the boot if
+   the database is unreachable, so a bad `DATABASE_URL` fails the deploy
+   instead of going live broken. There is no separate release command to
+   configure.
+7. **Seed master data** from the application's terminal in Coolify:
+   `npm run db:seed`, or `npm run db:import -- "./Grocery database.csv"`
+   for the real spreadsheet.
+8. **Reminders** — add the scheduled task described in §7.
+
+### Migrating an existing Railway deployment
+
+1. Dump from Railway and restore into the Coolify database *before* the
+   first deploy, so `prisma migrate deploy` sees the schema as current:
+
+   ```bash
+   mysqldump --single-transaction --no-tablespaces <railway-url> > grocery.sql
+   mysql <coolify-url> < grocery.sql
+   ```
+
+2. Verify the restore: `_prisma_migrations` should list every directory in
+   `prisma/migrations`, and row counts on `Item`, `GroceryList`,
+   `PriceHistory` and `BudgetExpense` should match the old database. On the
+   first boot the entrypoint then finds nothing to apply.
+3. There is no dual-write, so anything entered on Railway after the dump is
+   lost — do the cutover in a quiet window and keep Railway running for a
+   day or two as a fallback.
+4. **A new domain resets web push.** Service worker registrations and the
+   `PushSubscription` rows behind them are bound to an origin, so every
+   family member must re-add the app to their Home Screen and re-enable
+   reminders (`/budget` → bell → **Turn on for this device**). The rows
+   pointing at the old origin are dead weight; they are pruned automatically
+   after five consecutive send failures, or can be cleared in one go:
+
+   ```sql
+   DELETE FROM PushSubscription;
+   ```
+
+Local MySQL alternative for development, if you don't want to depend on a
+remote database while iterating:
 
 ```bash
 docker run --name grocery-mysql -e MYSQL_ROOT_PASSWORD=root \
@@ -350,6 +412,7 @@ src/
     budget/expenses/page.tsx  Manage the recurring expense rules (admin)
     api/budget/reminders/route.ts    Daily reminder sweep (x-cron-secret)
     api/budget/subscription/route.ts Re-register a rotated push endpoint
+    api/health/route.ts      Liveness probe for the container health check
     manifest.ts              Web App Manifest
   components/
     Stepper.tsx              The unit-aware +/- control
@@ -376,6 +439,9 @@ scripts/
 public/
   sw.js                      Offline shell service worker + push handlers
   icons/                     Manifest icons (generated by scripts/generate-icons.mjs)
+Dockerfile                   Production image (see §8)
+docker-entrypoint.sh         Applies migrations, then starts the server
+.dockerignore                Keeps host node_modules/.next/.env out of the build
 ```
 
 ## PWA notes
