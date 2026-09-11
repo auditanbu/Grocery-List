@@ -47,8 +47,7 @@ FROM node:22-alpine AS runner
 
 WORKDIR /app
 
-# curl is what the Coolify scheduled task uses to fire the daily reminder
-# sweep against localhost, and what the container health check uses.
+# curl is what the container health check uses.
 RUN apk add --no-cache curl
 
 ENV NODE_ENV=production

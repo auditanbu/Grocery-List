@@ -11,7 +11,6 @@ iPad and desktop.
 |---|---|
 | Frontend | Next.js 16 (App Router), React 19, Tailwind CSS 4 |
 | Backend | Next.js Server Actions + Route Handlers |
-| Notifications | Web Push (`web-push` + VAPID) via the service worker |
 | Database | MySQL via Prisma ORM 7 (`@prisma/adapter-mariadb` driver adapter) |
 | PDF export | `jspdf` + `jspdf-autotable` |
 | PWA | Web App Manifest (`app/manifest.ts`) + a hand-written offline service worker |
@@ -102,11 +101,6 @@ current set (synced from a supplementary spreadsheet).
 - **`PriceHistory`** — append-only ledger of what was actually paid, used
   to power the "cheaper/dearer than last time" comparison and the History
   tab.
-
-The Family Budget module adds `BudgetCategory`, `BudgetExpense` (the recurrence
-rule), `BudgetOccurrence` (sparse — only touched dates), `BudgetReminder` (the
-push dedupe log) and `PushSubscription`. See §7 for why occurrences are derived
-rather than materialized.
 
 Prisma 7 uses driver adapters instead of a bundled query engine binary —
 `src/lib/prisma.ts` wires up `@prisma/adapter-mariadb` (works against both
@@ -214,96 +208,7 @@ traditional print sheet with `jspdf-autotable`:
   (jsPDF cannot shape Tamil); English *and* Tanglish are both Latin script,
   so they take the crisp vector `jspdf-autotable` path.
 
-## 7. Family Budget module
-
-`/budget` tracks recurring household bills — rent, EB, insurance, internet,
-mobile — on a calendar and a list, covering both past and upcoming dates.
-Only an admin (unlocked with the app's PIN, see `src/lib/admin.ts`) can add or
-change anything; every other family member has read-only access. The client
-only hides the controls — every mutating Server Action re-checks the admin
-cookie server-side.
-
-### Occurrences are derived, not stored
-
-`BudgetExpense` is a **rule**, not a list of dates: an anchor date plus an
-interval in months (`ONE_OFF`, `MONTHLY`, `EVERY_2_MONTHS`, `QUARTERLY`,
-`HALF_YEARLY`, `YEARLY`, or `CUSTOM_MONTHS` with its own "every N months").
-Due dates are computed on read by `src/lib/budget/recurrence.ts`, so:
-
-- the calendar works arbitrarily far forward and back with no generator job
-  and no horizon to run past;
-- editing a rule needs no reconciliation of already-generated rows.
-
-`BudgetOccurrence` is therefore **sparse** — a row exists only once someone has
-touched that date (paid it, skipped it, or overridden its amount). Reads take
-the union of rule-generated dates and stored rows, so a row whose date the rule
-no longer produces still appears, flagged as *moved*, and editing a schedule
-can never silently erase payment history.
-
-Occurrence k is always `anchorDate + k * interval` months, computed from the
-anchor rather than by stepping off occurrence k−1, and clamped to short months.
-A bill due on the 31st therefore gives 31 Jan → 28 Feb → **31** Mar → 30 Apr,
-instead of collapsing to the 28th forever. `scripts/check-recurrence.ts`
-(`npx tsx scripts/check-recurrence.ts`) asserts this and ~35 other cases.
-
-### Dates are civil strings
-
-Due dates are `"YYYY-MM-DD"` `CHAR(10)` columns, extending the existing
-`monthKey` convention rather than using `DATE`/`DateTime`. They sort and range
-lexicographically, and nothing round-trips through a `Date` whose timezone
-could shift it a day. The only place the real clock is read is
-`todayDateKey()` in `src/lib/dates.ts`, which applies India's fixed +5:30 so
-"today" is correct even though the container runs UTC.
-
-### Reminders
-
-Two independent channels, so the module is useful even with nothing configured:
-
-1. **In-app alerts** — overdue and due-in-7-days banners on `/budget`. Always
-   on, every device, no setup.
-2. **Web push** — a notification on the due date, plus a heads-up
-   `reminderLeadDays` beforehand (default 2).
-
-Push setup:
-
-```bash
-npx web-push generate-vapid-keys     # -> VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY
-```
-
-Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` and `CRON_SECRET`
-on the web service. Each family member then opens `/budget` → the bell icon →
-**Turn on for this device**. Subscribing is deliberately *not* admin-gated —
-reminders are useless if only one person can receive them.
-
-> **On iPhone, web push only works once the app is added to the Home Screen**
-> (iOS 16.4+). In a normal Safari tab the API is absent and the sheet says so.
-> The in-app alerts still work there.
-
-`POST /api/budget/reminders` runs the daily sweep, authenticated with the
-`x-cron-secret` header (an unset `CRON_SECRET` returns 503 — it never falls
-open). `GET` on the same URL is always a dry run, which is a safe way to see
-what would fire. The sweep is **idempotent**: it writes a `BudgetReminder` row
-before sending, and that row's unique key on `(expenseId, dueDate, kind)` means
-a re-run sends nothing. Dead endpoints (HTTP 404/410) are pruned automatically.
-
-Trigger it once a day, any of these ways:
-
-- **Coolify scheduled task** (recommended) — on the application, add a
-  Scheduled Task with frequency `30 3 * * *` (09:00 IST) and command:
-
-  ```bash
-  curl -fsS -X POST -H "x-cron-secret: $CRON_SECRET" \
-    http://127.0.0.1:3000/api/budget/reminders
-  ```
-
-  It runs inside the app container, so the request never leaves the host and
-  needs no `APP_URL`. `curl` is installed by the Dockerfile for exactly this.
-- **`npm run cron:reminders`** — the same thing over the public URL, for a
-  scheduler that runs outside the container. Needs `APP_URL` and `CRON_SECRET`.
-- **External scheduler** (free) — cron-job.org or a GitHub Actions
-  `schedule` workflow POSTing the URL with the `x-cron-secret` header.
-
-## 8. Deploying to Coolify
+## 7. Deploying to Coolify
 
 The app ships a `Dockerfile`, so Coolify builds and runs it the same way on
 any host. Three files do the work:
@@ -332,13 +237,9 @@ terminal. See the comment at the top of the `Dockerfile`.
    | Variable | Value |
    |---|---|
    | `DATABASE_URL` | `mysql://<user>:<pass>@<internal-host>:3306/<db>` |
-   | `APP_URL` | `https://your-domain` |
-   | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | see §7 |
-   | `CRON_SECRET` | any random string |
 
-   Mark the two VAPID secrets and `CRON_SECRET` as secret values. All of
-   them are read at request time, so none is baked into the image and
-   changing one only needs a restart, not a rebuild.
+   It is read at request time, so it is never baked into the image and
+   changing it only needs a restart, not a rebuild.
 4. **Domain** — set it in Coolify (Configuration → Domains) and point an `A`
    record at the host. Coolify's proxy issues the Let's Encrypt certificate.
    Because the manifest's `start_url` is relative, "Add to Home Screen"
@@ -355,7 +256,6 @@ terminal. See the comment at the top of the `Dockerfile`.
 7. **Seed master data** from the application's terminal in Coolify:
    `npm run db:seed`, or `npm run db:import -- "./Grocery database.csv"`
    for the real spreadsheet.
-8. **Reminders** — add the scheduled task described in §7.
 
 ### Migrating an existing Railway deployment
 
@@ -369,22 +269,11 @@ terminal. See the comment at the top of the `Dockerfile`.
 
 2. Verify the restore: `_prisma_migrations` should list every directory in
    `prisma/migrations`, and row counts on `Item`, `GroceryList`,
-   `PriceHistory` and `BudgetExpense` should match the old database. On the
+   `PriceHistory` and `FuelEntry` should match the old database. On the
    first boot the entrypoint then finds nothing to apply.
 3. There is no dual-write, so anything entered on Railway after the dump is
    lost — do the cutover in a quiet window and keep Railway running for a
    day or two as a fallback.
-4. **A new domain resets web push.** Service worker registrations and the
-   `PushSubscription` rows behind them are bound to an origin, so every
-   family member must re-add the app to their Home Screen and re-enable
-   reminders (`/budget` → bell → **Turn on for this device**). The rows
-   pointing at the old origin are dead weight; they are pruned automatically
-   after five consecutive send failures, or can be cleared in one go:
-
-   ```sql
-   DELETE FROM PushSubscription;
-   ```
-
 Local MySQL alternative for development, if you don't want to depend on a
 remote database while iterating:
 
@@ -408,10 +297,6 @@ src/
     master/page.tsx         Master List tab — browse/search/edit the catalogue
     history/page.tsx        History tab — spend per month, biggest price moves
     items/[id]/page.tsx      Per-item price history
-    budget/page.tsx          Family Budget — calendar + list, ?month=YYYY-MM
-    budget/expenses/page.tsx  Manage the recurring expense rules (admin)
-    api/budget/reminders/route.ts    Daily reminder sweep (x-cron-secret)
-    api/budget/subscription/route.ts Re-register a rotated push endpoint
     api/health/route.ts      Liveness probe for the container health check
     manifest.ts              Web App Manifest
   components/
@@ -422,7 +307,6 @@ src/
     list/                    Draft editor, finalized list, shopping mode, PDF button,
                              ShopAddSheet (add an item mid-shop)
     master/                  Master catalogue browser + editor sheet
-    budget/                  Calendar grid, list view, expense + payment sheets
   lib/
     units.ts                 Stepper steps, formatting, Qty Type parsing
     tanglish.ts               Tamil → Latin transliteration (Tanglish fallback)
@@ -430,16 +314,13 @@ src/
     pdf.ts                    Print-sheet PDF builder
     prisma.ts, queries.ts     DB client + read queries (Decimal → plain number)
     actions.ts                Server Actions (create/finalize lists, record purchases, …)
-    dates.ts                  monthKey + "YYYY-MM-DD" civil-date helpers
-    budget/                   recurrence.ts (rule maths), queries, actions,
-                              push.ts / push-client.ts, reminders.ts
+    dates.ts                  monthKey helpers and label formatting
 scripts/
-  check-recurrence.ts        Assertions for the recurrence maths (npx tsx)
-  send-reminders.ts          Daily cron trigger (npm run cron:reminders)
+  generate-icons.mjs         Manifest icon generator (node, needs sharp)
 public/
-  sw.js                      Offline shell service worker + push handlers
+  sw.js                      Offline shell service worker
   icons/                     Manifest icons (generated by scripts/generate-icons.mjs)
-Dockerfile                   Production image (see §8)
+Dockerfile                   Production image (see §7)
 docker-entrypoint.sh         Applies migrations, then starts the server
 .dockerignore                Keeps host node_modules/.next/.env out of the build
 ```

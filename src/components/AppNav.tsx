@@ -52,29 +52,6 @@ const PETROL_TAB: Tab = {
   ),
 };
 
-const BUDGET_TAB: Tab = {
-  href: "/budget",
-  label: "Budget",
-  icon: (active) => (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden {...strokeProps}>
-      <rect x="3.5" y="5" width="17" height="15" rx="3" fill={active ? "currentColor" : "none"} />
-      <path d="M3.5 9.5h17M8 3.5v3M16 3.5v3" stroke={active ? "#fff" : "currentColor"} />
-      <path d="M8 13h4.5M8 16.5h7" stroke={active ? "#fff" : "currentColor"} />
-    </svg>
-  ),
-};
-
-const BUDGET_EXPENSES_TAB: Tab = {
-  href: "/budget/expenses",
-  label: "Expenses",
-  icon: (active) => (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden {...strokeProps}>
-      <rect x="3.5" y="4.5" width="17" height="15" rx="3" fill={active ? "currentColor" : "none"} />
-      <path d="M7.5 9.5h9M7.5 13h9M7.5 16.5h5" stroke={active ? "#fff" : "currentColor"} />
-    </svg>
-  ),
-};
-
 const MASTER_TAB: Tab = {
   href: "/grocery/master",
   label: "Master List",
@@ -105,8 +82,6 @@ function isActive(pathname: string, href: string) {
   if (href === "/grocery") {
     return pathname === "/grocery" || pathname.startsWith("/grocery/lists") || pathname.startsWith("/grocery/items");
   }
-  // Otherwise /budget would also light up while on /budget/expenses.
-  if (href === "/budget") return pathname === "/budget";
   return pathname.startsWith(href);
 }
 
@@ -118,16 +93,10 @@ function isActive(pathname: string, href: string) {
 export function AppNav() {
   const pathname = usePathname() ?? "/";
   const inGrocery = pathname.startsWith("/grocery");
-  const inBudget = pathname.startsWith("/budget");
 
-  let tabs: Tab[];
-  if (inGrocery) {
-    tabs = [HOME_TAB, GROCERY_TAB, MASTER_TAB, HISTORY_TAB];
-  } else if (inBudget) {
-    tabs = [HOME_TAB, BUDGET_TAB, BUDGET_EXPENSES_TAB];
-  } else {
-    tabs = [HOME_TAB, GROCERY_TAB, PETROL_TAB, BUDGET_TAB];
-  }
+  const tabs: Tab[] = inGrocery
+    ? [HOME_TAB, GROCERY_TAB, MASTER_TAB, HISTORY_TAB]
+    : [HOME_TAB, GROCERY_TAB, PETROL_TAB];
 
   return (
     <>
