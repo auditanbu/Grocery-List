@@ -52,36 +52,6 @@ const MODULES = [
       </svg>
     ),
   },
-  {
-    href: "/budget",
-    name: "Family Budget",
-    description: "Track recurring bills on a calendar, mark them paid, get reminders.",
-    accent: "bg-ios-green-soft text-ios-green",
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-7 w-7" aria-hidden>
-        <rect
-          x="3.5"
-          y="5"
-          width="17"
-          height="15"
-          rx="3"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-        />
-        <path
-          d="M3.5 9.5h17M8 3.5v3M16 3.5v3"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        />
-        <circle cx="8.5" cy="13" r="1.1" fill="currentColor" />
-        <circle cx="12" cy="13" r="1.1" fill="currentColor" />
-        <circle cx="8.5" cy="16.5" r="1.1" fill="currentColor" />
-      </svg>
-    ),
-  },
 ] as const;
 
 export default function DashboardPage() {
