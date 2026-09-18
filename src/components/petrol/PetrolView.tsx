@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import { AdminLoginButton } from "@/components/AdminLoginButton";
+import { TrashIcon } from "@/components/home/ListRow";
 import { Sheet } from "@/components/Sheet";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAdmin } from "@/lib/admin-context";
@@ -219,52 +220,9 @@ export function PetrolView({ summary }: PetrolViewProps) {
           </p>
         ) : (
           <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
-            {summary.entries.map((entry) => {
-              const date = new Date(entry.refueledAt);
-              return (
-                <li key={entry.id} className="flex items-center gap-3 px-4 py-3">
-                  <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-ios-blue-soft text-ios-blue">
-                    <VehicleIcon vehicle={entry.vehicleType} className="h-5 w-5" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[16px] font-semibold tabular-nums">
-                      {formatPrice(entry.amount)}
-                      <span className="ml-1.5 text-[13px] font-normal text-ios-label-2">{entry.vehicleName}</span>
-                    </span>
-                    <span className="block truncate text-[13px] text-ios-label-2">
-                      {formatDate(date)} · {date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                    {entry.latitude !== null && entry.longitude !== null ? (
-                      <a
-                        href={`https://maps.google.com/?q=${entry.latitude},${entry.longitude}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block truncate text-[13px] text-ios-blue active:opacity-60"
-                      >
-                        {entry.locationLabel ?? "Location"}
-                      </a>
-                    ) : null}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setEditingEntry(entry)}
-                    aria-label="Edit entry"
-                    className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-ios-blue transition active:bg-ios-blue-soft"
-                  >
-                    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
-                      <path
-                        d="M4 20h4l10.5-10.5a1.5 1.5 0 0 0 0-2.12l-1.88-1.88a1.5 1.5 0 0 0-2.12 0L4 16v4Z"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.7"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
-                </li>
-              );
-            })}
+            {summary.entries.map((entry) => (
+              <EntryRow key={entry.id} entry={entry} onEdit={() => setEditingEntry(entry)} />
+            ))}
           </ul>
         )}
       </section>
@@ -279,6 +237,85 @@ export function PetrolView({ summary }: PetrolViewProps) {
       <BudgetSheet open={budgetOpen} onClose={() => setBudgetOpen(false)} current={summary.budget} />
       <VehiclesSheet open={vehiclesOpen} onClose={() => setVehiclesOpen(false)} vehicles={summary.vehicles} />
     </div>
+  );
+}
+
+/**
+ * One logged refuel. Editing stays open to everyone, but deleting is admin-only —
+ * a refuel is a shared spending record, the same rule the server action enforces.
+ */
+function EntryRow({ entry, onEdit }: { entry: FuelEntryDTO; onEdit: () => void }) {
+  const router = useRouter();
+  const { isAdmin } = useAdmin();
+  const [pending, startTransition] = useTransition();
+  const date = new Date(entry.refueledAt);
+
+  const remove = () => {
+    if (!window.confirm(`Delete this ${formatPrice(entry.amount)} refuel entry? This can't be undone.`)) return;
+    startTransition(async () => {
+      const result = await deleteFuelEntry(entry.id);
+      if (!result.ok) {
+        window.alert(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  };
+
+  return (
+    <li className="flex items-center gap-3 px-4 py-3">
+      <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-ios-blue-soft text-ios-blue">
+        <VehicleIcon vehicle={entry.vehicleType} className="h-5 w-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[16px] font-semibold tabular-nums">
+          {formatPrice(entry.amount)}
+          <span className="ml-1.5 text-[13px] font-normal text-ios-label-2">{entry.vehicleName}</span>
+        </span>
+        <span className="block truncate text-[13px] text-ios-label-2">
+          {formatDate(date)} · {date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+        </span>
+        {entry.latitude !== null && entry.longitude !== null ? (
+          <a
+            href={`https://maps.google.com/?q=${entry.latitude},${entry.longitude}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block truncate text-[13px] text-ios-blue active:opacity-60"
+          >
+            {entry.locationLabel ?? "Location"}
+          </a>
+        ) : null}
+      </span>
+      <button
+        type="button"
+        onClick={onEdit}
+        disabled={pending}
+        aria-label="Edit entry"
+        className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-ios-blue transition active:bg-ios-blue-soft disabled:opacity-50"
+      >
+        <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+          <path
+            d="M4 20h4l10.5-10.5a1.5 1.5 0 0 0 0-2.12l-1.88-1.88a1.5 1.5 0 0 0-2.12 0L4 16v4Z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+      {isAdmin ? (
+        <button
+          type="button"
+          onClick={remove}
+          disabled={pending}
+          aria-label={`Delete ${formatPrice(entry.amount)} refuel entry`}
+          className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-ios-red transition active:bg-ios-red-soft disabled:opacity-50"
+        >
+          <TrashIcon />
+        </button>
+      ) : null}
+    </li>
   );
 }
 
