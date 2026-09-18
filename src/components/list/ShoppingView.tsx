@@ -397,7 +397,7 @@ export function ShoppingView({ list, items, categories }: ShoppingViewProps) {
         </button>
       ) : null}
 
-      <PurchaseSheet item={active} onClose={() => setActive(null)} />
+      <PurchaseSheet item={active} editable={editable} onClose={() => setActive(null)} />
 
       <ShopAddSheet
         open={addOpen}
