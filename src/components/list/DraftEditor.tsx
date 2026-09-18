@@ -7,7 +7,14 @@ import { useMemo, useState, useTransition } from "react";
 import { Sheet } from "@/components/Sheet";
 import { ShopFilter } from "@/components/list/ShopFilter";
 import { Stepper } from "@/components/Stepper";
-import { finalizeList, getItemPriceHistory, removeListItem, updateListItem } from "@/lib/actions";
+import {
+  copyPreviousList,
+  finalizeList,
+  getItemPriceHistory,
+  removeListItem,
+  updateListItem,
+} from "@/lib/actions";
+import { monthKeyToLabel } from "@/lib/dates";
 import { displayName, displayNameLine, useLanguage } from "@/lib/language";
 import { formatPrice, formatQty, type UnitType } from "@/lib/units";
 import type { ListDetailDTO, ListItemDTO, PriceHistoryDTO, ShopDTO } from "@/lib/types";
@@ -22,6 +29,7 @@ export function DraftEditor({ list }: DraftEditorProps) {
   const [shopPickerFor, setShopPickerFor] = useState<ListItemDTO | null>(null);
   const [shopId, setShopId] = useState<number | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const [expandedItemId, setExpandedItemId] = useState<number | null>(null);
@@ -89,6 +97,26 @@ export function DraftEditor({ list }: DraftEditorProps) {
     });
   };
 
+  const copyLastMonth = () => {
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      const result = await copyPreviousList({ listId: list.id });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      const { copied, skipped, sourceName } = result.data;
+      const items = copied === 1 ? "item" : "items";
+      setNotice(
+        copied === 0
+          ? `Nothing to copy — every item from ${sourceName} is already on this list.`
+          : `Copied ${copied} ${items} from ${sourceName}${skipped > 0 ? ` · ${skipped} already here` : ""}.`,
+      );
+      router.refresh();
+    });
+  };
+
   const finalize = () => {
     setError(null);
     const zeroCount = list.items.filter((item) => item.quantity === 0).length;
@@ -141,12 +169,35 @@ export function DraftEditor({ list }: DraftEditorProps) {
         <p className="rounded-ios bg-ios-red-soft px-4 py-3 text-[14px] text-ios-red">{error}</p>
       ) : null}
 
+      {notice ? (
+        <p className="rounded-ios bg-ios-surface-2 px-4 py-3 text-[14px] text-ios-label-2 ring-1 ring-inset ring-ios-separator">
+          {notice}
+        </p>
+      ) : null}
+
       {list.items.length === 0 ? (
         <div className="ios-card p-8 text-center">
           <p className="text-[17px] font-medium">Nothing on the list yet</p>
           <p className="mt-1 text-[15px] text-ios-label-2">
             Search your master list and set the quantity and shop for each item.
           </p>
+
+          {list.copySource ? (
+            <div className="mt-5 border-t border-ios-separator pt-5">
+              <button
+                type="button"
+                onClick={copyLastMonth}
+                disabled={pending}
+                className="flex h-12 w-full items-center justify-center rounded-ios bg-ios-surface-2 text-[17px] font-semibold text-ios-blue ring-1 ring-inset ring-ios-separator transition active:scale-[0.98] disabled:opacity-50"
+              >
+                {pending ? "Copying…" : `Copy ${monthKeyToLabel(list.copySource.monthKey)}`}
+              </button>
+              <p className="mt-2 text-[13px] text-ios-label-2">
+                Brings over all {list.copySource.itemCount} items from {list.copySource.name} with
+                the same quantities and shops. Edit or remove anything you don&apos;t need.
+              </p>
+            </div>
+          ) : null}
         </div>
       ) : visibleItems.length === 0 ? (
         <p className="ios-card p-6 text-center text-[15px] text-ios-label-2">

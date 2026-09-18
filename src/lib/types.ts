@@ -81,9 +81,20 @@ export type ListSummaryDTO = {
   createdAt: string;
 };
 
+/** The list a draft can be seeded from — the newest list of an earlier month. */
+export type CopySourceDTO = {
+  id: number;
+  name: string;
+  monthKey: string;
+  /** Rows worth copying (quantity > 0, master item still active). */
+  itemCount: number;
+};
+
 export type ListDetailDTO = ListSummaryDTO & {
   items: ListItemDTO[];
   shops: ShopDTO[];
+  /** Only populated for DRAFT lists; null when there is nothing to copy. */
+  copySource: CopySourceDTO | null;
 };
 
 export type PriceHistoryDTO = {

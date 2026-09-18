@@ -4,6 +4,7 @@ import { prisma } from "./prisma";
 import type { UnitType } from "./units";
 import type {
   CategoryDTO,
+  CopySourceDTO,
   ListDetailDTO,
   ListItemDTO,
   ListSummaryDTO,
@@ -153,6 +154,35 @@ function toSummary(list: {
   };
 }
 
+/**
+ * A row is worth carrying into next month only if it still means something:
+ * quantity 0 is the "check availability" marker the finalize step drops, and a
+ * de-activated master item shouldn't come back to life through a copy.
+ */
+export const COPYABLE_ITEM = { quantity: { gt: 0 }, item: { isActive: true } } as const;
+
+/**
+ * The list a draft can be seeded from — the newest list of an *earlier* month
+ * that still has copyable rows. monthKey is compared as a string, which is the
+ * whole reason it is stored as "YYYY-MM".
+ */
+export async function getCopySource(monthKey: string): Promise<CopySourceDTO | null> {
+  const source = await prisma.groceryList.findFirst({
+    where: { monthKey: { lt: monthKey }, items: { some: COPYABLE_ITEM } },
+    orderBy: [{ monthKey: "desc" }, { createdAt: "desc" }],
+    include: { _count: { select: { items: { where: COPYABLE_ITEM } } } },
+  });
+
+  if (!source) return null;
+
+  return {
+    id: source.id,
+    name: source.name,
+    monthKey: source.monthKey,
+    itemCount: source._count.items,
+  };
+}
+
 export async function getList(id: number): Promise<ListDetailDTO | null> {
   const list = await prisma.groceryList.findUnique({
     where: { id },
@@ -202,6 +232,8 @@ export async function getList(id: number): Promise<ListDetailDTO | null> {
     ...toSummary(list),
     items,
     shops: await getShops(),
+    // Only a draft can be seeded, so don't pay for the lookup otherwise.
+    copySource: list.status === "DRAFT" ? await getCopySource(list.monthKey) : null,
   };
 }
 
