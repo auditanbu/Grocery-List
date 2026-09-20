@@ -125,9 +125,47 @@ export function AddItemsPage({ list, items, shops, categories }: AddItemsPagePro
   // that creates it has come back with a listItemId.
   const creating = useRef<Set<number>>(new Set());
 
+  const searchMatches = useMemo(() => {
+    const trimmed = query.trim();
+    const needle = trimmed.toLowerCase();
+    if (!needle) return items;
+    return items.filter(
+      (item) =>
+        item.nameEn.toLowerCase().includes(needle) ||
+        item.nameTa.includes(trimmed) ||
+        (item.nameTl ?? "").toLowerCase().includes(needle) ||
+        item.categoryName.toLowerCase().includes(needle) ||
+        (item.categoryNameTa ?? "").includes(trimmed),
+    );
+  }, [items, query]);
+
+  const matchesStatus = (item: MasterItemDTO) => {
+    const entry = entries[item.id];
+    if (statusFilter === "unselected" && entry) return false;
+    if (statusFilter === "zero" && (!entry || entry.quantity !== 0)) return false;
+    return true;
+  };
+  const matchesCategory = (item: MasterItemDTO) =>
+    categoryId === null || item.categoryId === categoryId;
+
+  // A count next to a filter option is a promise about what picking it gives,
+  // so each menu counts against every filter *except its own*. Counting the
+  // whole catalogue instead meant "Zero qty" could show one item while the
+  // category menu still offered six.
+  const forCategoryMenu = useMemo(
+    () => searchMatches.filter(matchesStatus),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [searchMatches, statusFilter, entries],
+  );
+  const forStatusMenu = useMemo(
+    () => searchMatches.filter(matchesCategory),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [searchMatches, categoryId],
+  );
+
   const categoryOptions = useMemo(() => {
     const seen = new Map<number, { label: string; count: number }>();
-    for (const item of items) {
+    for (const item of forCategoryMenu) {
       const label = language === "ta" ? (item.categoryNameTa ?? item.categoryName) : item.categoryName;
       const existing = seen.get(item.categoryId);
       if (existing) existing.count += 1;
@@ -136,39 +174,21 @@ export function AddItemsPage({ list, items, shops, categories }: AddItemsPagePro
     return [...seen.entries()]
       .map(([id, value]) => ({ id, ...value }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [items, language]);
+  }, [forCategoryMenu, language]);
 
   const results = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    const trimmed = query.trim();
-    const matches = items.filter((item) => {
-      if (categoryId !== null && item.categoryId !== categoryId) return false;
-
-      const entry = entries[item.id];
-      if (statusFilter === "unselected" && entry) return false;
-      if (statusFilter === "zero" && (!entry || entry.quantity !== 0)) return false;
-
-      if (!needle) return true;
-      return (
-        item.nameEn.toLowerCase().includes(needle) ||
-        item.nameTa.includes(trimmed) ||
-        (item.nameTl ?? "").toLowerCase().includes(needle) ||
-        item.categoryName.toLowerCase().includes(needle) ||
-        (item.categoryNameTa ?? "").includes(trimmed)
-      );
-    });
-
     // Grouped by category id (stable across a language switch), labeled in
     // whichever language is currently selected.
     const grouped = new Map<number, { label: string; items: MasterItemDTO[] }>();
-    for (const item of matches) {
+    for (const item of forCategoryMenu.filter(matchesCategory)) {
       const label = language === "ta" ? (item.categoryNameTa ?? item.categoryName) : item.categoryName;
       const existing = grouped.get(item.categoryId);
       if (existing) existing.items.push(item);
       else grouped.set(item.categoryId, { label, items: [item] });
     }
     return [...grouped.entries()];
-  }, [items, query, language, categoryId, statusFilter, entries]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forCategoryMenu, categoryId, language]);
 
   /**
    * Persists a real row at quantity 0 right away — "on the list, check
@@ -272,11 +292,11 @@ export function AddItemsPage({ list, items, shops, categories }: AddItemsPagePro
   };
 
   const addedCount = Object.values(entries).filter((entry) => entry.listItemId !== null).length;
-  const notAddedCount = items.filter((item) => !entries[item.id]).length;
-  const zeroCount = items.filter((item) => entries[item.id]?.quantity === 0).length;
+  const notAddedCount = forStatusMenu.filter((item) => !entries[item.id]).length;
+  const zeroCount = forStatusMenu.filter((item) => entries[item.id]?.quantity === 0).length;
 
   const categoryFilterOptions: FilterOption<number | null>[] = [
-    { key: "all", label: "All categories", value: null, count: items.length },
+    { key: "all", label: "All categories", value: null, count: forCategoryMenu.length },
     ...categoryOptions.map((option) => ({
       key: String(option.id),
       label: option.label,
@@ -286,7 +306,7 @@ export function AddItemsPage({ list, items, shops, categories }: AddItemsPagePro
   ];
 
   const statusFilterOptions: FilterOption<StatusFilter>[] = [
-    { key: "all", label: "All", value: "all", count: items.length },
+    { key: "all", label: "All", value: "all", count: forStatusMenu.length },
     { key: "unselected", label: "Not added", value: "unselected", count: notAddedCount },
     { key: "zero", label: "Zero qty", value: "zero", count: zeroCount },
   ];
