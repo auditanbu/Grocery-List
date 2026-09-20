@@ -67,6 +67,28 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+/*
+ * What AppNav's bottom tab bar occupies, so anything else pinned to the
+ * bottom can sit on top of it. At md+ the nav becomes a left sidebar and
+ * there is no bottom bar, hence zero. A custom property rather than a
+ * Tailwind arbitrary value: the offset has to respond to the breakpoint,
+ * and calc() needs literal spaces that arbitrary values make awkward.
+ */
+:root {
+  --tab-bar-height: calc(3.75rem + 1px + env(safe-area-inset-bottom));
+  /* The tab bar already absorbs the home indicator on mobile, so a bar
+     sitting on top of it adds nothing. At md+ it becomes the bottom-most
+     element and has to account for it itself (iPad landscape). */
+  --bottom-bar-safe: 0px;
+}
+
+@media (min-width: 48rem) {
+  :root {
+    --tab-bar-height: 0px;
+    --bottom-bar-safe: env(safe-area-inset-bottom);
+  }
+}
+
 body {
   background-color: var(--color-ios-bg);
   color: var(--color-ios-label);

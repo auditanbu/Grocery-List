@@ -27,10 +27,13 @@ function estimatedCost(item: ListItemDTO): number {
 type FinalizedListProps = {
   items: ListItemDTO[];
   shopName: string | null;
+  /** Worded by ListScreen, which knows whether a shop, category or search
+   *  emptied the view. */
+  emptyMessage: string;
 };
 
 /** Read-only print view of a finalized list, filtered to the selected shop. */
-export function FinalizedList({ items, shopName }: FinalizedListProps) {
+export function FinalizedList({ items, shopName, emptyMessage }: FinalizedListProps) {
   const { language } = useLanguage();
   const groups = shopName ? [[shopName, items] as [string, ListItemDTO[]]] : groupByShop(items);
   let serial = 0;
@@ -43,9 +46,7 @@ export function FinalizedList({ items, shopName }: FinalizedListProps) {
       </p>
 
       {items.length === 0 ? (
-        <p className="ios-card p-6 text-center text-[15px] text-ios-label-2">
-          No items for this shop.
-        </p>
+        <p className="ios-card p-6 text-center text-[15px] text-ios-label-2">{emptyMessage}</p>
       ) : (
         groups.map(([group, groupItems]) => {
           const groupTotal = groupItems.reduce((sum, item) => sum + estimatedCost(item), 0);

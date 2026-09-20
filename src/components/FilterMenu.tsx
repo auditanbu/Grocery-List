@@ -32,6 +32,12 @@ type FilterMenuProps<T> = {
  * icon shows the selected option's name once a filter is on, so an active
  * filter is never invisible.
  *
+ * The button stays a fixed 36px circle and shows an applied filter by going
+ * solid blue, rather than growing to spell out the selection: these sit in a
+ * header row of up to seven controls, and one expanding chip pushed the next
+ * button off-screen where it could not be tapped. Which value is selected is
+ * in the title/aria-label, and checked in the sheet.
+ *
  * Options open in the app's existing bottom `Sheet` rather than an anchored
  * popover — there is no popover primitive here, and a sheet is both the
  * established pattern (PurchaseSheet, ShopAddSheet, the draft shop picker)
@@ -59,18 +65,11 @@ export function FilterMenu<T>({
         onClick={() => setOpen(true)}
         aria-label={`${label}: ${selected?.label ?? "All"}`}
         title={`${label}: ${selected?.label ?? "All"}`}
-        className={`flex h-9 flex-none items-center gap-1.5 rounded-full transition active:scale-95 ${
-          active
-            ? "bg-ios-blue pl-2.5 pr-3 text-white"
-            : "w-9 justify-center bg-ios-surface text-ios-blue shadow-ios"
+        className={`flex h-9 w-9 flex-none items-center justify-center rounded-full transition active:scale-95 ${
+          active ? "bg-ios-blue text-white" : "bg-ios-surface text-ios-blue shadow-ios"
         }`}
       >
-        <span className="flex-none">{icon}</span>
-        {active ? (
-          <span className="max-w-24 truncate text-[13px] font-semibold leading-none">
-            {selected?.label}
-          </span>
-        ) : null}
+        {icon}
       </button>
 
       <Sheet open={open} onClose={() => setOpen(false)} title={label}>
@@ -148,6 +147,69 @@ export function CategoryIcon() {
         fill="none"
         stroke="currentColor"
         strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function CartIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+      <path
+        d="M3 4h2.2l2.3 10.3a1.5 1.5 0 0 0 1.5 1.2h7.7a1.5 1.5 0 0 0 1.5-1.2L20 7H6M10 20a1 1 0 1 0 0-.01M17 20a1 1 0 1 0 0-.01"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** Counter-clockwise arrow — "put this list back to a draft". */
+export function ReopenIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+      <path
+        d="M4 5v5h5M4.6 13a7.5 7.5 0 1 0 1.2-5.2L4 10"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** Pencil — unlocks a closed list for editing. Deliberately nothing like
+ *  ReopenIcon: one rewinds the list's status, the other only unlocks a view. */
+export function PencilIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+      <path
+        d="M4 20l.9-4.2L15.6 5.1a1.6 1.6 0 0 1 2.3 0l1 1a1.6 1.6 0 0 1 0 2.3L8.2 19.1 4 20zM14.8 6l3.2 3.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+      <path
+        d="M5 13l4.5 4.5L19 7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />

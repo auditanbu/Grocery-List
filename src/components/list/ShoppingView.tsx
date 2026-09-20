@@ -15,30 +15,20 @@ import type { CategoryDTO, ListDetailDTO, ListItemDTO } from "@/lib/types";
 
 type ShoppingViewProps = {
   list: ListDetailDTO;
-  /** Already narrowed by ListScreen's shop and category filter icons. */
+  /** Already narrowed by ListScreen's filter icons and the search bar. */
   items: ListItemDTO[];
-  /** Master categories, for creating an item that isn't in the catalogue yet. */
-  categories: CategoryDTO[];
   /** False on a completed list until the header "Edit" button unlocks it. */
   editable: boolean;
-  /** Only to word the empty state; the filtering itself happens upstream. */
-  categoryFiltered: boolean;
+  /** Worded upstream — only ListScreen knows all three filter dimensions. */
+  emptyMessage: string;
 };
 
-export function ShoppingView({
-  list,
-  items,
-  categories,
-  editable,
-  categoryFiltered,
-}: ShoppingViewProps) {
+export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingViewProps) {
   const router = useRouter();
   const { language } = useLanguage();
   const [active, setActive] = useState<ListItemDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [query, setQuery] = useState("");
-  const [addOpen, setAddOpen] = useState(false);
 
   const [compareItemId, setCompareItemId] = useState<number | null>(null);
   const [compareState, setCompareState] = useState<
@@ -105,32 +95,16 @@ export function ShoppingView({
     setCompareState((prev) => (item.id in prev ? prev : { ...prev, [item.id]: stateOf(item) }));
   };
 
-  const visibleItems = useMemo(() => {
-    const trimmed = query.trim();
-    const needle = trimmed.toLowerCase();
-    return items.filter((item) => {
-      if (!needle) return true;
-      return (
-        item.nameEn.toLowerCase().includes(needle) ||
-        item.nameTa.includes(trimmed) ||
-        (item.nameTl ?? "").toLowerCase().includes(needle) ||
-        item.categoryName.toLowerCase().includes(needle) ||
-        (item.categoryNameTa ?? "").includes(trimmed) ||
-        (item.shopName ?? "").toLowerCase().includes(needle)
-      );
-    });
-  }, [items, query]);
-
   // Checked-off items sink to the bottom of their shop's section so the
   // remaining to-buy items stay at the top while shopping.
   const groupedByShop = useMemo(() => {
-    return groupByShop(visibleItems).map(
+    return groupByShop(items).map(
       ([shopName, shopItems]) =>
         [shopName, [...shopItems].sort((a, b) => Number(a.isPurchased) - Number(b.isPurchased))] as const,
     );
-  }, [visibleItems]);
+  }, [items]);
 
-  const purchased = visibleItems.filter((item) => item.isPurchased);
+  const purchased = items.filter((item) => item.isPurchased);
   const spent = purchased.reduce((sum, item) => sum + (item.purchasePrice ?? 0), 0);
   // "Finish shopping" completes the whole list, so it must reflect the
   // list's true completion — not just what the shop/category filters show.
@@ -149,75 +123,12 @@ export function ShoppingView({
 
   return (
     <div className="space-y-5">
-      <div className="ios-card flex items-center justify-between p-4">
-        <div>
-          <p className="text-[13px] text-ios-label-2">Bought</p>
-          <p className="text-[22px] font-semibold tabular-nums">
-            {purchased.length}
-            <span className="text-ios-label-3"> / {visibleItems.length}</span>
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-[13px] text-ios-label-2">Spent</p>
-          <p className="text-[22px] font-semibold tabular-nums">{formatPrice(spent)}</p>
-        </div>
-      </div>
-
-      {editable ? (
-        <button
-          type="button"
-          onClick={() => setAddOpen(true)}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-ios bg-ios-blue text-[17px] font-semibold text-white transition active:scale-[0.98]"
-        >
-          <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
-            <path d="M12 6v12M6 12h12" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
-          </svg>
-          Add item
-        </button>
-      ) : null}
-
-      <div className="relative">
-        <svg
-          viewBox="0 0 24 24"
-          className="pointer-events-none absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-ios-label-3"
-          aria-hidden
-        >
-          <circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" strokeWidth="2.1" />
-          <path d="M20 20l-4.3-4.3" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" />
-        </svg>
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search this list"
-          aria-label="Search this list"
-          className="h-11 w-full rounded-ios bg-ios-surface pl-10 pr-10 text-[17px] shadow-ios outline-none focus:ring-2 focus:ring-ios-blue"
-        />
-        {query ? (
-          <button
-            type="button"
-            onClick={() => setQuery("")}
-            aria-label="Clear search"
-            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-ios-label-3 active:opacity-60"
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
-            </svg>
-          </button>
-        ) : null}
-      </div>
-
       {error ? (
         <p className="rounded-ios bg-ios-red-soft px-4 py-3 text-[14px] text-ios-red">{error}</p>
       ) : null}
 
-      {visibleItems.length === 0 ? (
-        <p className="ios-card p-6 text-center text-[15px] text-ios-label-2">
-          {query.trim()
-            ? `Nothing on this list matched “${query.trim()}”.`
-            : categoryFiltered
-              ? "No items in this category."
-              : "No items for this shop."}
-        </p>
+      {items.length === 0 ? (
+        <p className="ios-card p-6 text-center text-[15px] text-ios-label-2">{emptyMessage}</p>
       ) : (
         groupedByShop.map(([shopName, shopItems]) => (
           <section key={shopName}>
@@ -411,16 +322,6 @@ export function ShoppingView({
         onClose={() => setActive(null)}
       />
 
-      <ShopAddSheet
-        open={addOpen}
-        listId={list.id}
-        allowClosed={list.status === "COMPLETED"}
-        onListItemIds={list.items.map((row) => row.itemId)}
-        categories={categories}
-        shops={list.shops}
-        onClose={() => setAddOpen(false)}
-        onAdded={() => router.refresh()}
-      />
     </div>
   );
 }
