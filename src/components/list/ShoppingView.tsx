@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
-import { CategoryFilter } from "@/components/list/CategoryFilter";
 import { PriceDelta } from "@/components/PriceDelta";
 import { PurchaseSheet } from "@/components/list/PurchaseSheet";
 import { ShopAddSheet } from "@/components/list/ShopAddSheet";
@@ -16,18 +15,28 @@ import type { CategoryDTO, ListDetailDTO, ListItemDTO } from "@/lib/types";
 
 type ShoppingViewProps = {
   list: ListDetailDTO;
+  /** Already narrowed by ListScreen's shop and category filter icons. */
   items: ListItemDTO[];
   /** Master categories, for creating an item that isn't in the catalogue yet. */
   categories: CategoryDTO[];
+  /** False on a completed list until the header "Edit" button unlocks it. */
+  editable: boolean;
+  /** Only to word the empty state; the filtering itself happens upstream. */
+  categoryFiltered: boolean;
 };
 
-export function ShoppingView({ list, items, categories }: ShoppingViewProps) {
+export function ShoppingView({
+  list,
+  items,
+  categories,
+  editable,
+  categoryFiltered,
+}: ShoppingViewProps) {
   const router = useRouter();
   const { language } = useLanguage();
   const [active, setActive] = useState<ListItemDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [categoryId, setCategoryId] = useState<number | undefined>(undefined);
   const [query, setQuery] = useState("");
   const [addOpen, setAddOpen] = useState(false);
 
@@ -71,7 +80,13 @@ export function ShoppingView({ list, items, categories }: ShoppingViewProps) {
       item.id in current ? current : { ...current, [item.id]: { quantity, unitType } },
     );
     startTransition(async () => {
-      const result = await updateListItem({ listItemId: item.id, quantity, unitType });
+      const result = await updateListItem({
+        listItemId: item.id,
+        quantity,
+        unitType,
+        // Only ever true once the header "Edit" button unlocked a closed list.
+        allowClosed: list.status === "COMPLETED",
+      });
       if (!result.ok) {
         setError(result.error);
         setOverrides((current) => {
@@ -90,24 +105,10 @@ export function ShoppingView({ list, items, categories }: ShoppingViewProps) {
     setCompareState((prev) => (item.id in prev ? prev : { ...prev, [item.id]: stateOf(item) }));
   };
 
-  const categoryOptions = useMemo(() => {
-    const counts = new Map<number, { name: string; count: number }>();
-    for (const item of items) {
-      const name = language === "ta" ? (item.categoryNameTa ?? item.categoryName) : item.categoryName;
-      const entry = counts.get(item.categoryId) ?? { name, count: 0 };
-      entry.count += 1;
-      counts.set(item.categoryId, entry);
-    }
-    return [...counts.entries()]
-      .map(([id, value]) => ({ id, name: value.name, count: value.count }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [items, language]);
-
   const visibleItems = useMemo(() => {
     const trimmed = query.trim();
     const needle = trimmed.toLowerCase();
     return items.filter((item) => {
-      if (categoryId !== undefined && item.categoryId !== categoryId) return false;
       if (!needle) return true;
       return (
         item.nameEn.toLowerCase().includes(needle) ||
@@ -118,7 +119,7 @@ export function ShoppingView({ list, items, categories }: ShoppingViewProps) {
         (item.shopName ?? "").toLowerCase().includes(needle)
       );
     });
-  }, [items, categoryId, query]);
+  }, [items, query]);
 
   // Checked-off items sink to the bottom of their shop's section so the
   // remaining to-buy items stay at the top while shopping.
@@ -134,7 +135,6 @@ export function ShoppingView({ list, items, categories }: ShoppingViewProps) {
   // "Finish shopping" completes the whole list, so it must reflect the
   // list's true completion — not just what the shop/category filters show.
   const allDone = list.items.length > 0 && list.items.every((item) => item.isPurchased);
-  const editable = list.status !== "COMPLETED";
 
   const complete = () => {
     startTransition(async () => {
@@ -206,20 +206,17 @@ export function ShoppingView({ list, items, categories }: ShoppingViewProps) {
         ) : null}
       </div>
 
-      <CategoryFilter
-        options={categoryOptions}
-        value={categoryId}
-        onChange={setCategoryId}
-        total={items.length}
-      />
-
       {error ? (
         <p className="rounded-ios bg-ios-red-soft px-4 py-3 text-[14px] text-ios-red">{error}</p>
       ) : null}
 
       {visibleItems.length === 0 ? (
         <p className="ios-card p-6 text-center text-[15px] text-ios-label-2">
-          {query.trim() ? `Nothing on this list matched “${query.trim()}”.` : "No items for this shop."}
+          {query.trim()
+            ? `Nothing on this list matched “${query.trim()}”.`
+            : categoryFiltered
+              ? "No items in this category."
+              : "No items for this shop."}
         </p>
       ) : (
         groupedByShop.map(([shopName, shopItems]) => (
@@ -300,6 +297,12 @@ export function ShoppingView({ list, items, categories }: ShoppingViewProps) {
                             <span className="text-[14px] font-semibold tabular-nums">
                               {formatPrice(item.purchasePrice ?? 0)}
                             </span>
+                            {/* Where it was actually bought — the row's own
+                                record, since the shop heading disappears once
+                                a category filter is on. */}
+                            <span className="text-[13px] text-ios-label-2">
+                              at {item.shopName ?? "Not set"}
+                            </span>
                             <PriceDelta
                               current={item.purchasePrice ?? 0}
                               previous={item.previousPrice}
@@ -308,6 +311,10 @@ export function ShoppingView({ list, items, categories }: ShoppingViewProps) {
                               previousQuantity={item.previousQuantity ?? undefined}
                               previousUnitType={item.previousUnitType ?? undefined}
                             />
+                          </span>
+                        ) : !editable ? (
+                          <span className="mt-1 block text-[13px] text-ios-label-3">
+                            Not bought
                           </span>
                         ) : item.lastPrice !== null ? (
                           <span className="block truncate text-[13px] text-ios-label-3">
@@ -397,11 +404,17 @@ export function ShoppingView({ list, items, categories }: ShoppingViewProps) {
         </button>
       ) : null}
 
-      <PurchaseSheet item={active} editable={editable} onClose={() => setActive(null)} />
+      <PurchaseSheet
+        item={active}
+        editable={editable}
+        allowClosed={list.status === "COMPLETED"}
+        onClose={() => setActive(null)}
+      />
 
       <ShopAddSheet
         open={addOpen}
         listId={list.id}
+        allowClosed={list.status === "COMPLETED"}
         onListItemIds={list.items.map((row) => row.itemId)}
         categories={categories}
         shops={list.shops}

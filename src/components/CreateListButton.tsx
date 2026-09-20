@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 
 import { Sheet } from "@/components/Sheet";
 import { createList } from "@/lib/actions";
+import { formatIsoDate } from "@/lib/dates";
 
 type CreateListButtonProps = {
   /** Pre-filled `MMM YYYY` name, e.g. "Jul 2026". */
@@ -25,6 +26,10 @@ export function CreateListButton({
   const [month, setMonth] = useState(monthKey);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // createList stamps createdAt itself, so this is a statement of what will be
+  // saved, not an input — an editable date here would be thrown away.
+  const today = formatIsoDate(new Date().toISOString());
 
   const submit = () => {
     setError(null);
@@ -108,6 +113,18 @@ export function CreateListButton({
               One list per month. Picking a month that already has a list opens it instead.
             </span>
           </label>
+
+          {/* Both dates, stated rather than asked for: the list date is stamped
+              on save, and the shopping date comes from the purchases themselves. */}
+          <div className="rounded-ios bg-ios-surface-2 px-4 py-3 ring-1 ring-inset ring-ios-separator">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-[13px] font-medium text-ios-label-2">List date</span>
+              <span className="text-[15px] font-medium tabular-nums">{today}</span>
+            </div>
+            <p className="mt-1.5 text-[13px] text-ios-label-3">
+              Shopping date is recorded for you as you enter prices while shopping.
+            </p>
+          </div>
 
           {error ? <p className="text-[14px] text-ios-red">{error}</p> : null}
         </div>

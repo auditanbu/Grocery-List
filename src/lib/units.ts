@@ -200,6 +200,42 @@ export function unitPriceOf(price: number, quantity: number, unit: UnitType): nu
 }
 
 /**
+ * The per-unit price in the unit people actually quote: per kg for weights,
+ * per L for volumes, "each" for countables. Returns null when there is no
+ * sensible figure — a missing quantity, or an RS-priced item, where the
+ * "quantity" is already rupees and a unit price of 1.00 says nothing.
+ *
+ * Deliberately normalised up to kg/L rather than down to g/ml: shelf labels
+ * and shop conversation are "₹420 a kilo", never "₹0.42 a gram".
+ */
+export function formatUnitPrice(
+  price: number,
+  quantity: number,
+  unit: UnitType,
+): string | null {
+  const group = unitGroup(unit);
+  if (group === "currency") return null;
+
+  const perBase = unitPriceOf(price, quantity, unit);
+  if (perBase === null) return null;
+
+  const [amount, suffix]: [number, string] =
+    group === "weight"
+      ? [perBase * 1000, "/kg"]
+      : group === "volume"
+        ? [perBase * 1000, "/L"]
+        : [perBase, " each"];
+
+  // Sub-₹100 unit prices need the paise; above that they are noise.
+  const digits = amount >= 100 ? 0 : 2;
+  const formatted = amount.toLocaleString("en-IN", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+  return `₹${formatted}${suffix}`;
+}
+
+/**
  * What `price` (paid for `quantity` of `unit`) works out to at
  * `targetQuantity` of `targetUnit` — e.g. "this month's 150 g at today's
  * price would have cost ₹X at last month's 200 g". Returns null when the

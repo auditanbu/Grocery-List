@@ -36,22 +36,16 @@ export default async function HomePage() {
         </div>
       </header>
 
-      <section className="space-y-3">
-        <p className="px-1 text-[13px] text-ios-label-2">This month</p>
-        {currentLists.length === 0 ? (
-          <div className="ios-card p-5">
-            <p className="text-[24px] font-semibold tracking-tight">{listNameFor()}</p>
-            <p className="mt-1 text-[15px] text-ios-label-2">
-              No list yet. Start one and add items from your master list.
-            </p>
-            <div className="mt-4">
-              <CreateListButton suggestedName={listNameFor()} monthKey={currentMonthKey} />
-            </div>
-          </div>
-        ) : (
-          currentLists.map((list) => <ThisMonthCard key={list.id} list={list} />)
-        )}
-      </section>
+      {/* No empty state: with nothing to show, the heading is just noise. The
+          + in the header is the one way to start a list. */}
+      {currentLists.length > 0 ? (
+        <section className="space-y-3">
+          <p className="px-1 text-[13px] text-ios-label-2">This month</p>
+          {currentLists.map((list) => (
+            <ThisMonthCard key={list.id} list={list} />
+          ))}
+        </section>
+      ) : null}
 
       <section>
         <div className="flex items-baseline justify-between px-1 pb-2">
