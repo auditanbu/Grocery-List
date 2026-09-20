@@ -6,7 +6,7 @@ import { useTransition } from "react";
 
 import { deleteList } from "@/lib/actions";
 import { useAdmin } from "@/lib/admin-context";
-import { monthKeyToLabel } from "@/lib/dates";
+import { formatIsoDate, monthKeyToLabel } from "@/lib/dates";
 import { formatPrice } from "@/lib/units";
 import type { ListSummaryDTO } from "@/lib/types";
 
@@ -42,9 +42,16 @@ export function ListRow({ list }: { list: ListSummaryDTO }) {
     <Link href={`/grocery/lists/${list.id}`} className="ios-row active:bg-ios-surface-2">
       <div className="min-w-0 flex-1">
         <p className="truncate text-[16px] font-medium">{list.name}</p>
-        <p className="text-[13px] text-ios-label-2">
+        <p className="truncate text-[13px] text-ios-label-2">
           {monthKeyToLabel(list.monthKey)} · {list.itemCount} items
           {list.totalSpent > 0 ? ` · ${formatPrice(list.totalSpent)}` : ""}
+        </p>
+        {/* When the shopping happened, which is what you look for on an old
+            list — falling back to when it was made, so a row never lacks a date. */}
+        <p className="truncate text-[12px] text-ios-label-3">
+          {list.purchasedAt
+            ? `Purchased ${formatIsoDate(list.purchasedAt)}`
+            : `Made ${formatIsoDate(list.createdAt)}`}
         </p>
       </div>
       <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_STYLES[list.status]}`}>

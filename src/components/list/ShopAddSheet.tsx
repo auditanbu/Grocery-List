@@ -3,15 +3,17 @@
 import { useEffect, useState, useTransition } from "react";
 
 import { Sheet } from "@/components/Sheet";
+import { NewItemFields, newItemDraft, type NewItemDraft } from "@/components/list/NewItemFields";
 import { addListItem, searchMasterItems, upsertMasterItem } from "@/lib/actions";
 import { displayName, useLanguage } from "@/lib/language";
-import { hasTamilScript } from "@/lib/tanglish";
-import { UNIT_TYPES, formatPrice, unitOptionLabel, type UnitType } from "@/lib/units";
+import { formatPrice } from "@/lib/units";
 import type { CategoryDTO, MasterItemDTO, ShopDTO } from "@/lib/types";
 
 type ShopAddSheetProps = {
   open: boolean;
   listId: number;
+  /** Set when the list is closed and the user unlocked it with "Edit". */
+  allowClosed?: boolean;
   /** Master-item ids already on the list, so they aren't offered twice. */
   onListItemIds: number[];
   categories: CategoryDTO[];
@@ -19,15 +21,6 @@ type ShopAddSheetProps = {
   onClose: () => void;
   /** Fires after a successful add so the caller can refresh the list. */
   onAdded: () => void;
-};
-
-type CreateDraft = {
-  nameTa: string;
-  nameTl: string;
-  nameEn: string;
-  categoryId: number;
-  unitType: UnitType;
-  shopId: number | null;
 };
 
 const SEARCH_DEBOUNCE_MS = 200;
@@ -42,6 +35,7 @@ const SEARCH_DEBOUNCE_MS = 200;
 export function ShopAddSheet({
   open,
   listId,
+  allowClosed,
   onListItemIds,
   categories,
   shops,
@@ -51,7 +45,7 @@ export function ShopAddSheet({
   const { language } = useLanguage();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<MasterItemDTO[] | null>(null);
-  const [draft, setDraft] = useState<CreateDraft | null>(null);
+  const [draft, setDraft] = useState<NewItemDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -97,6 +91,7 @@ export function ShopAddSheet({
         listId,
         itemId: item.id,
         quantity: item.defaultQty > 0 ? item.defaultQty : 1,
+        allowClosed,
       });
       if (!result.ok) {
         setError(result.error);
@@ -108,17 +103,8 @@ export function ShopAddSheet({
   };
 
   const startCreate = () => {
-    const trimmed = query.trim();
-    const tamil = hasTamilScript(trimmed);
     setError(null);
-    setDraft({
-      nameTa: tamil ? trimmed : "",
-      nameTl: "",
-      nameEn: tamil ? "" : trimmed,
-      categoryId: categories[0]?.id ?? 0,
-      unitType: "COUNT",
-      shopId: null,
-    });
+    setDraft(newItemDraft(query, categories));
   };
 
   const create = () => {
@@ -130,7 +116,7 @@ export function ShopAddSheet({
         setError(saved.error);
         return;
       }
-      const added = await addListItem({ listId, itemId: saved.data.id, quantity: 1 });
+      const added = await addListItem({ listId, itemId: saved.data.id, quantity: 1, allowClosed });
       if (!added.ok) {
         setError(added.error);
         return;
@@ -141,13 +127,6 @@ export function ShopAddSheet({
       onAdded();
     });
   };
-
-  const chip = (active: boolean) =>
-    `h-9 rounded-full px-3.5 text-[14px] font-medium transition active:scale-95 ${
-      active
-        ? "bg-ios-blue text-white"
-        : "bg-ios-surface-2 text-ios-label-2 ring-1 ring-inset ring-ios-separator"
-    }`;
 
   if (draft) {
     return (
@@ -177,87 +156,12 @@ export function ShopAddSheet({
         }
       >
         <div className="space-y-4 pb-3">
-          <Field label="Tamil name">
-            <input
-              value={draft.nameTa}
-              onChange={(event) => setDraft({ ...draft, nameTa: event.target.value })}
-              placeholder="துவரம் பருப்பு"
-              className="h-12 w-full rounded-ios bg-ios-surface-2 px-4 text-[17px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
-            />
-          </Field>
-
-          <Field label="Tanglish name">
-            <input
-              value={draft.nameTl}
-              onChange={(event) => setDraft({ ...draft, nameTl: event.target.value })}
-              placeholder="Thuvaram Paruppu"
-              className="h-12 w-full rounded-ios bg-ios-surface-2 px-4 text-[17px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
-            />
-            <p className="pt-1.5 text-[12px] text-ios-label-3">
-              Leave blank and one is worked out from the Tamil name.
-            </p>
-          </Field>
-
-          <Field label="English name">
-            <input
-              value={draft.nameEn}
-              onChange={(event) => setDraft({ ...draft, nameEn: event.target.value })}
-              placeholder="Toor Dal"
-              className="h-12 w-full rounded-ios bg-ios-surface-2 px-4 text-[17px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
-            />
-          </Field>
-
-          <Field label="Category">
-            <select
-              value={draft.categoryId}
-              onChange={(event) => setDraft({ ...draft, categoryId: Number(event.target.value) })}
-              className="h-12 w-full rounded-ios bg-ios-surface-2 px-3 text-[17px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
-            >
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.nameTa ? `${category.nameTa} / ` : ""}
-                  {category.nameEn}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Unit type">
-            <div className="flex flex-wrap gap-2">
-              {UNIT_TYPES.map((unit) => (
-                <button
-                  key={unit}
-                  type="button"
-                  onClick={() => setDraft({ ...draft, unitType: unit })}
-                  className={chip(draft.unitType === unit)}
-                >
-                  {unitOptionLabel(unit)}
-                </button>
-              ))}
-            </div>
-          </Field>
-
-          <Field label="Shop by">
-            <div className="flex flex-wrap gap-2">
-              {shops.map((shop) => (
-                <button
-                  key={shop.id}
-                  type="button"
-                  onClick={() => setDraft({ ...draft, shopId: shop.id })}
-                  className={chip(draft.shopId === shop.id)}
-                >
-                  {shop.name}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setDraft({ ...draft, shopId: null })}
-                className={chip(draft.shopId === null)}
-              >
-                Not set
-              </button>
-            </div>
-          </Field>
+          <NewItemFields
+            draft={draft}
+            onChange={setDraft}
+            categories={categories}
+            shops={shops}
+          />
 
           {error ? <p className="text-[14px] text-ios-red">{error}</p> : null}
         </div>
@@ -337,14 +241,5 @@ export function ShopAddSheet({
         ) : null}
       </div>
     </Sheet>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="pb-1.5 text-[13px] font-medium text-ios-label-2">{label}</p>
-      {children}
-    </div>
   );
 }

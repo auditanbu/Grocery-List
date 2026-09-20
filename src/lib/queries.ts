@@ -25,7 +25,13 @@ function numOrNull(value: DecimalLike): number | null {
   return typeof value === "number" ? value : value.toNumber();
 }
 
-type LastPriceEntry = { price: number; at: Date; quantity: number; unitType: UnitType };
+type LastPriceEntry = {
+  price: number;
+  at: Date;
+  quantity: number;
+  unitType: UnitType;
+  shopName: string | null;
+};
 
 /**
  * Latest recorded price per item, ignoring one list (the one being shopped)
@@ -40,7 +46,14 @@ async function lastPriceMap(itemIds: number[], excludeListId?: number) {
       ...(excludeListId ? { NOT: { listId: excludeListId } } : {}),
     },
     orderBy: { purchasedAt: "desc" },
-    select: { itemId: true, price: true, purchasedAt: true, quantity: true, unitType: true },
+    select: {
+      itemId: true,
+      price: true,
+      purchasedAt: true,
+      quantity: true,
+      unitType: true,
+      shop: { select: { name: true } },
+    },
   });
 
   const map = new Map<number, LastPriceEntry>();
@@ -51,6 +64,7 @@ async function lastPriceMap(itemIds: number[], excludeListId?: number) {
         at: row.purchasedAt,
         quantity: num(row.quantity),
         unitType: row.unitType,
+        shopName: row.shop?.name ?? null,
       });
     }
   }
@@ -106,7 +120,9 @@ export async function getMasterItems(options?: {
 
   const prices = await lastPriceMap(items.map((item) => item.id));
 
-  return items.map((item) => ({
+  return items.map((item) => {
+    const last = prices.get(item.id);
+    return {
     id: item.id,
     nameEn: item.nameEn,
     nameTa: item.nameTa,
@@ -120,15 +136,19 @@ export async function getMasterItems(options?: {
     shopName: item.shop?.name ?? null,
     isActive: item.isActive,
     hasVariableUnit: item.hasVariableUnit,
-    lastPrice: prices.get(item.id)?.price ?? null,
-    lastPriceAt: prices.get(item.id)?.at.toISOString() ?? null,
-  }));
+    lastPrice: last?.price ?? null,
+    lastPriceAt: last?.at.toISOString() ?? null,
+    lastPriceQuantity: last?.quantity ?? null,
+    lastPriceUnitType: last?.unitType ?? null,
+    lastPriceShopName: last?.shopName ?? null,
+    };
+  });
 }
 
 export async function getLists(): Promise<ListSummaryDTO[]> {
   const lists = await prisma.groceryList.findMany({
     orderBy: { monthKey: "desc" },
-    include: { items: { select: { isPurchased: true, purchasePrice: true } } },
+    include: { items: { select: { isPurchased: true, purchasePrice: true, purchasedAt: true } } },
   });
 
   return lists.map(toSummary);
@@ -140,8 +160,17 @@ function toSummary(list: {
   monthKey: string;
   status: ListSummaryDTO["status"];
   createdAt: Date;
-  items: { isPurchased: boolean; purchasePrice: DecimalLike }[];
+  completedAt: Date | null;
+  items: { isPurchased: boolean; purchasePrice: DecimalLike; purchasedAt: Date | null }[];
 }): ListSummaryDTO {
+  // The shopping date is whenever the last thing was actually bought. A list
+  // marked complete without any purchase still has completedAt to fall back on.
+  const lastPurchase = list.items.reduce<Date | null>(
+    (latest, item) =>
+      item.purchasedAt && (!latest || item.purchasedAt > latest) ? item.purchasedAt : latest,
+    null,
+  );
+
   return {
     id: list.id,
     name: list.name,
@@ -151,6 +180,7 @@ function toSummary(list: {
     purchasedCount: list.items.filter((item) => item.isPurchased).length,
     totalSpent: list.items.reduce((sum, item) => sum + num(item.purchasePrice), 0),
     createdAt: list.createdAt.toISOString(),
+    purchasedAt: (lastPurchase ?? list.completedAt)?.toISOString() ?? null,
   };
 }
 

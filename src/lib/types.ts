@@ -38,6 +38,11 @@ export type MasterItemDTO = {
   /** Most recent price paid, across all past lists. */
   lastPrice: number | null;
   lastPriceAt: string | null;
+  /** Quantity/unit lastPrice bought, so "₹240" reads as "₹240 for 1 kg". */
+  lastPriceQuantity: number | null;
+  lastPriceUnitType: UnitType | null;
+  /** Where that purchase was made. Null when the row carried no shop. */
+  lastPriceShopName: string | null;
 };
 
 export type ListItemDTO = {
@@ -78,7 +83,13 @@ export type ListSummaryDTO = {
   itemCount: number;
   purchasedCount: number;
   totalSpent: number;
+  /** When the list was made. */
   createdAt: string;
+  /**
+   * When the shopping actually happened: the latest purchase recorded on the
+   * list, falling back to completedAt. Null until something is bought.
+   */
+  purchasedAt: string | null;
 };
 
 /** The list a draft can be seeded from — the newest list of an earlier month. */

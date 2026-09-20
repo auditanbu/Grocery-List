@@ -16,6 +16,8 @@ type PurchaseSheetProps = {
   item: ListItemDTO | null;
   /** False on a closed list — the quantity is then a historical record. */
   editable?: boolean;
+  /** True when the list is closed but the user unlocked it with "Edit". */
+  allowClosed?: boolean;
   onClose: () => void;
 };
 
@@ -29,7 +31,7 @@ type PurchaseSheetProps = {
  * `hasVariableUnit` (sold in inconsistent pack sizes) open with the editor
  * already showing, since those are expected to need it.
  */
-export function PurchaseSheet({ item, editable = true, onClose }: PurchaseSheetProps) {
+export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: PurchaseSheetProps) {
   const router = useRouter();
   const { language } = useLanguage();
   const [price, setPrice] = useState("");
@@ -69,7 +71,12 @@ export function PurchaseSheet({ item, editable = true, onClose }: PurchaseSheetP
     }
     startTransition(async () => {
       if (sizeChanged) {
-        const sizeResult = await updateListItem({ listItemId: item.id, quantity, unitType });
+        const sizeResult = await updateListItem({
+          listItemId: item.id,
+          quantity,
+          unitType,
+          allowClosed,
+        });
         if (!sizeResult.ok) {
           setError(sizeResult.error);
           return;
@@ -112,26 +119,28 @@ export function PurchaseSheet({ item, editable = true, onClose }: PurchaseSheetP
         .filter(Boolean)
         .join(" · ")}
       footer={
-        <div className="space-y-2">
-          <button
-            type="button"
-            onClick={save}
-            disabled={pending}
-            className="flex h-12 w-full items-center justify-center rounded-ios bg-ios-blue text-[17px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
-          >
-            {pending ? "Saving…" : item.isPurchased ? "Update price" : "Mark as bought"}
-          </button>
-          {item.isPurchased ? (
+        editable ? (
+          <div className="space-y-2">
             <button
               type="button"
-              onClick={undo}
+              onClick={save}
               disabled={pending}
-              className="h-11 w-full text-[16px] font-medium text-ios-red active:opacity-60"
+              className="flex h-12 w-full items-center justify-center rounded-ios bg-ios-blue text-[17px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
             >
-              Uncheck item
+              {pending ? "Saving…" : item.isPurchased ? "Update price" : "Mark as bought"}
             </button>
-          ) : null}
-        </div>
+            {item.isPurchased ? (
+              <button
+                type="button"
+                onClick={undo}
+                disabled={pending}
+                className="h-11 w-full text-[16px] font-medium text-ios-red active:opacity-60"
+              >
+                Uncheck item
+              </button>
+            ) : null}
+          </div>
+        ) : undefined
       }
     >
       <div className="space-y-4 pb-3">
@@ -189,26 +198,36 @@ export function PurchaseSheet({ item, editable = true, onClose }: PurchaseSheetP
           </div>
         ) : null}
 
-        <label className="block">
-          <span className="text-[13px] font-medium text-ios-label-2">Price paid</span>
-          <div className="mt-1.5 flex items-center rounded-ios bg-ios-surface-2 px-4 ring-1 ring-inset ring-ios-separator focus-within:ring-2 focus-within:ring-ios-blue">
-            <span className="text-[22px] font-semibold text-ios-label-2">₹</span>
-            <input
-              autoFocus
-              type="text"
-              inputMode="decimal"
-              value={price}
-              onChange={(event) => setPrice(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") save();
-              }}
-              placeholder="0.00"
-              className="h-14 w-full bg-transparent px-2 text-[22px] font-semibold tabular-nums outline-none"
-            />
+        {editable ? (
+          <label className="block">
+            <span className="text-[13px] font-medium text-ios-label-2">Price paid</span>
+            <div className="mt-1.5 flex items-center rounded-ios bg-ios-surface-2 px-4 ring-1 ring-inset ring-ios-separator focus-within:ring-2 focus-within:ring-ios-blue">
+              <span className="text-[22px] font-semibold text-ios-label-2">₹</span>
+              <input
+                autoFocus
+                type="text"
+                inputMode="decimal"
+                value={price}
+                onChange={(event) => setPrice(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") save();
+                }}
+                placeholder="0.00"
+                className="h-14 w-full bg-transparent px-2 text-[22px] font-semibold tabular-nums outline-none"
+              />
+            </div>
+          </label>
+        ) : (
+          // Closed list: what was paid, stated, with nothing to type into.
+          <div>
+            <p className="text-[13px] font-medium text-ios-label-2">Price paid</p>
+            <p className="mt-1 text-[28px] font-semibold tabular-nums">
+              {item.isPurchased ? formatPrice(item.purchasePrice ?? 0) : "Not bought"}
+            </p>
           </div>
-        </label>
+        )}
 
-        {reference !== null ? (
+        {!editable ? null : reference !== null ? (
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"

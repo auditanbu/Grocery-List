@@ -94,10 +94,15 @@ export async function addListItem(input: {
   /** Overrides the master item's unit — used when a stepper promoted g/ml to kg/L. */
   unitType?: UnitType;
   shopId?: number | null;
+  /**
+   * Set only by the shopping view after the user has explicitly tapped "Edit"
+   * on a closed list. A completed list stays closed to every other caller.
+   */
+  allowClosed?: boolean;
 }): Promise<ActionResult<{ listItemId: number }>> {
   const list = await prisma.groceryList.findUnique({ where: { id: input.listId } });
   if (!list) return fail("List not found.");
-  if (list.status === "COMPLETED") return fail("This list is closed.");
+  if (list.status === "COMPLETED" && !input.allowClosed) return fail("This list is closed.");
 
   const item = await prisma.item.findUnique({ where: { id: input.itemId } });
   if (!item) return fail("Item not found.");
@@ -220,13 +225,15 @@ export async function updateListItem(input: {
   /** Set alongside quantity when a stepper promoted g/ml to kg/L. */
   unitType?: UnitType;
   shopId?: number | null;
+  /** See addListItem — the "Edit" button on a closed list sets this. */
+  allowClosed?: boolean;
 }): Promise<ActionResult> {
   const row = await prisma.groceryListItem.findUnique({
     where: { id: input.listItemId },
     include: { list: true },
   });
   if (!row) return fail("Item not found on this list.");
-  if (row.list.status === "COMPLETED") return fail("This list is closed.");
+  if (row.list.status === "COMPLETED" && !input.allowClosed) return fail("This list is closed.");
 
   const unitType = input.unitType ?? (row.unitType as UnitType);
   const data: { quantity?: number; unitType?: UnitType; shopId?: number | null } = {};
