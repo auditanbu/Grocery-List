@@ -1,14 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import { PriceDelta } from "@/components/PriceDelta";
 import { PurchaseSheet } from "@/components/list/PurchaseSheet";
 import { ShopAddSheet } from "@/components/list/ShopAddSheet";
 import { Stepper } from "@/components/Stepper";
 import { groupByShop } from "@/components/list/DraftEditor";
-import { completeList, updateListItem } from "@/lib/actions";
+import { completeList } from "@/lib/actions";
 import { displayName, useLanguage } from "@/lib/language";
 import { formatPrice, formatQty, projectPrice, unitGroup, type UnitType } from "@/lib/units";
 import type { CategoryDTO, ListDetailDTO, ListItemDTO } from "@/lib/types";
@@ -35,64 +35,14 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
     Record<number, { quantity: number; unitType: UnitType }>
   >({});
 
-  // Optimistic quantity/unit, so the stepper stays responsive while the
-  // action runs — same approach as the draft editor's stepper.
-  const [overrides, setOverrides] = useState<Record<number, { quantity: number; unitType: UnitType }>>(
-    {},
-  );
-  const stateOf = (item: ListItemDTO) =>
-    overrides[item.id] ?? { quantity: item.quantity, unitType: item.unitType };
-
-  // Retire an override as soon as the server value agrees with it. Left in
-  // place it would shadow later changes made elsewhere — most visibly a
-  // variable-unit item resized from the purchase sheet and then unchecked.
-  useEffect(() => {
-    setOverrides((current) => {
-      let changed = false;
-      const next = { ...current };
-      for (const row of list.items) {
-        const override = next[row.id];
-        if (override && override.quantity === row.quantity && override.unitType === row.unitType) {
-          delete next[row.id];
-          changed = true;
-        }
-      }
-      return changed ? next : current;
-    });
-  }, [list.items]);
-
-  const changeQuantity = (item: ListItemDTO, quantity: number, unitType: UnitType) => {
-    setError(null);
-    setOverrides((current) => ({ ...current, [item.id]: { quantity, unitType } }));
-    // Keep the "compare at this quantity" panel in step with the row it
-    // belongs to, unless it's already been dialled to something else.
-    setCompareState((current) =>
-      item.id in current ? current : { ...current, [item.id]: { quantity, unitType } },
-    );
-    startTransition(async () => {
-      const result = await updateListItem({
-        listItemId: item.id,
-        quantity,
-        unitType,
-        // Only ever true once the header "Edit" button unlocked a closed list.
-        allowClosed: list.status === "COMPLETED",
-      });
-      if (!result.ok) {
-        setError(result.error);
-        setOverrides((current) => {
-          const next = { ...current };
-          delete next[item.id];
-          return next;
-        });
-      }
-      router.refresh();
-    });
-  };
-
   const toggleCompare = (item: ListItemDTO, event: React.MouseEvent) => {
     event.stopPropagation();
     setCompareItemId((current) => (current === item.id ? null : item.id));
-    setCompareState((prev) => (item.id in prev ? prev : { ...prev, [item.id]: stateOf(item) }));
+    setCompareState((prev) =>
+      item.id in prev
+        ? prev
+        : { ...prev, [item.id]: { quantity: item.quantity, unitType: item.unitType } },
+    );
   };
 
   // Checked-off items sink to the bottom of their shop's section so the
@@ -139,8 +89,8 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
               {shopItems.map((item) => {
                 const name = displayName(item, language);
                 const comparing = compareItemId === item.id;
-                const current = stateOf(item);
-                const compare = compareState[item.id] ?? current;
+                const compare =
+                  compareState[item.id] ?? { quantity: item.quantity, unitType: item.unitType };
                 const canProject =
                   item.lastPrice !== null && item.lastPriceQuantity !== null && item.lastPriceUnitType !== null;
                 const sameGroup = canProject && unitGroup(item.lastPriceUnitType as UnitType) === unitGroup(compare.unitType);
@@ -154,10 +104,6 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
                         compare.unitType,
                       )
                     : null;
-                // Quantity is editable right up until the item is checked
-                // off; after that it's a record of what was actually bought
-                // and belongs to the purchase sheet, which re-prices it.
-                const canEditQuantity = editable && !item.isPurchased;
                 return (
                 <li key={item.id}>
                   <div className="flex w-full items-center gap-3 px-4 py-3">
@@ -198,10 +144,7 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
                           {name.primary}
                         </span>
                         <span className="block truncate text-[13px] text-ios-label-2">
-                          {name.secondary}
-                          {/* The stepper alongside already states the
-                              quantity — only spell it out when there isn't one. */}
-                          {canEditQuantity ? "" : ` · ${formatQty(item.quantity, item.unitType)}`}
+                          {name.secondary} · {formatQty(item.quantity, item.unitType)}
                         </span>
                         {item.isPurchased ? (
                           <span className="mt-1 flex flex-wrap items-center gap-2">
@@ -239,15 +182,6 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
                       </span>
                     </button>
 
-                    {canEditQuantity ? (
-                      <Stepper
-                        value={current.quantity}
-                        unit={current.unitType}
-                        size="compact"
-                        onChange={(quantity, unitType) => changeQuantity(item, quantity, unitType)}
-                        aria-label={`Quantity for ${item.nameEn}`}
-                      />
-                    ) : null}
                   </div>
 
                   {!item.isPurchased && item.lastPrice !== null ? (
