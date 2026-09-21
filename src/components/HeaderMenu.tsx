@@ -21,6 +21,8 @@ type HeaderMenuProps = {
   onOpenChange: (open: boolean) => void;
   title?: string;
   items: HeaderMenuItem[];
+  /** Read-once detail (status, dates) shown above the actions. */
+  info?: React.ReactNode;
   /** Shown as a dot on the burger when any filter is applied. */
   showDot?: boolean;
 };
@@ -34,9 +36,20 @@ type HeaderMenuProps = {
  * corner of a tall phone. Selecting an item always closes the menu, so a row
  * that opens a second sheet (a filter) reads as one continuous gesture.
  */
-export function HeaderMenu({ open, onOpenChange, title = "Menu", items }: HeaderMenuProps) {
+export function HeaderMenu({
+  open,
+  onOpenChange,
+  title = "Menu",
+  items,
+  info,
+}: HeaderMenuProps) {
   return (
     <Sheet open={open} onClose={() => onOpenChange(false)} title={title}>
+      {info ? (
+        <div className="mb-2 rounded-ios bg-ios-surface-2 px-4 py-3 ring-1 ring-inset ring-ios-separator">
+          {info}
+        </div>
+      ) : null}
       <ul className="divide-y divide-ios-separator pb-2">
         {items.map((item) => (
           <li key={item.key}>

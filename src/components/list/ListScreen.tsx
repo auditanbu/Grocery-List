@@ -326,11 +326,11 @@ export function ListScreen({ list, categories }: ListScreenProps) {
 
         {mode === "shopping" ? (
           <div className="flex-none text-right leading-tight">
-            <p className="text-[14px] font-semibold tabular-nums">
+            <p className="text-[13px] tabular-nums text-ios-label-2">
               {purchasedCount}
               <span className="text-ios-label-3">/{visibleItems.length}</span>
             </p>
-            <p className="text-[11px] tabular-nums text-ios-label-2">{formatPrice(spent)}</p>
+            <p className="text-[17px] font-semibold tabular-nums">{formatPrice(spent)}</p>
           </div>
         ) : null}
 
@@ -359,17 +359,6 @@ export function ListScreen({ list, categories }: ListScreenProps) {
         <BurgerButton onClick={() => setMenuOpen(true)} marked={filterApplied} />
       </header>
 
-      {/* Scrolls away: you read these once, so they don't earn pinned height. */}
-      <div className="px-1">
-        <p className="text-[13px] text-ios-label-2">
-          {monthKeyToLabel(list.monthKey)} · {STATUS_LABEL[list.status]} · {list.itemCount} items
-        </p>
-        <p className="text-[12px] text-ios-label-3">
-          Made {formatIsoDate(list.createdAt)}
-          {list.purchasedAt ? ` · Shopped ${formatIsoDate(list.purchasedAt)}` : ""}
-        </p>
-      </div>
-
       {isDraft ? (
         <DraftEditor list={list} />
       ) : mode === "list" ? (
@@ -390,7 +379,23 @@ export function ListScreen({ list, categories }: ListScreenProps) {
       {/* Drafts keep DraftEditor's own filtering, so no shared search there. */}
       {!isDraft ? <ListSearchBar value={query} onChange={setQuery} /> : null}
 
-      <HeaderMenu open={menuOpen} onOpenChange={setMenuOpen} items={menuItems} />
+      <HeaderMenu
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
+        items={menuItems}
+        info={
+          <>
+            <p className="text-[14px] font-medium">
+              {monthKeyToLabel(list.monthKey)} · {STATUS_LABEL[list.status]} · {list.itemCount}{" "}
+              items
+            </p>
+            <p className="mt-0.5 text-[13px] text-ios-label-2">
+              Made {formatIsoDate(list.createdAt)}
+              {list.purchasedAt ? ` · Shopped ${formatIsoDate(list.purchasedAt)}` : ""}
+            </p>
+          </>
+        }
+      />
 
       {/* Opened from a menu row; the menu closes first, so the two sheets
           never stack. */}
