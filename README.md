@@ -250,7 +250,11 @@ once the list has been finalized and reality starts diverging from the plan:
 - **Every comparison runs on packs × size** (`totalAmount` in
   `src/lib/units.ts`, then `projectPrice`). ₹95 for one 150 g tube against
   ₹95 for one 200 g tube is dearer, not "same as last time", and the per-kg
-  figure under the price pill says by how much.
+  figure under the price pill says by how much. The History tab's **biggest price
+  moves** runs on the same figures, and is ranked by them: comparing the
+  raw rupees made ₹690 for two packets against ₹340 for one look like a
+  103% hike rather than the ₹5 a packet it is, and floated every such row
+  to the top of the list.
 - **Add item** (`ShopAddSheet`) covers what never made the list. It
   searches the master catalogue server-side, and anything genuinely new can
   be created on the spot — Tamil / Tanglish / English name, category, unit,

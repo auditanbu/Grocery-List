@@ -39,7 +39,16 @@ export default async function HistoryPage() {
                       {change.nameEn} · {formatPrice(change.current)}
                     </span>
                   </span>
-                  <PriceDelta current={change.current} previous={change.previous} />
+                  {/* The amounts matter: without them a month where only
+                      the quantity changed reads as a price move. */}
+                  <PriceDelta
+                    current={change.current}
+                    previous={change.previous}
+                    currentQuantity={change.currentQuantity}
+                    currentUnitType={change.currentUnitType}
+                    previousQuantity={change.previousQuantity}
+                    previousUnitType={change.previousUnitType}
+                  />
                 </Link>
               </li>
             ))}
