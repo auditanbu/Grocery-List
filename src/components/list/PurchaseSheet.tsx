@@ -26,7 +26,7 @@ import {
   type RateBasis,
   type UnitType,
 } from "@/lib/units";
-import type { ListItemDTO, PriceHistoryDTO } from "@/lib/types";
+import type { ListItemDTO, PriceHistoryDTO, ShopDTO } from "@/lib/types";
 
 /** "Showing the rate per kg — tap for per 500 g." */
 function rateBasisHint(unit: UnitType, basis: RateBasis, nextBasis: RateBasis): string {
@@ -38,6 +38,8 @@ function rateBasisHint(unit: UnitType, basis: RateBasis, nextBasis: RateBasis): 
 
 type PurchaseSheetProps = {
   item: ListItemDTO | null;
+  /** Every shop on the list, so the row can be moved to the right one. */
+  shops: ShopDTO[];
   /** False on a closed list — the quantity is then a historical record. */
   editable?: boolean;
   /** True when the list is closed but the user unlocked it with "Edit". */
@@ -60,7 +62,13 @@ type PurchaseSheetProps = {
  * comparison against last time is made on the total amount (packs × size)
  * rather than on "one tube" either way.
  */
-export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: PurchaseSheetProps) {
+export function PurchaseSheet({
+  item,
+  shops,
+  editable = true,
+  allowClosed,
+  onClose,
+}: PurchaseSheetProps) {
   const router = useRouter();
   const { language } = useLanguage();
   const { basis, nextBasis, cycleBasis } = useRateBasis();
@@ -69,8 +77,10 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
   const [unitType, setUnitType] = useState<UnitType>("COUNT");
   const [sizeValue, setSizeValue] = useState<number | null>(null);
   const [sizeUnit, setSizeUnit] = useState<UnitType | null>(null);
+  const [shopId, setShopId] = useState<number | null>(null);
   const [history, setHistory] = useState<PriceHistoryDTO[] | null>(null);
   const [editingQuantity, setEditingQuantity] = useState(false);
+  const [editingShop, setEditingShop] = useState(false);
   const [comparing, setComparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -81,7 +91,9 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
     setUnitType(item?.unitType ?? "COUNT");
     setSizeValue(item?.sizeValue ?? null);
     setSizeUnit(item?.sizeUnit ?? null);
+    setShopId(item?.shopId ?? null);
     setEditingQuantity(false);
+    setEditingShop(false);
     setComparing(false);
     setError(null);
     setHistory(null);
@@ -101,6 +113,9 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
   const sizeChanged =
     size?.value !== listSize?.value || size?.unit !== listSize?.unit;
   const quantityChanged = quantity !== item.quantity || unitType !== item.unitType;
+  const shopChanged = shopId !== item.shopId;
+  const shopLabel = (id: number | null) =>
+    shops.find((shop) => shop.id === id)?.name ?? "Not set";
 
   const reference = item.purchasePrice != null ? item.previousPrice : item.lastPrice;
   const referenceQuantity = item.purchasePrice != null ? item.previousQuantity : item.lastPriceQuantity;
@@ -183,12 +198,13 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
       return;
     }
     startTransition(async () => {
-      if (quantityChanged || sizeChanged) {
+      if (quantityChanged || sizeChanged || shopChanged) {
         const rowResult = await updateListItem({
           listItemId: item.id,
           quantity,
           unitType,
           ...(sizeable ? { sizeValue: size?.value ?? null, sizeUnit: size?.unit ?? null } : {}),
+          ...(shopChanged ? { shopId } : {}),
           allowClosed,
         });
         if (!rowResult.ok) {
@@ -234,7 +250,10 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
       subtitle={[
         name.secondary,
         editable ? null : `List wants ${formatQtyWithSize(item.quantity, item.unitType, listSize)}`,
-        item.shopName,
+        // The "Bought at" row below owns the shop while it is editable, and
+        // it moves — repeating it up here would go stale the moment it is
+        // changed. A closed list has no such row, so it keeps it.
+        editable ? null : item.shopName,
       ]
         .filter(Boolean)
         .join(" · ")}
@@ -313,16 +332,7 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
                   className="flex h-8 flex-none items-center gap-1.5 rounded-full bg-ios-surface-2 px-3 text-[14px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator transition active:scale-95"
                 >
                   <span className="tabular-nums">{packsLabel(quantity, unitType)}</span>
-                  <svg viewBox="0 0 24 24" className="h-4 w-4 flex-none" aria-hidden>
-                    <path
-                      d="M4 20l.9-4.2L15.6 5.1a1.6 1.6 0 0 1 2.3 0l1 1a1.6 1.6 0 0 1 0 2.3L8.2 19.1 4 20zM14.8 6l3.2 3.2"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
+                  <PencilIcon />
                 </button>
               )}
             </div>
@@ -343,6 +353,58 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
                     ? "Took more than one? Adjust the count here — the price you enter below is taken as the price for all of them."
                     : "Bought a different amount? Adjust it here — the price you enter below is taken as the price for this quantity."}
                 </span>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* Where it was actually bought. The row's shop is a copy of the
+            master item's, taken when it was added, and until now nothing
+            could correct it once the list was finalized — so an item whose
+            usual shop changed stayed stranded under the old one. It also
+            decides which shop this price is recorded against. */}
+        {editable ? (
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[13px] font-medium text-ios-label-2">
+                Bought at
+                {shopChanged ? (
+                  <span className="ml-1.5 font-normal text-ios-blue">
+                    (list said {shopLabel(item.shopId)})
+                  </span>
+                ) : null}
+              </span>
+              {editingShop ? null : (
+                <button
+                  type="button"
+                  onClick={() => setEditingShop(true)}
+                  aria-label={`Change shop, currently ${shopLabel(shopId)}`}
+                  className="flex h-8 flex-none items-center gap-1.5 rounded-full bg-ios-surface-2 px-3 text-[14px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator transition active:scale-95"
+                >
+                  <span className="max-w-[9rem] truncate">{shopLabel(shopId)}</span>
+                  <PencilIcon />
+                </button>
+              )}
+            </div>
+
+            {editingShop ? (
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                {[...shops.map((shop) => ({ id: shop.id as number | null, name: shop.name })), { id: null, name: "Not set" }].map(
+                  (shop) => (
+                    <button
+                      key={shop.id ?? "none"}
+                      type="button"
+                      onClick={() => setShopId(shop.id)}
+                      className={`h-10 rounded-full px-4 text-[15px] font-medium transition active:scale-95 ${
+                        shopId === shop.id
+                          ? "bg-ios-blue text-white"
+                          : "bg-ios-surface-2 text-ios-label-2 ring-1 ring-inset ring-ios-separator"
+                      }`}
+                    >
+                      {shop.name}
+                    </button>
+                  ),
+                )}
               </div>
             ) : null}
           </div>
@@ -536,5 +598,21 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
         </div>
       </div>
     </Sheet>
+  );
+}
+
+/** The small "edit this" affordance on the quantity and shop pills. */
+function PencilIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4 flex-none" aria-hidden>
+      <path
+        d="M4 20l.9-4.2L15.6 5.1a1.6 1.6 0 0 1 2.3 0l1 1a1.6 1.6 0 0 1 0 2.3L8.2 19.1 4 20zM14.8 6l3.2 3.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

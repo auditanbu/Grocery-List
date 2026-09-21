@@ -236,6 +236,17 @@ once the list has been finalized and reality starts diverging from the plan:
   Saving applies both through `updateListItem` before `recordPurchase`, so
   the price you type is recorded against what actually went in the basket,
   and the `PriceHistory` row snapshots quantity *and* size together.
+- **The purchase sheet also moves the row to another shop.** A row's shop
+  is a copy of the master item's default, taken when it was added
+  (`addListItem`), so changing that default later leaves lists already made
+  untouched — deliberately, since a finalized list is a plan you are walking
+  through, not a view of the catalogue. The cost was that a row whose shop
+  had since changed was stranded: the shop picker lived in `DraftEditor`,
+  which only renders for drafts. `PurchaseSheet` now carries a **Bought at**
+  row beside the size and the quantity, so it can be corrected in the aisle
+  and the price is recorded against the shop it was really bought from.
+  `updateListItem` refuses a move that would collide with the same item
+  already on the list under the target shop, naming that shop.
 - **Every comparison runs on packs × size** (`totalAmount` in
   `src/lib/units.ts`, then `projectPrice`). ₹95 for one 150 g tube against
   ₹95 for one 200 g tube is dearer, not "same as last time", and the per-kg

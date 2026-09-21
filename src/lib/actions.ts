@@ -294,7 +294,21 @@ export async function updateListItem(input: {
     data.sizeValue = value;
     data.sizeUnit = unit;
   }
-  if (input.shopId !== undefined) data.shopId = input.shopId;
+  if (input.shopId !== undefined && input.shopId !== row.shopId) {
+    // One row per (list, item, shop), so moving a row onto a shop that
+    // already has this item would collide. Say so rather than letting the
+    // unique index surface as a crash.
+    const clash = await prisma.groceryListItem.findFirst({
+      where: { listId: row.listId, itemId: row.itemId, shopId: input.shopId },
+      include: { shop: true },
+    });
+    if (clash) {
+      return fail(
+        `This item is already on the list under ${clash.shop?.name ?? "no shop"}.`,
+      );
+    }
+    data.shopId = input.shopId;
+  }
 
   await prisma.groceryListItem.update({ where: { id: input.listItemId }, data });
   revalidateList(row.listId);

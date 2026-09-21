@@ -196,6 +196,7 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
 
       <PurchaseSheet
         item={active}
+        shops={list.shops}
         editable={editable}
         allowClosed={list.status === "COMPLETED"}
         onClose={() => setActive(null)}
