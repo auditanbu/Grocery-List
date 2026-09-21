@@ -264,7 +264,7 @@ export async function updateListItem(input: {
 }): Promise<ActionResult> {
   const row = await prisma.groceryListItem.findUnique({
     where: { id: input.listItemId },
-    include: { list: true },
+    include: { list: true, item: { select: { sizeValue: true, unitType: true } } },
   });
   if (!row) return fail("Item not found on this list.");
   if (row.list.status === "COMPLETED" && !input.allowClosed) return fail("This list is closed.");
@@ -293,6 +293,25 @@ export async function updateListItem(input: {
     if (value !== null && !unit) return fail("Pick a unit for the size.");
     data.sizeValue = value;
     data.sizeUnit = unit;
+
+    // A size filled in on a master item that has none is not a correction
+    // for this month, it is the fact nobody had recorded — a 125 g soap is
+    // 125 g next month too. So it seeds the master, and every later list
+    // starts with it. Never an overwrite: a master item that already has a
+    // size keeps it, because then the row really is the one-off (the shop
+    // only had the 150 g tube).
+    if (
+      value !== null &&
+      unit !== null &&
+      row.item.sizeValue === null &&
+      row.item.unitType === "COUNT"
+    ) {
+      await prisma.item.update({
+        where: { id: row.itemId },
+        data: { sizeValue: value, sizeUnit: unit },
+      });
+      revalidatePath("/grocery/master");
+    }
   }
   if (input.shopId !== undefined && input.shopId !== row.shopId) {
     // One row per (list, item, shop), so moving a row onto a shop that

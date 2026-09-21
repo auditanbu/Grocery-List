@@ -103,9 +103,12 @@ export function PurchaseSheet({
   const name = displayName(item, language);
   const size = sizeOf(sizeValue, sizeUnit);
   const listSize = sizeOf(item.sizeValue, item.sizeUnit);
-  // Only items the master list gives a size to can be re-sized here —
-  // everything else carries its amount in the quantity.
-  const sizeable = listSize !== null;
+  // Anything counted in packs can carry a pack size, whether or not one has
+  // ever been filled in: an item nobody has sized yet is exactly the one you
+  // are holding when you notice it is a 650 ml bottle. Items measured in
+  // g/ml/kg/L (or priced in rupees) carry their amount in the quantity
+  // instead, and have no size to set.
+  const sizeable = unitType === "COUNT";
   const sizeChanged =
     size?.value !== listSize?.value || size?.unit !== listSize?.unit;
   const quantityChanged = quantity !== item.quantity || unitType !== item.unitType;
@@ -174,9 +177,11 @@ export function PurchaseSheet({
   );
 
   // For a packaged item the quantity counts packs, so "1" on its own reads
-  // as nothing at all — say what it is a count of.
+  // as nothing at all — say what it is a count of. Only once a size is
+  // actually set, though: "3 packs" of an unsized item says no more than
+  // "3" and reads as though something is missing.
   const packsLabel = (value: number, unit: UnitType) =>
-    sizeable ? `${formatQtyValue(value, unit)} ${value === 1 ? "pack" : "packs"}` : formatQty(value, unit);
+    size ? `${formatQtyValue(value, unit)} ${value === 1 ? "pack" : "packs"}` : formatQty(value, unit);
 
   const save = () => {
     if (!valid) {
@@ -281,8 +286,9 @@ export function PurchaseSheet({
               />
             </div>
             <span className="mt-1.5 block text-[12px] text-ios-label-3">
-              Shop only had another size? Put it in here — the price you enter
-              below is taken as the price for this size.
+              {listSize
+                ? "Shop only had another size? Put it in here — the price you enter below is taken as the price for this size."
+                : "What one comes in — a 200 g paste, a 650 ml bottle. Fill it in and the price you enter below is taken as the price for this size."}
             </span>
           </div>
         ) : null}

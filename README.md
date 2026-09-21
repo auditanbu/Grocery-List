@@ -235,10 +235,17 @@ once the list has been finalized and reality starts diverging from the plan:
   the purchase sheet's business, because changing it has to re-price the
   item too.
 - **The purchase sheet corrects the size and the quantity**, and keeps the
-  two apart because they go wrong for different reasons. For a packaged
-  item `PurchaseSheet` shows a **Size** box outright — the shop only had
-  the 150 g tube, which is the single most common surprise at the shelf —
-  while the **quantity** (how many packs) stays behind a small edit button.
+  two apart because they go wrong for different reasons. For anything
+  counted in packs `PurchaseSheet` shows a **Size** box outright — the shop
+  only had the 150 g tube, which is the single most common surprise at the
+  shelf — while the **quantity** (how many packs) stays behind a small edit
+  button. The box appears whether or not a size has ever been filled in: an
+  item nobody has sized yet is exactly the one you are holding when you
+  notice it is a 650 ml bottle, and a size filled in there where the master
+  item has **none** seeds the master too (`updateListItem`), so next month's
+  list starts with it. Never an overwrite — a master item that already has a
+  size keeps it, because then the row really is the one-off. Items measured
+  in g/ml/kg/L carry their amount in the quantity and have no size to set.
   Saving applies both through `updateListItem` before `recordPurchase`, so
   the price you type is recorded against what actually went in the basket,
   and the `PriceHistory` row snapshots quantity *and* size together.
