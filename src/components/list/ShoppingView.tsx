@@ -5,13 +5,11 @@ import { useMemo, useState, useTransition } from "react";
 
 import { PriceDelta } from "@/components/PriceDelta";
 import { PurchaseSheet } from "@/components/list/PurchaseSheet";
-import { ShopAddSheet } from "@/components/list/ShopAddSheet";
-import { Stepper } from "@/components/Stepper";
 import { groupByShop } from "@/components/list/DraftEditor";
 import { completeList } from "@/lib/actions";
 import { displayName, useLanguage } from "@/lib/language";
-import { formatPrice, formatQty, projectPrice, unitGroup, type UnitType } from "@/lib/units";
-import type { CategoryDTO, ListDetailDTO, ListItemDTO } from "@/lib/types";
+import { formatPrice, formatQty } from "@/lib/units";
+import type { ListDetailDTO, ListItemDTO } from "@/lib/types";
 
 type ShoppingViewProps = {
   list: ListDetailDTO;
@@ -30,21 +28,6 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const [compareItemId, setCompareItemId] = useState<number | null>(null);
-  const [compareState, setCompareState] = useState<
-    Record<number, { quantity: number; unitType: UnitType }>
-  >({});
-
-  const toggleCompare = (item: ListItemDTO, event: React.MouseEvent) => {
-    event.stopPropagation();
-    setCompareItemId((current) => (current === item.id ? null : item.id));
-    setCompareState((prev) =>
-      item.id in prev
-        ? prev
-        : { ...prev, [item.id]: { quantity: item.quantity, unitType: item.unitType } },
-    );
-  };
-
   // Checked-off items sink to the bottom of their shop's section so the
   // remaining to-buy items stay at the top while shopping.
   const groupedByShop = useMemo(() => {
@@ -59,6 +42,9 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
   // "Finish shopping" completes the whole list, so it must reflect the
   // list's true completion — not just what the shop/category filters show.
   const allDone = list.items.length > 0 && list.items.every((item) => item.isPurchased);
+  // Based on the list's own status, not `editable`: unlocking a finished list
+  // to fix a price should not strip the record you came to look at.
+  const isCompleted = list.status === "COMPLETED";
 
   const complete = () => {
     startTransition(async () => {
@@ -88,22 +74,6 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
             <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
               {shopItems.map((item) => {
                 const name = displayName(item, language);
-                const comparing = compareItemId === item.id;
-                const compare =
-                  compareState[item.id] ?? { quantity: item.quantity, unitType: item.unitType };
-                const canProject =
-                  item.lastPrice !== null && item.lastPriceQuantity !== null && item.lastPriceUnitType !== null;
-                const sameGroup = canProject && unitGroup(item.lastPriceUnitType as UnitType) === unitGroup(compare.unitType);
-                const projected =
-                  canProject && sameGroup
-                    ? projectPrice(
-                        item.lastPrice as number,
-                        item.lastPriceQuantity as number,
-                        item.lastPriceUnitType as UnitType,
-                        compare.quantity,
-                        compare.unitType,
-                      )
-                    : null;
                 return (
                 <li key={item.id}>
                   <div className="flex w-full items-center gap-3 px-4 py-3">
@@ -136,6 +106,8 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
                       </span>
 
                       <span className="min-w-0 flex-1">
+                        {/* One name only — the second language belongs in the
+                            toggle, not stacked under every row. */}
                         <span
                           className={`block truncate text-[16px] font-medium ${
                             item.isPurchased ? "text-ios-label-3" : ""
@@ -143,17 +115,14 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
                         >
                           {name.primary}
                         </span>
-                        <span className="block truncate text-[13px] text-ios-label-2">
-                          {name.secondary} · {formatQty(item.quantity, item.unitType)}
-                        </span>
-                        {item.isPurchased ? (
-                          <span className="mt-1 flex flex-wrap items-center gap-2">
+                        {/* A finished list is a record, so it keeps what was
+                            paid and where. While shopping, that lives in the
+                            purchase sheet instead of crowding the row. */}
+                        {isCompleted && item.isPurchased ? (
+                          <span className="mt-0.5 flex flex-wrap items-center gap-2">
                             <span className="text-[14px] font-semibold tabular-nums">
                               {formatPrice(item.purchasePrice ?? 0)}
                             </span>
-                            {/* Where it was actually bought — the row's own
-                                record, since the shop heading disappears once
-                                a category filter is on. */}
                             <span className="text-[13px] text-ios-label-2">
                               at {item.shopName ?? "Not set"}
                             </span>
@@ -166,70 +135,23 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
                               previousUnitType={item.previousUnitType ?? undefined}
                             />
                           </span>
-                        ) : !editable ? (
-                          <span className="mt-1 block text-[13px] text-ios-label-3">
+                        ) : isCompleted ? (
+                          <span className="mt-0.5 block text-[13px] text-ios-label-3">
                             Not bought
-                          </span>
-                        ) : item.lastPrice !== null ? (
-                          <span className="block truncate text-[13px] text-ios-label-3">
-                            Last {formatPrice(item.lastPrice)}
-                            {item.lastPriceQuantity !== null && item.lastPriceUnitType !== null
-                              ? ` for ${formatQty(item.lastPriceQuantity, item.lastPriceUnitType)}`
-                              : ""}
-                            {item.shopName ? ` · ${item.shopName}` : ""}
                           </span>
                         ) : null}
                       </span>
                     </button>
 
+                    <span
+                      className={`flex-none text-[16px] font-semibold tabular-nums ${
+                        item.isPurchased ? "text-ios-label-3" : ""
+                      }`}
+                    >
+                      {formatQty(item.quantity, item.unitType)}
+                    </span>
                   </div>
 
-                  {!item.isPurchased && item.lastPrice !== null ? (
-                    <div className="-mt-1 px-4 pb-3">
-                      <button
-                        type="button"
-                        onClick={(event) => toggleCompare(item, event)}
-                        className={`h-8 rounded-full px-3 text-[13px] font-medium transition active:scale-95 ${
-                          comparing
-                            ? "bg-ios-blue text-white"
-                            : "bg-ios-surface-2 text-ios-blue ring-1 ring-inset ring-ios-separator"
-                        }`}
-                      >
-                        Compare
-                      </button>
-                    </div>
-                  ) : null}
-
-                  {comparing ? (
-                    <div className="mx-4 mb-3 rounded-ios bg-ios-surface-2 p-3 ring-1 ring-inset ring-ios-separator">
-                      <p className="pb-1.5 text-[12px] font-medium text-ios-label-2">
-                        Compare at this quantity
-                      </p>
-                      <Stepper
-                        value={compare.quantity}
-                        unit={compare.unitType}
-                        size="compact"
-                        onChange={(quantity, unitType) =>
-                          setCompareState((prev) => ({ ...prev, [item.id]: { quantity, unitType } }))
-                        }
-                        aria-label={`Compare quantity for ${item.nameEn}`}
-                      />
-                      <p className="mt-2 text-[14px] font-semibold tabular-nums">
-                        {projected !== null ? (
-                          <>
-                            ≈ {formatPrice(projected)}
-                            <span className="ml-1.5 text-[12px] font-normal text-ios-label-2">
-                              based on last price
-                            </span>
-                          </>
-                        ) : (
-                          <span className="text-[13px] font-normal text-ios-label-2">
-                            Different pack size — can&apos;t compare
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  ) : null}
                 </li>
                 );
               })}
