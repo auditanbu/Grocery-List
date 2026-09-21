@@ -10,6 +10,7 @@ import { SizeField } from "@/components/SizeField";
 import { Stepper } from "@/components/Stepper";
 import { getItemPriceHistory, recordPurchase, undoPurchase, updateListItem } from "@/lib/actions";
 import { displayName, useLanguage } from "@/lib/language";
+import { useRateBasis } from "@/lib/rate-basis";
 import {
   formatPrice,
   formatQty,
@@ -17,12 +18,22 @@ import {
   formatQtyWithSize,
   formatUnitPrice,
   projectPrice,
+  rateBasisLabel,
   sizeOf,
   totalAmount,
   unitGroup,
+  type RateBasis,
   type UnitType,
 } from "@/lib/units";
 import type { ListItemDTO, PriceHistoryDTO } from "@/lib/types";
+
+/** "Showing the rate per kg — tap for per 500 g." */
+function rateBasisHint(unit: UnitType, basis: RateBasis, nextBasis: RateBasis): string {
+  return `Showing the rate per ${rateBasisLabel(unit, basis)} — tap for per ${rateBasisLabel(
+    unit,
+    nextBasis,
+  )}`;
+}
 
 type PurchaseSheetProps = {
   item: ListItemDTO | null;
@@ -51,6 +62,7 @@ type PurchaseSheetProps = {
 export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: PurchaseSheetProps) {
   const router = useRouter();
   const { language } = useLanguage();
+  const { basis, nextBasis, cycleBasis } = useRateBasis();
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState(0);
   const [unitType, setUnitType] = useState<UnitType>("COUNT");
@@ -119,15 +131,45 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
         )
       : null;
 
-  // Per-kg / per-L / per-piece, the figure that survives a change of pack
-  // size: ₹212 for 4 kg and ₹212 for 8 kg are the same rupees and a very
-  // different deal. Recomputed as the price is typed. Null for RS-priced
-  // items (their "quantity" is already rupees) and before a price is entered.
+  // The rate that survives a change of pack size: ₹212 for 4 kg and ₹212 for
+  // 8 kg are the same rupees and a very different deal. Read off the total
+  // amount, and quoted against whichever pack size the rate line is set to —
+  // per kg, or per 500/250/100 g when that is the figure the shop is quoting.
+  // Recomputed as the price is typed. Null for RS-priced items (their
+  // "quantity" is already rupees) and before a price is entered.
   const currentUnitPrice =
-    valid && parsed > 0 ? formatUnitPrice(parsed, bought.quantity, bought.unit) : null;
+    valid && parsed > 0 ? formatUnitPrice(parsed, bought.quantity, bought.unit, basis) : null;
   const referenceUnitPrice = canCompare
-    ? formatUnitPrice(reference as number, referenceBought.quantity, referenceBought.unit)
+    ? formatUnitPrice(reference as number, referenceBought.quantity, referenceBought.unit, basis)
     : null;
+
+  // Loose countable items read "₹40 each" whatever the basis, so there is
+  // nothing to cycle through — the line stays plain text for those. Anything
+  // with a size measures out in g or ml and does have a rate to re-quote.
+  const rateUnit = currentUnitPrice ? bought.unit : (referenceBought?.unit ?? null);
+  const rateHint =
+    rateUnit !== null && rateBasisLabel(rateUnit, basis) !== null
+      ? rateBasisHint(rateUnit, basis, nextBasis)
+      : null;
+
+  // Built once, so the wording is identical whether it ends up inside the
+  // tappable button or the plain paragraph a loose countable item gets.
+  const rateLine = (
+    <>
+      {currentUnitPrice ? (
+        <>
+          <span className="font-semibold tabular-nums text-ios-label">{currentUnitPrice}</span> at{" "}
+          {formatQtyWithSize(quantity, unitType, size)}
+        </>
+      ) : null}
+      {currentUnitPrice && referenceUnitPrice ? " · " : null}
+      {referenceUnitPrice ? (
+        <>
+          <span className="tabular-nums">{referenceUnitPrice}</span> last time
+        </>
+      ) : null}
+    </>
+  );
 
   // For a packaged item the quantity counts packs, so "1" on its own reads
   // as nothing at all — say what it is a count of.
@@ -408,24 +450,33 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
             )}
 
             {/* The rate, right under the pill: the same ₹ over a bigger or
-                smaller pack is what the pill can't tell you. */}
+                smaller pack is what the pill can't tell you. Tapping it
+                changes the pack size it is quoted against — per kg is the
+                shelf label, but the shop quotes you 100 g. */}
             {currentUnitPrice || referenceUnitPrice ? (
-              <p className="text-[13px] text-ios-label-2">
-                {currentUnitPrice ? (
-                  <>
-                    <span className="font-semibold tabular-nums text-ios-label">
-                      {currentUnitPrice}
-                    </span>{" "}
-                    at {formatQtyWithSize(quantity, unitType, size)}
-                  </>
-                ) : null}
-                {currentUnitPrice && referenceUnitPrice ? " · " : null}
-                {referenceUnitPrice ? (
-                  <>
-                    <span className="tabular-nums">{referenceUnitPrice}</span> last time
-                  </>
-                ) : null}
-              </p>
+              rateHint !== null ? (
+                <button
+                  type="button"
+                  onClick={cycleBasis}
+                  title={rateHint}
+                  aria-label={rateHint}
+                  className="-mx-1 flex items-center gap-1 rounded-lg px-1 py-0.5 text-left text-[13px] text-ios-label-2 transition active:opacity-60"
+                >
+                  <span>{rateLine}</span>
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 flex-none text-ios-blue" aria-hidden>
+                    <path
+                      d="M4 9h13a3.5 3.5 0 0 1 0 7h-2m5-7l-3-3m3 3l-3 3M20 15H7a3.5 3.5 0 0 1 0-7h2"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              ) : (
+                <p className="text-[13px] text-ios-label-2">{rateLine}</p>
+              )
             ) : null}
           </div>
         )}

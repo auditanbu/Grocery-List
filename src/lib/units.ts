@@ -251,6 +251,34 @@ export function unitGroup(unit: UnitType): UnitGroup {
   return UNIT_GROUP[unit];
 }
 
+/**
+ * The pack sizes a rate can be quoted against, in base units (grams, ml),
+ * in the order the purchase sheet cycles through them. Per kg leads because
+ * it is how shelf labels are written; the smaller sizes are how the shop
+ * actually quotes you when you are buying 200 g of masala.
+ */
+export const RATE_BASIS_ORDER = [1000, 500, 250, 100] as const;
+
+export type RateBasis = (typeof RATE_BASIS_ORDER)[number];
+
+export const DEFAULT_RATE_BASIS: RateBasis = 1000;
+
+/**
+ * How a basis reads next to a rate: "kg", "500 g", "L", "100 ml". Null for
+ * countable and RS-priced items, which have no pack size to quote against —
+ * a countable rate is "each" whatever the basis says.
+ */
+export function rateBasisLabel(unit: UnitType, basis: RateBasis): string | null {
+  switch (unitGroup(unit)) {
+    case "weight":
+      return basis === 1000 ? "kg" : `${basis} g`;
+    case "volume":
+      return basis === 1000 ? "L" : `${basis} ml`;
+    default:
+      return null;
+  }
+}
+
 /** Price per base unit (per gram, per ml, per item) — the fair basis for comparison. */
 export function unitPriceOf(price: number, quantity: number, unit: UnitType): number | null {
   if (!Number.isFinite(price) || !Number.isFinite(quantity) || quantity <= 0) return null;
@@ -263,13 +291,16 @@ export function unitPriceOf(price: number, quantity: number, unit: UnitType): nu
  * sensible figure — a missing quantity, or an RS-priced item, where the
  * "quantity" is already rupees and a unit price of 1.00 says nothing.
  *
- * Deliberately normalised up to kg/L rather than down to g/ml: shelf labels
- * and shop conversation are "₹420 a kilo", never "₹0.42 a gram".
+ * Deliberately normalised up to kg/L rather than down to g/ml by default:
+ * shelf labels and shop conversation are "₹420 a kilo", never "₹0.42 a
+ * gram". `basis` quotes it against a smaller pack instead — ₹420/kg is
+ * ₹42.00/100 g, which is the figure you need when you are buying 200 g.
  */
 export function formatUnitPrice(
   price: number,
   quantity: number,
   unit: UnitType,
+  basis: RateBasis = DEFAULT_RATE_BASIS,
 ): string | null {
   const group = unitGroup(unit);
   if (group === "currency") return null;
@@ -277,12 +308,9 @@ export function formatUnitPrice(
   const perBase = unitPriceOf(price, quantity, unit);
   if (perBase === null) return null;
 
+  const basisLabel = rateBasisLabel(unit, basis);
   const [amount, suffix]: [number, string] =
-    group === "weight"
-      ? [perBase * 1000, "/kg"]
-      : group === "volume"
-        ? [perBase * 1000, "/L"]
-        : [perBase, " each"];
+    basisLabel !== null ? [perBase * basis, `/${basisLabel}`] : [perBase, " each"];
 
   // Sub-₹100 unit prices need the paise; above that they are noise.
   const digits = amount >= 100 ? 0 : 2;

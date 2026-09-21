@@ -30,6 +30,7 @@ import {
   displayName,
   useLanguage,
 } from "@/lib/language";
+import { useRateBasis } from "@/lib/rate-basis";
 import {
   UNIT_TYPES,
   formatPrice,
@@ -78,6 +79,7 @@ type StatusFilter = "all" | "unselected" | "zero";
 export function AddItemsPage({ list, items, shops, categories }: AddItemsPageProps) {
   const router = useRouter();
   const { language, setLanguage } = useLanguage();
+  const { basis } = useRateBasis();
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [categoryId, setCategoryId] = useState<number | null>(null);
@@ -524,7 +526,7 @@ export function AddItemsPage({ list, items, shops, categories }: AddItemsPagePro
                     : null;
                   const unitPrice =
                     lastBought && item.lastPrice !== null
-                      ? formatUnitPrice(item.lastPrice, lastBought.quantity, lastBought.unit)
+                      ? formatUnitPrice(item.lastPrice, lastBought.quantity, lastBought.unit, basis)
                       : null;
                   // Where *that purchase* happened, not the item's default shop
                   // — the name line above already carries the default.

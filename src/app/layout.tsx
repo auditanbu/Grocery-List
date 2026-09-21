@@ -6,6 +6,7 @@ import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
 import { AdminProvider } from "@/lib/admin-context";
 import { isAdminSession } from "@/lib/admin";
 import { LanguageProvider } from "@/lib/language";
+import { RateBasisProvider } from "@/lib/rate-basis";
 import { ThemeProvider, noFlashThemeScript } from "@/lib/theme";
 import "./globals.css";
 
@@ -89,13 +90,15 @@ export default async function RootLayout({
         <ThemeProvider>
           <AdminProvider initialIsAdmin={isAdmin}>
             <LanguageProvider>
-              <AppNav />
-              <div className="flex-1 md:pl-64">
-                {/* Bottom padding clears the tab bar on mobile. */}
-                <main className="mx-auto w-full max-w-3xl px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 md:pb-12 md:pt-8">
-                  {children}
-                </main>
-              </div>
+              <RateBasisProvider>
+                <AppNav />
+                <div className="flex-1 md:pl-64">
+                  {/* Bottom padding clears the tab bar on mobile. */}
+                  <main className="mx-auto w-full max-w-3xl px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 md:pb-12 md:pt-8">
+                    {children}
+                  </main>
+                </div>
+              </RateBasisProvider>
             </LanguageProvider>
           </AdminProvider>
         </ThemeProvider>
