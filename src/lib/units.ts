@@ -204,6 +204,19 @@ export function formatQtyWithSize(
   return quantity === 1 ? sizeText : `${formatQtyValue(quantity, unit)} × ${sizeText}`;
 }
 
+/**
+ * An item's name carrying the size it is sold in — "3 ரோசஸ் டீ தூள் - 500 g".
+ *
+ * A packet item's name says nothing about how much is in the packet, and
+ * that is exactly what you are pricing at the shelf, so the size travels
+ * with the name wherever the row is about one item: the shopping list and
+ * the purchase sheet. Loose items measure out in their quantity and get
+ * the name on its own.
+ */
+export function formatNameWithSize(name: string, size: PackSize | null): string {
+  return size ? `${name} - ${formatQty(size.value, size.unit)}` : name;
+}
+
 /** "500 g", "1 kg", "1.5 kg", "₹10", "3" — kg/L under 1 shown as g/ml. */
 export function formatQty(value: number, unit: UnitType): string {
   const display = displayUnitFor(value, unit);

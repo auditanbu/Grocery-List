@@ -8,7 +8,7 @@ import { PurchaseSheet } from "@/components/list/PurchaseSheet";
 import { groupByShop } from "@/components/list/DraftEditor";
 import { completeList } from "@/lib/actions";
 import { displayName, useLanguage } from "@/lib/language";
-import { formatPrice, formatQtyWithSize, sizeOf, totalAmount } from "@/lib/units";
+import { formatPrice, formatQty, sizeOf, totalAmount } from "@/lib/units";
 import type { ListDetailDTO, ListItemDTO } from "@/lib/types";
 
 type ShoppingViewProps = {
@@ -116,13 +116,24 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
 
                       <span className="min-w-0 flex-1">
                         {/* One name only — the second language belongs in the
-                            toggle, not stacked under every row. */}
+                            toggle, not stacked under every row. The size rides
+                            along with it: at the shelf "3 ரோசஸ் டீ தூள்" is a
+                            row of tins until it says which tin. */}
                         <span
-                          className={`block truncate text-[16px] font-medium ${
+                          className={`flex items-baseline gap-1 ${
                             item.isPurchased ? "text-ios-label-3" : ""
                           }`}
                         >
-                          {name.primary}
+                          <span className="truncate text-[16px] font-medium">{name.primary}</span>
+                          {size ? (
+                            <span
+                              className={`flex-none text-[14px] ${
+                                item.isPurchased ? "text-ios-label-3" : "text-ios-label-2"
+                              }`}
+                            >
+                              - {formatQty(size.value, size.unit)}
+                            </span>
+                          ) : null}
                         </span>
                         {/* A finished list is a record, so it keeps what was
                             paid and where. While shopping, that lives in the
@@ -157,7 +168,10 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
                         item.isPurchased ? "text-ios-label-3" : ""
                       }`}
                     >
-                      {formatQtyWithSize(item.quantity, item.unitType, size)}
+                      {/* Packs, not packs × size — the size is spelled out
+                          beside the name, and saying it twice reads as a
+                          different number. */}
+                      {formatQty(item.quantity, item.unitType)}
                     </span>
                   </div>
 

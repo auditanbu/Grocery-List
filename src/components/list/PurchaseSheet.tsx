@@ -12,6 +12,7 @@ import { getItemPriceHistory, recordPurchase, undoPurchase, updateListItem } fro
 import { displayName, useLanguage } from "@/lib/language";
 import { useRateBasis } from "@/lib/rate-basis";
 import {
+  formatNameWithSize,
   formatPrice,
   formatQty,
   formatQtyValue,
@@ -217,13 +218,19 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
     });
   };
 
+  // The size belongs in the title, not only in the field below: the price
+  // typed here is the price *for that size*, and the title is what you
+  // glance at while typing it. It follows the size actually bought, so
+  // re-sizing at the shop re-titles the sheet.
+  const sheetTitle = formatNameWithSize(name.primary, size);
+
   // The quantity row below carries the amount whenever it's editable, so the
   // subtitle only spells it out when that row is hidden.
   return (
     <Sheet
       open
       onClose={onClose}
-      title={name.primary}
+      title={sheetTitle}
       subtitle={[
         name.secondary,
         editable ? null : `List wants ${formatQtyWithSize(item.quantity, item.unitType, listSize)}`,
