@@ -8,7 +8,7 @@ import { PurchaseSheet } from "@/components/list/PurchaseSheet";
 import { groupByShop } from "@/components/list/DraftEditor";
 import { completeList } from "@/lib/actions";
 import { displayName, useLanguage } from "@/lib/language";
-import { formatPrice, formatQty, sizeOf, totalAmount } from "@/lib/units";
+import { formatNameWithSize, formatPrice, formatQty, sizeOf, totalAmount } from "@/lib/units";
 import type { ListDetailDTO, ListItemDTO } from "@/lib/types";
 
 type ShoppingViewProps = {
@@ -120,20 +120,11 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
                             along with it: at the shelf "3 ரோசஸ் டீ தூள்" is a
                             row of tins until it says which tin. */}
                         <span
-                          className={`flex items-baseline gap-1 ${
+                          className={`block truncate text-[16px] font-medium ${
                             item.isPurchased ? "text-ios-label-3" : ""
                           }`}
                         >
-                          <span className="truncate text-[16px] font-medium">{name.primary}</span>
-                          {size ? (
-                            <span
-                              className={`flex-none text-[14px] ${
-                                item.isPurchased ? "text-ios-label-3" : "text-ios-label-2"
-                              }`}
-                            >
-                              - {formatQty(size.value, size.unit)}
-                            </span>
-                          ) : null}
+                          {formatNameWithSize(name.primary, size)}
                         </span>
                         {/* A finished list is a record, so it keeps what was
                             paid and where. While shopping, that lives in the

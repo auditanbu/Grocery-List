@@ -17,8 +17,8 @@ import {
 import { monthKeyToLabel } from "@/lib/dates";
 import { displayName, displayNameLine, useLanguage } from "@/lib/language";
 import {
+  formatNameWithSize,
   formatPrice,
-  formatQty,
   formatQtyWithSize,
   sizeOf,
   type UnitType,
@@ -219,19 +219,21 @@ export function DraftEditor({ list }: DraftEditorProps) {
               <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
                 {items.map((item) => {
                   const name = displayName(item, language);
+                  const size = sizeOf(item.sizeValue, item.sizeUnit);
                   const expanded = expandedItemId === item.id;
                   const history = historyByItem[item.itemId];
                   return (
                   <li key={item.id} className="px-4 py-3">
                     <div className="flex items-start gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[16px] font-medium">{name.primary}</p>
+                        {/* Both names carry the pack size the stepper is
+                            counting — whichever one the toggle makes primary
+                            is the one being read. */}
+                        <p className="truncate text-[16px] font-medium">
+                          {formatNameWithSize(name.primary, size)}
+                        </p>
                         <p className="truncate text-[13px] text-ios-label-2">
-                          {name.secondary}
-                          {/* The pack size the stepper above is counting. */}
-                          {sizeOf(item.sizeValue, item.sizeUnit)
-                            ? ` · ${formatQty(item.sizeValue as number, item.sizeUnit as UnitType)} each`
-                            : ""}
+                          {formatNameWithSize(name.secondary, size)}
                         </p>
                         {stateOf(item).quantity === 0 ? (
                           <span className="mt-0.5 inline-flex items-center rounded-full bg-ios-orange/15 px-2 py-0.5 text-[11px] font-medium text-ios-orange">

@@ -213,13 +213,18 @@ once the list has been finalized and reality starts diverging from the plan:
 
 - **Search** narrows the list as you type — Tamil, Tanglish, English,
   category or shop name — on top of the shop and category chips.
-- **The size rides with the name.** A packaged item reads
-  "3 ரோசஸ் டீ தூள் - 500 g" on the row and in the purchase sheet's title
-  (`formatNameWithSize`), because the name alone does not say which tin is
-  meant and the size is what you match against the shelf. The figure on the
-  right of the row is then just the pack count. In the sheet the title
-  follows the size *actually bought*, so correcting it to 150 g re-titles
-  the sheet you are typing the price into.
+- **The size rides with the name**, on every screen that lists items — the
+  draft editor, the finalized list, the shopping view — and in the purchase
+  sheet's title. `formatNameWithSize` appends it to whichever name is being
+  shown, so the language toggle gives "3 ரோசஸ் டீ தூள் - 500 g",
+  "3 roses tea - 500 g" or "Red label - Natural care - 500 g"; the draft
+  editor, which shows both names, appends it to each. The name alone does
+  not say which tin is meant, and the size is what you match against the
+  shelf. The figure on the right of a row is then just the pack count —
+  repeating the size there reads as a different number. In the sheet the
+  title follows the size *actually bought*, so correcting it to 150 g
+  re-titles the sheet you are typing the price into. Loose items have no
+  size and are untouched: their quantity is already the measure.
 - **Quantity is editable inline.** Every un-bought row carries the same
   unit-aware stepper the draft editor uses, so "actually, make it 2 kg" is
   one tap rather than a trip back through *Edit list*. Changes are

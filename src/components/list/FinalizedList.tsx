@@ -3,8 +3,9 @@
 import { groupByShop } from "@/components/list/DraftEditor";
 import { displayName, useLanguage } from "@/lib/language";
 import {
+  formatNameWithSize,
   formatPrice,
-  formatQtyWithSize,
+  formatQty,
   projectPrice,
   sizeOf,
   totalAmount,
@@ -81,21 +82,22 @@ export function FinalizedList({ items, shopName, emptyMessage }: FinalizedListPr
               {groupItems.map((item) => {
                 serial += 1;
                 const name = displayName(item, language);
+                const size = sizeOf(item.sizeValue, item.sizeUnit);
                 return (
                   <li key={item.id} className="ios-row">
                     <span className="w-6 flex-none text-[14px] tabular-nums text-ios-label-3">
                       {serial}
                     </span>
-                    {/* One name only — the language toggle picks which. */}
+                    {/* One name only — the language toggle picks which — and
+                        it carries the pack size, whichever name that is. */}
                     <span className="min-w-0 flex-1 truncate text-[16px] font-medium">
-                      {name.primary}
+                      {formatNameWithSize(name.primary, size)}
                     </span>
+                    {/* Packs, not packs × size: the size is already in the
+                        name, and saying it twice reads as a different
+                        number. */}
                     <span className="flex-none text-[15px] font-semibold tabular-nums">
-                      {formatQtyWithSize(
-                        item.quantity,
-                        item.unitType,
-                        sizeOf(item.sizeValue, item.sizeUnit),
-                      )}
+                      {formatQty(item.quantity, item.unitType)}
                     </span>
                   </li>
                 );
