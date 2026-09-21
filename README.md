@@ -51,6 +51,41 @@ Useful scripts (see `package.json`):
 | `npm run db:import -- "./Grocery database.csv"` | Import the real spreadsheet (see below) |
 | `npm run db:studio` | Prisma Studio, a GUI for the database |
 
+### Seeing a change without deploying
+
+Production runs on Coolify off `main`, so "merge and look at the live site"
+is the slowest possible way to review a change — and it reviews it after it
+is already live. `scripts/preview.sh` brings the whole thing up from nothing
+and photographs it instead:
+
+```bash
+./scripts/preview.sh                     # DB, migrations, demo data, dev server, screenshots
+./scripts/preview.sh /petrol:petrol      # just one screen
+```
+
+It writes `shots/<screen>-phone.png` and `shots/<screen>-desktop.png` (both
+gitignored), starting a local MariaDB and installing dependencies only if
+they are missing, so re-running it after an edit just re-takes the pictures.
+It refuses to run unless `DATABASE_URL` points at localhost — the demo lists
+it seeds must never reach the Coolify database.
+
+This is what makes a cloud coding session reviewable: there is no browser
+pointed at `localhost:3000` in one, so the screenshots are the only way to
+see a change before it is pushed. On your own machine `npm run dev` and a
+browser are still the faster loop.
+
+`scripts/screenshot.mjs` can be pointed at any running instance on its own:
+
+```bash
+BASE_URL=https://grocery.example.com node scripts/screenshot.mjs ./shots
+```
+
+Screens are given as `path:label`; with none passed it shoots the grocery
+home, the current month's list (found by id from the home page), the master
+list, history and petrol. `FULL_PAGE=1` captures the entire scroll height
+instead of a tall window, at the cost of misplacing the pinned search field
+and tab bar.
+
 ### Importing "Grocery database.xlsx"
 
 The seed script ships with a representative Tamil/English master list so the
