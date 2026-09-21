@@ -71,11 +71,9 @@ export function FinalizedList({ items, shopName, emptyMessage }: FinalizedListPr
                     <span className="w-6 flex-none text-[14px] tabular-nums text-ios-label-3">
                       {serial}
                     </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[16px] font-medium">{name.primary}</span>
-                      <span className="block truncate text-[13px] text-ios-label-2">
-                        {name.secondary}
-                      </span>
+                    {/* One name only — the language toggle picks which. */}
+                    <span className="min-w-0 flex-1 truncate text-[16px] font-medium">
+                      {name.primary}
                     </span>
                     <span className="flex-none text-[15px] font-semibold tabular-nums">
                       {formatQty(item.quantity, item.unitType)}

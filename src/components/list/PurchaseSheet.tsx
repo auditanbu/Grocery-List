@@ -9,7 +9,7 @@ import { Sheet } from "@/components/Sheet";
 import { Stepper } from "@/components/Stepper";
 import { getItemPriceHistory, recordPurchase, undoPurchase, updateListItem } from "@/lib/actions";
 import { displayName, useLanguage } from "@/lib/language";
-import { formatPrice, formatQty, type UnitType } from "@/lib/units";
+import { formatPrice, formatQty, projectPrice, unitGroup, type UnitType } from "@/lib/units";
 import type { ListItemDTO, PriceHistoryDTO } from "@/lib/types";
 
 type PurchaseSheetProps = {
@@ -39,6 +39,7 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
   const [unitType, setUnitType] = useState<UnitType>("COUNT");
   const [history, setHistory] = useState<PriceHistoryDTO[] | null>(null);
   const [editingQuantity, setEditingQuantity] = useState(false);
+  const [comparing, setComparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -47,6 +48,7 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
     setQuantity(item?.quantity ?? 0);
     setUnitType(item?.unitType ?? "COUNT");
     setEditingQuantity(item?.hasVariableUnit ?? false);
+    setComparing(false);
     setError(null);
     setHistory(null);
     if (item) {
@@ -63,6 +65,19 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
   const referenceUnitType = item.purchasePrice != null ? item.previousUnitType : item.lastPriceUnitType;
   const parsed = Number.parseFloat(price.replace(",", "."));
   const valid = Number.isFinite(parsed) && parsed >= 0;
+
+  const canCompare =
+    reference !== null && referenceQuantity !== null && referenceUnitType !== null;
+  const projected =
+    canCompare && unitGroup(referenceUnitType as UnitType) === unitGroup(unitType)
+      ? projectPrice(
+          reference as number,
+          referenceQuantity as number,
+          referenceUnitType as UnitType,
+          quantity,
+          unitType,
+        )
+      : null;
 
   const save = () => {
     if (!valid) {
@@ -199,8 +214,35 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
         ) : null}
 
         {editable ? (
-          <label className="block">
-            <span className="text-[13px] font-medium text-ios-label-2">Price paid</span>
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[13px] font-medium text-ios-label-2">Price paid</span>
+              {canCompare ? (
+                <button
+                  type="button"
+                  onClick={() => setComparing((current) => !current)}
+                  aria-pressed={comparing}
+                  aria-label="Compare with the last price paid"
+                  title="Compare with the last price paid"
+                  className={`flex h-8 w-8 flex-none items-center justify-center rounded-full transition active:scale-95 ${
+                    comparing
+                      ? "bg-ios-blue text-white"
+                      : "bg-ios-surface-2 text-ios-blue ring-1 ring-inset ring-ios-separator"
+                  }`}
+                >
+                  <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+                    <path
+                      d="M12 4v16M5 8h14M5 8l-2.5 5.5h5L5 8zm14 0l-2.5 5.5h5L19 8z"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              ) : null}
+            </div>
             <div className="mt-1.5 flex items-center rounded-ios bg-ios-surface-2 px-4 ring-1 ring-inset ring-ios-separator focus-within:ring-2 focus-within:ring-ios-blue">
               <span className="text-[22px] font-semibold text-ios-label-2">₹</span>
               <input
@@ -213,10 +255,34 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
                   if (event.key === "Enter") save();
                 }}
                 placeholder="0.00"
+                aria-label="Price paid"
                 className="h-14 w-full bg-transparent px-2 text-[22px] font-semibold tabular-nums outline-none"
               />
             </div>
-          </label>
+
+            {comparing ? (
+              <div className="mt-2 rounded-ios bg-ios-surface-2 p-3 ring-1 ring-inset ring-ios-separator">
+                {projected !== null ? (
+                  <>
+                    <p className="text-[15px] font-semibold tabular-nums">
+                      ≈ {formatPrice(projected)}
+                      <span className="ml-1.5 text-[12px] font-normal text-ios-label-2">
+                        at {formatQty(quantity, unitType)}
+                      </span>
+                    </p>
+                    <p className="mt-0.5 text-[12px] text-ios-label-2">
+                      Based on {formatPrice(reference as number)} for{" "}
+                      {formatQty(referenceQuantity as number, referenceUnitType as UnitType)}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[13px] text-ios-label-2">
+                    Last bought in a different kind of unit — nothing to compare against.
+                  </p>
+                )}
+              </div>
+            ) : null}
+          </div>
         ) : (
           // Closed list: what was paid, stated, with nothing to type into.
           <div>
@@ -281,8 +347,13 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
                       for {formatQty(entry.quantity, entry.unitType)}
                     </span>
                   </span>
-                  <span className="text-[12px] text-ios-label-3">
-                    {entry.listName ?? entry.shopName ?? ""}
+                  {/* Shop first — where you bought it is what makes an old
+                      price worth comparing; the list name only dates it. */}
+                  <span className="min-w-0 pl-3 text-right text-[12px] text-ios-label-3">
+                    <span className="block truncate">{entry.shopName ?? "Shop not set"}</span>
+                    {entry.listName ? (
+                      <span className="block truncate text-ios-label-3/70">{entry.listName}</span>
+                    ) : null}
                   </span>
                 </li>
               ))}

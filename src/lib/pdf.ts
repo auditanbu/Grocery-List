@@ -199,8 +199,14 @@ function escapeHtml(value: string): string {
 // declaration after font-family (margin, fixed page height, overflow
 // clip, font-size), which is exactly what caused Tamil PDFs to render
 // with no page margins and get stretched to fill the sheet.
+//
+// var(--font-tamil) is the webfont loaded in the root layout; next/font/local
+// hashes the family name, so the variable is the only stable way to reach it.
+// The device faces stay behind it for the case where it has not loaded. This
+// is what makes the printed sheet match the screen instead of depending on
+// the machine.
 const TAMIL_FONT_STACK =
-  "'Noto Sans Tamil', 'Tamil Sangam MN', 'Tamil MN', 'Nirmala UI', -apple-system, sans-serif";
+  "var(--font-tamil), 'Noto Sans Tamil', 'Tamil Sangam MN', 'Tamil MN', 'Nirmala UI', -apple-system, sans-serif";
 
 const TAMIL_PAGE_MARGIN_MM = 14;
 

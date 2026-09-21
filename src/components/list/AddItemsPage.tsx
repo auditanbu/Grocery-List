@@ -6,11 +6,12 @@ import { useMemo, useRef, useState, useTransition } from "react";
 
 import {
   CategoryIcon,
-  FilterMenu,
+  FilterSheet,
   FunnelIcon,
+  selectedOption,
   type FilterOption,
-} from "@/components/FilterMenu";
-import { LanguageToggle } from "@/components/LanguageToggle";
+} from "@/components/FilterSheet";
+import { BurgerButton, HeaderMenu, type HeaderMenuItem } from "@/components/HeaderMenu";
 import { Sheet } from "@/components/Sheet";
 import { NewItemFields, newItemDraft, type NewItemDraft } from "@/components/list/NewItemFields";
 import { Stepper } from "@/components/Stepper";
@@ -22,7 +23,13 @@ import {
   updateMasterItemQuick,
   upsertMasterItem,
 } from "@/lib/actions";
-import { displayName, useLanguage } from "@/lib/language";
+import {
+  LANGUAGE_CODE,
+  LANGUAGE_NAME,
+  LANGUAGE_ORDER,
+  displayName,
+  useLanguage,
+} from "@/lib/language";
 import {
   UNIT_TYPES,
   formatPrice,
@@ -67,7 +74,7 @@ type StatusFilter = "all" | "unselected" | "zero";
  */
 export function AddItemsPage({ list, items, shops, categories }: AddItemsPageProps) {
   const router = useRouter();
-  const { language } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [categoryId, setCategoryId] = useState<number | null>(null);
@@ -75,6 +82,8 @@ export function AddItemsPage({ list, items, shops, categories }: AddItemsPagePro
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [openSheet, setOpenSheet] = useState<"category" | "status" | "language" | null>(null);
   const [newDraft, setNewDraft] = useState<NewItemDraft | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -311,6 +320,53 @@ export function AddItemsPage({ list, items, shops, categories }: AddItemsPagePro
     { key: "zero", label: "Zero qty", value: "zero", count: zeroCount },
   ];
 
+  // Search stays out of the menu for the same reason the view toggle does on
+  // the list screen: it is what you reach for constantly on a 100+ item page.
+  const menuItems: HeaderMenuItem[] = [
+    {
+      key: "new",
+      label: "New item",
+      icon: (
+        <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+          <path d="M12 6v12M6 12h12" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
+        </svg>
+      ),
+      detail: "Add to the master list",
+      onSelect: () => setNewDraft(newItemDraft(query, categories)),
+    },
+    {
+      key: "category",
+      label: "Category",
+      icon: <CategoryIcon />,
+      detail: selectedOption(categoryFilterOptions, categoryId)?.label,
+      active: categoryId !== null,
+      onSelect: () => setOpenSheet("category"),
+    },
+    {
+      key: "status",
+      label: "Show",
+      icon: <FunnelIcon />,
+      detail: selectedOption(statusFilterOptions, statusFilter)?.label,
+      active: statusFilter !== "all",
+      onSelect: () => setOpenSheet("status"),
+    },
+    {
+      key: "language",
+      label: "Language",
+      // aria-hidden: the code is decoration here, and without it the row
+      // announces as "த Language Tamil".
+      icon: (
+        <span className="text-[12px] font-bold" aria-hidden>
+          {LANGUAGE_CODE[language]}
+        </span>
+      ),
+      detail: LANGUAGE_NAME[language],
+      onSelect: () => setOpenSheet("language"),
+    },
+  ];
+
+  const filterApplied = categoryId !== null || statusFilter !== "all";
+
   /**
    * Saves to the master catalogue only — this page's whole job is adding, so
    * the new row's own "Add" button does that part. The search box is primed
@@ -377,23 +433,6 @@ export function AddItemsPage({ list, items, shops, categories }: AddItemsPagePro
           <div className="flex flex-none items-center gap-1.5">
             <button
               type="button"
-              onClick={() => setNewDraft(newItemDraft(query, categories))}
-              aria-label="New item"
-              title="New item"
-              className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-ios-blue text-white shadow-ios transition active:scale-95"
-            >
-              <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
-                <path
-                  d="M12 6v12M6 12h12"
-                  stroke="currentColor"
-                  strokeWidth="2.25"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-
-            <button
-              type="button"
               onClick={() => {
                 setSearchOpen((open) => {
                   if (open) setQuery("");
@@ -402,16 +441,13 @@ export function AddItemsPage({ list, items, shops, categories }: AddItemsPagePro
               }}
               aria-label={searchOpen ? "Close search" : "Search"}
               title={searchOpen ? "Close search" : "Search"}
-              className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-ios-surface text-ios-blue shadow-ios transition active:scale-95"
+              className={`flex h-9 w-9 flex-none items-center justify-center rounded-full shadow-ios transition active:scale-95 ${
+                searchOpen ? "bg-ios-blue text-white" : "bg-ios-surface text-ios-blue"
+              }`}
             >
               {searchOpen ? (
                 <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
-                  <path
-                    d="M6 6l12 12M18 6L6 18"
-                    stroke="currentColor"
-                    strokeWidth="2.25"
-                    strokeLinecap="round"
-                  />
+                  <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
                 </svg>
               ) : (
                 <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
@@ -421,25 +457,7 @@ export function AddItemsPage({ list, items, shops, categories }: AddItemsPagePro
               )}
             </button>
 
-            <FilterMenu
-              label="Category"
-              icon={<CategoryIcon />}
-              options={categoryFilterOptions}
-              value={categoryId}
-              defaultValue={null}
-              onChange={setCategoryId}
-            />
-
-            <FilterMenu
-              label="Show"
-              icon={<FunnelIcon />}
-              options={statusFilterOptions}
-              value={statusFilter}
-              defaultValue="all"
-              onChange={setStatusFilter}
-            />
-
-            <LanguageToggle />
+            <BurgerButton onClick={() => setMenuOpen(true)} marked={filterApplied} />
           </div>
         </div>
 
@@ -670,6 +688,37 @@ export function AddItemsPage({ list, items, shops, categories }: AddItemsPagePro
           ))}
         </div>
       )}
+
+      <HeaderMenu open={menuOpen} onOpenChange={setMenuOpen} items={menuItems} />
+
+      <FilterSheet
+        open={openSheet === "category"}
+        onClose={() => setOpenSheet(null)}
+        label="Category"
+        options={categoryFilterOptions}
+        value={categoryId}
+        onChange={setCategoryId}
+      />
+      <FilterSheet
+        open={openSheet === "status"}
+        onClose={() => setOpenSheet(null)}
+        label="Show"
+        options={statusFilterOptions}
+        value={statusFilter}
+        onChange={setStatusFilter}
+      />
+      <FilterSheet
+        open={openSheet === "language"}
+        onClose={() => setOpenSheet(null)}
+        label="Language"
+        options={LANGUAGE_ORDER.map((code) => ({
+          key: code,
+          label: LANGUAGE_NAME[code],
+          value: code,
+        }))}
+        value={language}
+        onChange={setLanguage}
+      />
 
       <Sheet
         open={newDraft !== null}
