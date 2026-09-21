@@ -249,12 +249,14 @@ once the list has been finalized and reality starts diverging from the plan:
   is the one field here you rarely touch. `updateListItem` refuses a move
   that would collide with the same item already on the list under the target
   shop, naming that shop.
-- **The price is typed in the footer, beside the button.** Entering a price
-  and confirming it is one motion at the shelf, so the ₹ field shares its
-  row with *Mark as bought* rather than scrolling with the body while the
-  button stays pinned below it. Enter saves as well as the button does.
-  What stays in the body is only what informs the number: the *same as last
-  time* pill, the live delta, and the tappable rate line.
+- **The price and its button sit one row under the quantity**, which is the
+  order the questions come at the shelf: how much did you take, what did it
+  cost, done. The ₹ field and *Mark as bought* share that row — entering a
+  price and confirming it is one motion — and Enter saves as well as the
+  button does. Under them is only what informs the number: the *same as
+  last time* pill, the live delta, and the tappable rate line. The sheet's
+  pinned footer is left for *Uncheck item*, and on an un-bought row there
+  is no footer at all.
 - **Every comparison runs on packs × size** (`totalAmount` in
   `src/lib/units.ts`, then `projectPrice`). ₹95 for one 150 g tube against
   ₹95 for one 200 g tube is dearer, not "same as last time", and the per-kg

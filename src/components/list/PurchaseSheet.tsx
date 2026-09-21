@@ -244,48 +244,15 @@ export function PurchaseSheet({
         .filter(Boolean)
         .join(" · ")}
       footer={
-        editable ? (
-          <div className="space-y-2">
-            {/* One row: at the shelf this is a single motion — type what it
-                cost, confirm — and a field that scrolls with the body while
-                the button stays pinned makes you look in two places. */}
-            <div className="flex items-stretch gap-2">
-              <div className="flex min-w-0 flex-1 items-center rounded-ios bg-ios-surface-2 px-3 ring-1 ring-inset ring-ios-separator focus-within:ring-2 focus-within:ring-ios-blue">
-                <span className="flex-none text-[20px] font-semibold text-ios-label-2">₹</span>
-                <input
-                  autoFocus
-                  type="text"
-                  inputMode="decimal"
-                  value={price}
-                  onChange={(event) => setPrice(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") save();
-                  }}
-                  placeholder="0.00"
-                  aria-label="Price paid"
-                  className="h-12 w-full min-w-0 bg-transparent px-2 text-[20px] font-semibold tabular-nums outline-none"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={save}
-                disabled={pending}
-                className="flex h-12 flex-none items-center justify-center rounded-ios bg-ios-blue px-4 text-[16px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
-              >
-                {pending ? "Saving…" : item.isPurchased ? "Update price" : "Mark as bought"}
-              </button>
-            </div>
-            {item.isPurchased ? (
-              <button
-                type="button"
-                onClick={undo}
-                disabled={pending}
-                className="h-11 w-full text-[16px] font-medium text-ios-red active:opacity-60"
-              >
-                Uncheck item
-              </button>
-            ) : null}
-          </div>
+        editable && item.isPurchased ? (
+          <button
+            type="button"
+            onClick={undo}
+            disabled={pending}
+            className="h-11 w-full text-[16px] font-medium text-ios-red active:opacity-60"
+          >
+            Uncheck item
+          </button>
         ) : undefined
       }
     >
@@ -362,6 +329,39 @@ export function PurchaseSheet({
                 </span>
               </div>
             ) : null}
+          </div>
+        ) : null}
+
+        {/* Straight after the quantity, because that is the order the
+            questions come in at the shelf: how much did you take, what did
+            it cost, done. The button shares the field's row — typing a price
+            and confirming it is one motion, not two. */}
+        {editable ? (
+          <div className="flex items-stretch gap-2">
+            <div className="flex min-w-0 flex-1 items-center rounded-ios bg-ios-surface-2 px-3 ring-1 ring-inset ring-ios-separator focus-within:ring-2 focus-within:ring-ios-blue">
+              <span className="flex-none text-[20px] font-semibold text-ios-label-2">₹</span>
+              <input
+                autoFocus
+                type="text"
+                inputMode="decimal"
+                value={price}
+                onChange={(event) => setPrice(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") save();
+                }}
+                placeholder="0.00"
+                aria-label="Price paid"
+                className="h-12 w-full min-w-0 bg-transparent px-2 text-[20px] font-semibold tabular-nums outline-none"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={save}
+              disabled={pending}
+              className="flex h-12 flex-none items-center justify-center rounded-ios bg-ios-blue px-4 text-[16px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
+            >
+              {pending ? "Saving…" : item.isPurchased ? "Update price" : "Mark as bought"}
+            </button>
           </div>
         ) : null}
 
