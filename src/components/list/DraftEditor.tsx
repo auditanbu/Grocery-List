@@ -6,6 +6,7 @@ import { useMemo, useState, useTransition } from "react";
 
 import { Sheet } from "@/components/Sheet";
 import { ShopFilter } from "@/components/list/ShopFilter";
+import { SizePill } from "@/components/SizePill";
 import { Stepper } from "@/components/Stepper";
 import {
   copyPreviousList,
@@ -17,7 +18,6 @@ import {
 import { monthKeyToLabel } from "@/lib/dates";
 import { displayName, displayNameLine, useLanguage } from "@/lib/language";
 import {
-  formatNameWithSize,
   formatPrice,
   formatQtyWithSize,
   sizeOf,
@@ -226,15 +226,14 @@ export function DraftEditor({ list }: DraftEditorProps) {
                   <li key={item.id} className="px-4 py-3">
                     <div className="flex items-start gap-3">
                       <div className="min-w-0 flex-1">
-                        {/* Both names carry the pack size the stepper is
-                            counting — whichever one the toggle makes primary
-                            is the one being read. */}
-                        <p className="truncate text-[16px] font-medium">
-                          {formatNameWithSize(name.primary, size)}
+                        {/* One pill for the row — the size the stepper is
+                            counting — rather than a suffix on each of the
+                            two names. */}
+                        <p className="flex items-center gap-2">
+                          <span className="truncate text-[16px] font-medium">{name.primary}</span>
+                          <SizePill size={size} />
                         </p>
-                        <p className="truncate text-[13px] text-ios-label-2">
-                          {formatNameWithSize(name.secondary, size)}
-                        </p>
+                        <p className="truncate text-[13px] text-ios-label-2">{name.secondary}</p>
                         {stateOf(item).quantity === 0 ? (
                           <span className="mt-0.5 inline-flex items-center rounded-full bg-ios-orange/15 px-2 py-0.5 text-[11px] font-medium text-ios-orange">
                             Check availability

@@ -213,18 +213,19 @@ once the list has been finalized and reality starts diverging from the plan:
 
 - **Search** narrows the list as you type — Tamil, Tanglish, English,
   category or shop name — on top of the shop and category chips.
-- **The size rides with the name**, on every screen that lists items — the
-  draft editor, the finalized list, the shopping view — and in the purchase
-  sheet's title. `formatNameWithSize` appends it to whichever name is being
-  shown, so the language toggle gives "3 ரோசஸ் டீ தூள் - 500 g",
-  "3 roses tea - 500 g" or "Red label - Natural care - 500 g"; the draft
-  editor, which shows both names, appends it to each. The name alone does
-  not say which tin is meant, and the size is what you match against the
-  shelf. The figure on the right of a row is then just the pack count —
-  repeating the size there reads as a different number. In the sheet the
-  title follows the size *actually bought*, so correcting it to 150 g
-  re-titles the sheet you are typing the price into. Loose items have no
-  size and are untouched: their quantity is already the measure.
+- **The size rides with the name** as a pill (`SizePill`), on every screen
+  that lists items — the draft editor, the finalized list, the shopping
+  view. The name alone does not say which tin is meant, and the size is
+  what you match against the shelf. A chip rather than part of the name
+  string so a long name truncates and the size still does not, and so a
+  screen showing two names (the draft editor) carries one pill for the row
+  rather than a suffix on each. The figure on the right of a row is then
+  just the pack count — repeating the size there reads as a different
+  number. The purchase sheet, whose title is plain text, appends it with
+  `formatNameWithSize` instead, and follows the size *actually bought*, so
+  correcting it to 150 g re-titles the sheet you are typing the price into.
+  Loose items have no size and are untouched: their quantity is already the
+  measure.
 - **Quantity is editable inline.** Every un-bought row carries the same
   unit-aware stepper the draft editor uses, so "actually, make it 2 kg" is
   one tap rather than a trip back through *Edit list*. Changes are

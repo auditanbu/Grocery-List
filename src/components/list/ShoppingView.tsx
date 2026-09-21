@@ -5,10 +5,11 @@ import { useMemo, useState, useTransition } from "react";
 
 import { PriceDelta } from "@/components/PriceDelta";
 import { PurchaseSheet } from "@/components/list/PurchaseSheet";
+import { SizePill } from "@/components/SizePill";
 import { groupByShop } from "@/components/list/DraftEditor";
 import { completeList } from "@/lib/actions";
 import { displayName, useLanguage } from "@/lib/language";
-import { formatNameWithSize, formatPrice, formatQty, sizeOf, totalAmount } from "@/lib/units";
+import { formatPrice, formatQty, sizeOf, totalAmount } from "@/lib/units";
 import type { ListDetailDTO, ListItemDTO } from "@/lib/types";
 
 type ShoppingViewProps = {
@@ -119,12 +120,15 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
                             toggle, not stacked under every row. The size rides
                             along with it: at the shelf "3 ரோசஸ் டீ தூள்" is a
                             row of tins until it says which tin. */}
-                        <span
-                          className={`block truncate text-[16px] font-medium ${
-                            item.isPurchased ? "text-ios-label-3" : ""
-                          }`}
-                        >
-                          {formatNameWithSize(name.primary, size)}
+                        <span className="flex items-center gap-2">
+                          <span
+                            className={`truncate text-[16px] font-medium ${
+                              item.isPurchased ? "text-ios-label-3" : ""
+                            }`}
+                          >
+                            {name.primary}
+                          </span>
+                          <SizePill size={size} dimmed={item.isPurchased} />
                         </span>
                         {/* A finished list is a record, so it keeps what was
                             paid and where. While shopping, that lives in the

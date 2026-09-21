@@ -1,9 +1,9 @@
 "use client";
 
 import { groupByShop } from "@/components/list/DraftEditor";
+import { SizePill } from "@/components/SizePill";
 import { displayName, useLanguage } from "@/lib/language";
 import {
-  formatNameWithSize,
   formatPrice,
   formatQty,
   projectPrice,
@@ -90,8 +90,9 @@ export function FinalizedList({ items, shopName, emptyMessage }: FinalizedListPr
                     </span>
                     {/* One name only — the language toggle picks which — and
                         it carries the pack size, whichever name that is. */}
-                    <span className="min-w-0 flex-1 truncate text-[16px] font-medium">
-                      {formatNameWithSize(name.primary, size)}
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className="truncate text-[16px] font-medium">{name.primary}</span>
+                      <SizePill size={size} />
                     </span>
                     {/* Packs, not packs × size: the size is already in the
                         name, and saying it twice reads as a different
