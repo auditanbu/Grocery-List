@@ -11,6 +11,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { createScriptClient, importMasterData, type MasterData } from "./master-import.js";
+import { importFamilyTree, type FamilyTreeData } from "./import-family-tree.js";
 import { monthKeyOf, listNameFor } from "../src/lib/dates.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -118,6 +119,13 @@ async function main() {
       console.log(`   skipped:    ${result.skipped.length}`);
       for (const reason of result.skipped) console.log(`     - ${reason}`);
     }
+
+    const familyRaw = await readFile(join(here, "data", "family-tree.json"), "utf8");
+    const familyData = JSON.parse(familyRaw) as FamilyTreeData;
+    const familyResult = await importFamilyTree(prisma, familyData);
+    console.log("✔ Family tree seeded");
+    console.log(`   members:       ${familyResult.members.created} created, ${familyResult.members.updated} updated`);
+    console.log(`   relationships: ${familyResult.relationships.created} created, ${familyResult.relationships.updated} updated`);
 
     if (process.env.SEED_DEMO === "1") {
       await seedDemoHistory(prisma);

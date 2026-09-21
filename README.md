@@ -101,6 +101,9 @@ current set (synced from a supplementary spreadsheet).
 - **`PriceHistory`** — append-only ledger of what was actually paid, used
   to power the "cheaper/dearer than last time" comparison and the History
   tab.
+- **`FamilyMember`** / **`FamilyRelationship`** — the Family Tree module
+  (see §6): one row per person, and a directed `PARENT_OF` or `SPOUSE_OF`
+  edge between two of them.
 
 Prisma 7 uses driver adapters instead of a bundled query engine binary —
 `src/lib/prisma.ts` wires up `@prisma/adapter-mariadb` (works against both
@@ -291,14 +294,49 @@ docker run --name grocery-mysql -e MYSQL_ROOT_PASSWORD=root \
   -e MYSQL_DATABASE=grocery -p 3306:3306 -d mysql:8
 ```
 
+## 6. Family Tree module
+
+Browse and grow a genealogy tree at `/family`. The initial tree was
+imported from `Family_tree.xlsx` — not a normal spreadsheet table, but a
+PowerPoint/Excel **SmartArt org chart** used to draw a family tree, so it
+had to be parsed differently from the grocery CSV:
+
+- Excel stores each SmartArt shape's text and its parent/child links in
+  `xl/diagrams/data1.xml` inside the `.xlsx` (a hierarchy of `<pt>` shapes
+  connected by `<cxn>` edges), not in worksheet cells.
+- That XML was parsed once to produce `prisma/data/family-tree.json` — a
+  flat list of members (keyed by the shape's stable `modelId` GUID) and
+  `PARENT_OF` / `SPOUSE_OF` edges between them, in the same order the tree
+  is walked from its root.
+- `prisma/import-family-tree.ts` loads that JSON idempotently (matched by
+  the GUID, stored as `FamilyMember.importKey`, so re-seeding updates
+  existing rows instead of creating duplicates — several people in this
+  family share a first name, so matching by name alone wouldn't work) and
+  runs as part of `npm run db:seed`.
+- The chart only distinguished spouses from children for the root couple
+  (via a SmartArt "assistant" shape); every other link was imported as
+  `PARENT_OF` exactly as authored. A box the original chart left blank
+  imports as an unnamed placeholder member. Use the "Fix" control in a
+  person's relationship list (admin only) to reclassify a relationship the
+  import guessed wrong, or the "Unlink" button to remove it — both are
+  everyday edits, not schema changes.
+
+From there the tree is meant to grow: any visitor can add a spouse, child,
+or parent from a person's card, or start an unconnected "New branch";
+`src/lib/family/queries.ts`'s `getFamilyTree` walks the `FamilyMember` /
+`FamilyRelationship` graph into nested nodes for the UI, resolving each
+person's spouse(s) alongside them and their children below.
+
 ## App structure
 
 ```
 prisma/
   schema.prisma          Database schema
-  seed.ts                Seeds prisma/data/master-data.json (+ optional demo history)
+  seed.ts                Seeds prisma/data/master-data.json + family-tree.json (+ optional demo history)
   import-csv.ts           npm run db:import — loads the real spreadsheet export
   master-import.ts        Shared idempotent upsert logic used by both scripts
+  import-family-tree.ts   Idempotent import of prisma/data/family-tree.json
+  data/family-tree.json   Members + relationships extracted from Family_tree.xlsx's SmartArt
 src/
   app/
     page.tsx               Home — current month card, previous lists
@@ -307,6 +345,7 @@ src/
     history/page.tsx        History tab — spend per month, biggest price moves
     items/[id]/page.tsx      Per-item price history
     api/health/route.ts      Liveness probe for the container health check
+    family/page.tsx          Family Tree module
     manifest.ts              Web App Manifest
   components/
     Stepper.tsx              The unit-aware +/- control
@@ -316,6 +355,7 @@ src/
     list/                    Draft editor, finalized list, shopping mode, PDF button,
                              ShopAddSheet (add an item mid-shop)
     master/                  Master catalogue browser + editor sheet
+    family/                  Collapsible tree view, member editor, relationship fixer
   lib/
     units.ts                 Stepper steps, formatting, Qty Type parsing
     tanglish.ts               Tamil → Latin transliteration (Tanglish fallback)
@@ -324,6 +364,7 @@ src/
     prisma.ts, queries.ts     DB client + read queries (Decimal → plain number)
     actions.ts                Server Actions (create/finalize lists, record purchases, …)
     dates.ts                  monthKey helpers and label formatting
+    family/                   Family Tree queries, types, and Server Actions
 scripts/
   generate-icons.mjs         Manifest icon generator (node, needs sharp)
 public/
