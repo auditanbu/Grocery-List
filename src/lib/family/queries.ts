@@ -6,6 +6,7 @@ import type {
   FamilyMemberDTO,
   FamilyNodeDTO,
   FamilyRelationshipDTO,
+  FamilySpouseDTO,
   FamilyTreeDTO,
 } from "./types";
 
@@ -42,7 +43,7 @@ export async function getFamilyTree(): Promise<FamilyTreeDTO> {
   const memberById = new Map(members.map((m) => [m.id, toMemberDTO(m)]));
   const parentToChildren = new Map<number, { childId: number; sortOrder: number }[]>();
   const hasParent = new Set<number>();
-  const spouseMap = new Map<number, number[]>();
+  const spouseMap = new Map<number, { spouseId: number; marriageYear: number | null }[]>();
 
   for (const rel of relationships) {
     if (rel.type === "PARENT_OF") {
@@ -52,8 +53,8 @@ export async function getFamilyTree(): Promise<FamilyTreeDTO> {
     } else {
       if (!spouseMap.has(rel.fromMemberId)) spouseMap.set(rel.fromMemberId, []);
       if (!spouseMap.has(rel.toMemberId)) spouseMap.set(rel.toMemberId, []);
-      spouseMap.get(rel.fromMemberId)!.push(rel.toMemberId);
-      spouseMap.get(rel.toMemberId)!.push(rel.fromMemberId);
+      spouseMap.get(rel.fromMemberId)!.push({ spouseId: rel.toMemberId, marriageYear: rel.marriageYear });
+      spouseMap.get(rel.toMemberId)!.push({ spouseId: rel.fromMemberId, marriageYear: rel.marriageYear });
     }
   }
 
@@ -61,7 +62,8 @@ export async function getFamilyTree(): Promise<FamilyTreeDTO> {
 
   function buildNode(memberId: number): FamilyNodeDTO {
     visited.add(memberId);
-    const spouseIds = spouseMap.get(memberId) ?? [];
+    const spouseLinks = spouseMap.get(memberId) ?? [];
+    const spouseIds = spouseLinks.map((link) => link.spouseId);
     for (const spouseId of spouseIds) visited.add(spouseId);
 
     // Children of the couple: union of this member's and their spouse(s)'
@@ -78,24 +80,49 @@ export async function getFamilyTree(): Promise<FamilyTreeDTO> {
       .map(([id]) => id)
       .filter((id) => !visited.has(id));
 
+    const spouses: FamilySpouseDTO[] = spouseLinks.map((link) => ({
+      ...memberById.get(link.spouseId)!,
+      marriageYear: link.marriageYear,
+    }));
+
     return {
       ...memberById.get(memberId)!,
-      spouses: spouseIds.map((id) => memberById.get(id)!),
+      spouses,
       children: childIds.map((id) => buildNode(id)),
     };
   }
 
-  // A root candidate is anyone with no recorded parent. Processed in order
-  // (oldest-inserted first) so that when a couple both qualify — neither
-  // has a parent on file — whichever was added first becomes the anchor
-  // card and its spouse is folded in underneath, instead of each showing
-  // up as its own tree. `visited` (populated as a side effect of
-  // buildNode) is what actually prevents the second one from duplicating.
-  const candidateRootIds = members.map((m) => m.id).filter((id) => !hasParent.has(id));
+  // A root candidate is anyone with no recorded parent. Two more rules pick
+  // which half of a couple anchors the card, since buildNode folds the other
+  // half in underneath as "m. <name>" and marks them visited:
+  //
+  //  1. Bloodline wins. If a spouse has parents on file, that spouse anchors
+  //     and the couple renders under their parent — otherwise the pair would
+  //     be lifted out of the family they belong to, and the parent's card
+  //     would lose the child (visited already claimed them).
+  //  2. Otherwise the husband anchors, so the male name reads first.
+  //
+  // Anyone still unvisited after that (only reachable if hand-entered data
+  // loops a parent back on itself) is added at the end rather than dropped.
+  const spouseIdsOf = (id: number) => (spouseMap.get(id) ?? []).map((link) => link.spouseId);
+  const candidateRootIds = members
+    .map((m) => m.id)
+    .filter((id) => {
+      if (hasParent.has(id)) return false;
+      const spouseIds = spouseIdsOf(id);
+      if (spouseIds.some((spouseId) => hasParent.has(spouseId))) return false;
+      if (memberById.get(id)!.gender === "MALE") return true;
+      return !spouseIds.some((spouseId) => memberById.get(spouseId)!.gender === "MALE");
+    });
+
   const roots: FamilyNodeDTO[] = [];
   for (const id of candidateRootIds) {
     if (visited.has(id)) continue;
     roots.push(buildNode(id));
+  }
+  for (const member of members) {
+    if (visited.has(member.id)) continue;
+    roots.push(buildNode(member.id));
   }
 
   return { roots, memberCount: members.length };
@@ -117,12 +144,14 @@ export async function getFamilyMemberDetail(id: number): Promise<FamilyMemberDet
       id: rel.id,
       type: rel.type,
       direction: "FROM",
+      marriageYear: rel.type === "SPOUSE_OF" ? rel.marriageYear : null,
       otherMember: toMemberDTO(rel.toMember),
     })),
     ...member.relationshipsTo.map((rel): FamilyRelationshipDTO => ({
       id: rel.id,
       type: rel.type,
       direction: "TO",
+      marriageYear: rel.type === "SPOUSE_OF" ? rel.marriageYear : null,
       otherMember: toMemberDTO(rel.fromMember),
     })),
   ];

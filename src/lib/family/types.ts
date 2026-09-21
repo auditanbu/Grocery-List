@@ -11,9 +11,14 @@ export type FamilyMemberDTO = {
   isPlaceholder: boolean;
 };
 
+/** A spouse as seen from their partner's card — the person plus the year they married. */
+export type FamilySpouseDTO = FamilyMemberDTO & {
+  marriageYear: number | null;
+};
+
 /** A member with their spouse(s) and children resolved, for rendering the tree. */
 export type FamilyNodeDTO = FamilyMemberDTO & {
-  spouses: FamilyMemberDTO[];
+  spouses: FamilySpouseDTO[];
   children: FamilyNodeDTO[];
 };
 
@@ -28,6 +33,8 @@ export type FamilyRelationshipDTO = {
   type: RelationType;
   /** "FROM": this member is the parent/spouse in the edge. "TO": this member is the child/spouse. */
   direction: "FROM" | "TO";
+  /** Year of marriage on a SPOUSE_OF edge; always null on a PARENT_OF one. */
+  marriageYear: number | null;
   otherMember: FamilyMemberDTO;
 };
 

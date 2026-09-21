@@ -22,12 +22,22 @@ type MemberInput = {
   notes?: string | null;
 };
 
-function validateMemberInput(input: MemberInput): string | null {
-  if (!input.fullName.trim()) return "Enter a name.";
-  if (input.birthYear != null && (!Number.isInteger(input.birthYear) || input.birthYear < 1800 || input.birthYear > new Date().getFullYear())) {
-    return "Enter a valid birth year.";
+type SpouseInput = MemberInput & {
+  /** Year the couple married — optional, and only stored on the SPOUSE_OF edge. */
+  marriageYear?: number | null;
+};
+
+function validateYear(year: number | null | undefined, label: string): string | null {
+  if (year == null) return null;
+  if (!Number.isInteger(year) || year < 1800 || year > new Date().getFullYear()) {
+    return `Enter a valid ${label}.`;
   }
   return null;
+}
+
+function validateMemberInput(input: MemberInput): string | null {
+  if (!input.fullName.trim()) return "Enter a name.";
+  return validateYear(input.birthYear, "birth year");
 }
 
 function memberData(input: MemberInput) {
@@ -99,9 +109,9 @@ export async function addChild(
   return { ok: true, data: { id: child.id } };
 }
 
-/** Adds a spouse of `memberId`. */
-export async function addSpouse(memberId: number, input: MemberInput): Promise<ActionResult<{ id: number }>> {
-  const error = validateMemberInput(input);
+/** Adds a spouse of `memberId`, optionally recording the year they married. */
+export async function addSpouse(memberId: number, input: SpouseInput): Promise<ActionResult<{ id: number }>> {
+  const error = validateMemberInput(input) ?? validateYear(input.marriageYear, "marriage year");
   if (error) return fail(error);
 
   const member = await prisma.familyMember.findUnique({ where: { id: memberId }, select: { id: true } });
@@ -109,7 +119,13 @@ export async function addSpouse(memberId: number, input: MemberInput): Promise<A
 
   const spouse = await prisma.familyMember.create({ data: memberData(input) });
   await prisma.familyRelationship.create({
-    data: { type: "SPOUSE_OF", fromMemberId: memberId, toMemberId: spouse.id, sortOrder: 0 },
+    data: {
+      type: "SPOUSE_OF",
+      fromMemberId: memberId,
+      toMemberId: spouse.id,
+      sortOrder: 0,
+      marriageYear: input.marriageYear ?? null,
+    },
   });
 
   revalidatePath("/family");
@@ -138,6 +154,23 @@ export async function updateMember(id: number, input: MemberInput): Promise<Acti
   if (error) return fail(error);
 
   await prisma.familyMember.update({ where: { id }, data: memberData(input) });
+  revalidatePath("/family");
+  return { ok: true };
+}
+
+/** Sets (or clears, with null) the year a couple married. */
+export async function setMarriageYear(relationshipId: number, year: number | null): Promise<ActionResult> {
+  const error = validateYear(year, "marriage year");
+  if (error) return fail(error);
+
+  const relationship = await prisma.familyRelationship.findUnique({
+    where: { id: relationshipId },
+    select: { type: true },
+  });
+  if (!relationship) return fail("Relationship not found.");
+  if (relationship.type !== "SPOUSE_OF") return fail("A marriage year only applies to a spouse link.");
+
+  await prisma.familyRelationship.update({ where: { id: relationshipId }, data: { marriageYear: year } });
   revalidatePath("/family");
   return { ok: true };
 }

@@ -15,6 +15,7 @@ import {
   deleteMember,
   deleteRelationship,
   fetchFamilyMemberDetail,
+  setMarriageYear,
   setRelationshipType,
   updateMember,
 } from "@/lib/family/actions";
@@ -22,6 +23,7 @@ import type {
   FamilyMemberDetailDTO,
   FamilyMemberDTO,
   FamilyNodeDTO,
+  FamilyRelationshipDTO,
   FamilyTreeDTO,
   Gender,
   RelationType,
@@ -236,7 +238,9 @@ function MemberNode({
             <div className="flex flex-col">
               {node.spouses.map((spouse) => (
                 <div key={spouse.id} className="flex items-center gap-1.5">
-                  <span className="pl-1 text-[13px] text-ios-label-3">m.</span>
+                  <span className="pl-1 text-[13px] tabular-nums text-ios-label-3">
+                    {spouse.marriageYear ? `m. ${spouse.marriageYear}` : "m."}
+                  </span>
                   <PersonPill
                     member={spouse}
                     highlighted={needle.length > 0 && spouse.fullName.toLowerCase().includes(needle)}
@@ -400,14 +404,24 @@ function ManageMemberSheet({
               refresh();
             });
           }}
+          onSetMarriageYear={async (relId, year) => {
+            const result = await setMarriageYear(relId, year);
+            if (result.ok) refresh();
+            return result;
+          }}
         />
       ) : mode === "edit" ? (
         <EditMemberForm
           member={detail.member}
+          isAdmin={isAdmin}
           onCancel={() => setMode("view")}
           onSaved={() => {
             setMode("view");
             refresh();
+          }}
+          onDeleted={() => {
+            onClose();
+            router.refresh();
           }}
         />
       ) : (
@@ -437,6 +451,7 @@ function MemberOverview({
   onDeleteMember,
   onUnlink,
   onFixType,
+  onSetMarriageYear,
 }: {
   detail: FamilyMemberDetailDTO;
   isAdmin: boolean;
@@ -449,6 +464,7 @@ function MemberOverview({
   onDeleteMember: () => void;
   onUnlink: (relationshipId: number) => void;
   onFixType: (relationshipId: number, type: RelationType) => void;
+  onSetMarriageYear: (relationshipId: number, year: number | null) => Promise<{ ok: true } | { ok: false; error: string }>;
 }) {
   const { member, relationships } = detail;
   const parents = relationships.filter((r) => r.type === "PARENT_OF" && r.direction === "TO");
@@ -497,7 +513,15 @@ function MemberOverview({
       </div>
 
       <RelationList label="Parents" entries={parents} isAdmin={isAdmin} onOpenOther={onOpenOther} onUnlink={onUnlink} onFixType={onFixType} />
-      <RelationList label="Spouse" entries={spouses} isAdmin={isAdmin} onOpenOther={onOpenOther} onUnlink={onUnlink} onFixType={onFixType} />
+      <RelationList
+        label="Spouse"
+        entries={spouses}
+        isAdmin={isAdmin}
+        onOpenOther={onOpenOther}
+        onUnlink={onUnlink}
+        onFixType={onFixType}
+        onSetMarriageYear={onSetMarriageYear}
+      />
       <RelationList label="Children" entries={children} isAdmin={isAdmin} onOpenOther={onOpenOther} onUnlink={onUnlink} onFixType={onFixType} />
 
       {isAdmin ? (
@@ -529,13 +553,16 @@ function RelationList({
   onOpenOther,
   onUnlink,
   onFixType,
+  onSetMarriageYear,
 }: {
   label: string;
-  entries: { id: number; type: RelationType; direction: "FROM" | "TO"; otherMember: FamilyMemberDTO }[];
+  entries: FamilyRelationshipDTO[];
   isAdmin: boolean;
   onOpenOther: (id: number) => void;
   onUnlink: (relationshipId: number) => void;
   onFixType: (relationshipId: number, type: RelationType) => void;
+  /** Only passed for the spouse list — enables the "married in" year field. */
+  onSetMarriageYear?: (relationshipId: number, year: number | null) => Promise<{ ok: true } | { ok: false; error: string }>;
 }) {
   if (entries.length === 0) return null;
   return (
@@ -543,39 +570,102 @@ function RelationList({
       <p className="pb-1.5 text-[12px] font-semibold uppercase tracking-wide text-ios-label-3">{label}</p>
       <ul className="divide-y divide-ios-separator overflow-hidden rounded-ios ring-1 ring-inset ring-ios-separator">
         {entries.map((entry) => (
-          <li key={entry.id} className="flex items-center gap-2 px-3 py-2">
-            <button
-              type="button"
-              onClick={() => onOpenOther(entry.otherMember.id)}
-              className="min-w-0 flex-1 truncate text-left text-[14px] font-medium active:opacity-60"
-            >
-              {displayName(entry.otherMember)}
-            </button>
-            {isAdmin ? (
-              <>
-                <select
-                  value={entry.type}
-                  onChange={(event) => onFixType(entry.id, event.target.value as RelationType)}
-                  className="h-8 flex-none rounded-full bg-ios-surface-2 px-2 text-[12px] ring-1 ring-inset ring-ios-separator"
-                >
-                  <option value="PARENT_OF">Parent/child</option>
-                  <option value="SPOUSE_OF">Spouse</option>
-                </select>
-                <button
-                  type="button"
-                  onClick={() => onUnlink(entry.id)}
-                  aria-label="Unlink"
-                  className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-ios-red active:bg-ios-red-soft"
-                >
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-                    <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </button>
-              </>
+          <li key={entry.id} className="px-3 py-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onOpenOther(entry.otherMember.id)}
+                className="min-w-0 flex-1 truncate text-left text-[14px] font-medium active:opacity-60"
+              >
+                {displayName(entry.otherMember)}
+              </button>
+              {isAdmin ? (
+                <>
+                  <select
+                    value={entry.type}
+                    onChange={(event) => onFixType(entry.id, event.target.value as RelationType)}
+                    className="h-8 flex-none rounded-full bg-ios-surface-2 px-2 text-[12px] ring-1 ring-inset ring-ios-separator"
+                  >
+                    <option value="PARENT_OF">Parent/child</option>
+                    <option value="SPOUSE_OF">Spouse</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => onUnlink(entry.id)}
+                    aria-label="Unlink"
+                    className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-ios-red active:bg-ios-red-soft"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+                      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                </>
+              ) : null}
+            </div>
+            {onSetMarriageYear && entry.type === "SPOUSE_OF" ? (
+              <MarriageYearField
+                value={entry.marriageYear}
+                onSave={(year) => onSetMarriageYear(entry.id, year)}
+              />
             ) : null}
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/** The year a couple married, editable inline — blank clears it. Saves on blur or Enter. */
+function MarriageYearField({
+  value,
+  onSave,
+}: {
+  value: number | null;
+  onSave: (year: number | null) => Promise<{ ok: true } | { ok: false; error: string }>;
+}) {
+  const [text, setText] = useState(value == null ? "" : String(value));
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setText(value == null ? "" : String(value));
+  }, [value]);
+
+  const commit = async () => {
+    const year = text ? Number(text) : null;
+    if (year === value) {
+      setError(null);
+      return;
+    }
+    setSaving(true);
+    const result = await onSave(year);
+    setSaving(false);
+    if (result.ok) {
+      setError(null);
+      return;
+    }
+    setError(result.error);
+    setText(value == null ? "" : String(value));
+  };
+
+  return (
+    <div className="flex items-center gap-2 pt-1.5">
+      <span className="flex-none text-[12px] text-ios-label-3">Married in</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        maxLength={4}
+        value={text}
+        disabled={saving}
+        onChange={(event) => setText(event.target.value.replace(/[^0-9]/g, ""))}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+        }}
+        placeholder="Year"
+        className="h-8 w-20 flex-none rounded-full bg-ios-surface-2 px-3 text-[13px] tabular-nums outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue disabled:opacity-50"
+      />
+      {error ? <span className="text-[12px] text-ios-red">{error}</span> : null}
     </div>
   );
 }
@@ -662,12 +752,16 @@ function PersonFields({
 
 function EditMemberForm({
   member,
+  isAdmin,
   onCancel,
   onSaved,
+  onDeleted,
 }: {
   member: FamilyMemberDTO;
+  isAdmin: boolean;
   onCancel: () => void;
   onSaved: () => void;
+  onDeleted: () => void;
 }) {
   const [value, setValue] = useState<MemberFormInput>({
     fullName: member.isPlaceholder ? "" : member.fullName,
@@ -686,6 +780,18 @@ function EditMemberForm({
         return;
       }
       onSaved();
+    });
+  };
+
+  const remove = () => {
+    if (!window.confirm(`Delete ${displayName(member)}? Their children stay in the tree.`)) return;
+    startTransition(async () => {
+      const result = await deleteMember(member.id);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onDeleted();
     });
   };
 
@@ -710,6 +816,23 @@ function EditMemberForm({
           {pending ? "Saving…" : "Save"}
         </button>
       </div>
+
+      <div className="border-t border-ios-separator pt-4">
+        {isAdmin ? (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={remove}
+            className="h-11 w-full rounded-ios bg-ios-red-soft text-[15px] font-medium text-ios-red active:scale-[0.98] disabled:opacity-50"
+          >
+            Delete {displayName(member)}
+          </button>
+        ) : (
+          <p className="text-center text-[13px] text-ios-label-3">
+            Unlock admin to delete someone from the tree.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -726,6 +849,7 @@ function RelativeForm({
   onSaved: () => void;
 }) {
   const [value, setValue] = useState<MemberFormInput>({ fullName: "", gender: "UNKNOWN", birthYear: null, notes: null });
+  const [marriageYear, setMarriageYearValue] = useState<number | null>(null);
   const spouseOptions = detail.relationships.filter((r) => r.type === "SPOUSE_OF").map((r) => r.otherMember);
   const [coParentId, setCoParentId] = useState<number | null>(spouseOptions[0]?.id ?? null);
   const [error, setError] = useState<string | null>(null);
@@ -735,7 +859,7 @@ function RelativeForm({
     startTransition(async () => {
       const result =
         mode === "addSpouse"
-          ? await addSpouse(detail.member.id, value)
+          ? await addSpouse(detail.member.id, { ...value, marriageYear })
           : mode === "addParent"
             ? await addParent(detail.member.id, value)
             : await addChild(detail.member.id, coParentId, value);
@@ -776,6 +900,25 @@ function RelativeForm({
       ) : null}
 
       <PersonFields value={value} onChange={setValue} />
+
+      {mode === "addSpouse" ? (
+        <label className="block">
+          <span className="text-[13px] font-medium text-ios-label-2">Married year (optional)</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={4}
+            value={marriageYear ?? ""}
+            onChange={(event) => {
+              const digits = event.target.value.replace(/[^0-9]/g, "");
+              setMarriageYearValue(digits ? Number(digits) : null);
+            }}
+            placeholder="e.g. 1985"
+            className="mt-1.5 h-11 w-full rounded-ios bg-ios-surface-2 px-3.5 text-[16px] tabular-nums outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
+          />
+        </label>
+      ) : null}
+
       {error ? <p className="text-[14px] text-ios-red">{error}</p> : null}
       <div className="flex gap-2">
         <button

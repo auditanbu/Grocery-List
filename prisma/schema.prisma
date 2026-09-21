@@ -312,6 +312,9 @@ model FamilyRelationship {
   /// Preserves the order children/spouses were listed in, so the tree
   /// renders in the same order as the source chart.
   sortOrder    Int          @default(0)
+  /// Year the couple married. Only meaningful on SPOUSE_OF edges; null when
+  /// unknown, which is the case for everything the original chart imported.
+  marriageYear Int?
   createdAt    DateTime     @default(now())
 
   fromMember FamilyMember @relation("RelationshipFrom", fields: [fromMemberId], references: [id], onDelete: Cascade)
