@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 type SheetProps = {
   open: boolean;
@@ -16,6 +17,15 @@ type SheetProps = {
  * iPad and desktop. Closes on backdrop tap or Escape.
  */
 export function Sheet({ open, onClose, title, subtitle, children, footer }: SheetProps) {
+  // Portalled to <body>. A `position: fixed` element is positioned against
+  // the nearest ancestor with a filter, backdrop-filter or transform rather
+  // than against the viewport — and these sheets are opened from buttons that
+  // live inside `backdrop-blur` sticky headers, which would strand the sheet
+  // above the fold. The portal makes the sheet immune to wherever it is
+  // rendered from.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   useEffect(() => {
     if (!open) return;
 
@@ -32,9 +42,9 @@ export function Sheet({ open, onClose, title, subtitle, children, footer }: Shee
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       <button
         type="button"
@@ -86,6 +96,7 @@ export function Sheet({ open, onClose, title, subtitle, children, footer }: Shee
           </div>
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

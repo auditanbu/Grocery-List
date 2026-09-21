@@ -3,9 +3,12 @@
 import { LANGUAGE_CODE, LANGUAGE_NAME, useLanguage } from "@/lib/language";
 
 /**
- * Cycles the app's display preference: Tamil → Tanglish → English. The
- * current language's short code rides next to the icon — with three states
- * an icon alone no longer says which one you're on.
+ * Cycles the app's display preference: Tamil → Tanglish → English.
+ *
+ * Sized to match the other header icons, and shows only the current
+ * language's short code — with the code right there a globe glyph adds
+ * nothing, and dropping it is what lets the control be a circle rather than
+ * a wider pill. The full names live in the title/aria-label.
  */
 export function LanguageToggle() {
   const { language, nextLanguage, toggleLanguage } = useLanguage();
@@ -17,19 +20,14 @@ export function LanguageToggle() {
       onClick={toggleLanguage}
       aria-label={label}
       title={label}
-      className="flex h-7 flex-none items-center gap-1 rounded-full bg-ios-surface px-2 text-ios-blue shadow-ios transition active:scale-95"
+      className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-ios-surface text-ios-blue shadow-ios transition active:scale-95"
     >
-      <svg viewBox="0 0 24 24" className="h-4 w-4 flex-none" aria-hidden>
-        <path
-          d="M4 6h9M8.5 4v2.5S8 11 4.5 13.5M6.5 10c1 1.5 3 2.8 5.5 3.3M14 20l4-9 4 9M15.3 17h5.4"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      <span className="text-[11px] font-semibold leading-none">{LANGUAGE_CODE[language]}</span>
+      {/* The Tamil code is one glyph and reads small beside "EN"/"Tg". */}
+      <span
+        className={`font-bold leading-none ${language === "ta" ? "text-[16px]" : "text-[13px]"}`}
+      >
+        {LANGUAGE_CODE[language]}
+      </span>
     </button>
   );
 }
