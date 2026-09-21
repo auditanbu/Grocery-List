@@ -14,6 +14,7 @@
     "db:seed": "prisma db seed",
     "db:import": "tsx prisma/import-csv.ts",
     "db:resync": "tsx prisma/resync.ts",
+    "db:audit-prices": "tsx prisma/audit-prices.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {

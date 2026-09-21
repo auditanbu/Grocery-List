@@ -49,6 +49,7 @@ Useful scripts (see `package.json`):
 | `npm run db:deploy` | Apply migrations in production (no prompts) |
 | `npm run db:seed` | Seed categories, shops and items |
 | `npm run db:import -- "./Grocery database.csv"` | Import the real spreadsheet (see below) |
+| `npm run db:audit-prices` | List price-history rows that look like testing leftovers |
 | `npm run db:studio` | Prisma Studio, a GUI for the database |
 
 ### Seeing a change without deploying
@@ -370,6 +371,8 @@ prisma/
   seed.ts                Seeds prisma/data/master-data.json + family-tree.json (+ optional demo history)
   import-csv.ts           npm run db:import — loads the real spreadsheet export
   master-import.ts        Shared idempotent upsert logic used by both scripts
+  audit-prices.ts         npm run db:audit-prices — finds test rows in price history
+  price-audit.ts          Which rows count as suspect, kept free of the database
   import-family-tree.ts   Idempotent import of prisma/data/family-tree.json
   data/family-tree.json   Members + relationships extracted from Family_tree.xlsx's SmartArt
 src/
