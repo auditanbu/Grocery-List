@@ -9,7 +9,14 @@ import { Sheet } from "@/components/Sheet";
 import { Stepper } from "@/components/Stepper";
 import { getItemPriceHistory, recordPurchase, undoPurchase, updateListItem } from "@/lib/actions";
 import { displayName, useLanguage } from "@/lib/language";
-import { formatPrice, formatQty, projectPrice, unitGroup, type UnitType } from "@/lib/units";
+import {
+  formatPrice,
+  formatQty,
+  formatUnitPrice,
+  projectPrice,
+  unitGroup,
+  type UnitType,
+} from "@/lib/units";
 import type { ListItemDTO, PriceHistoryDTO } from "@/lib/types";
 
 type PurchaseSheetProps = {
@@ -78,6 +85,19 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
           unitType,
         )
       : null;
+
+  // Per-kg / per-L / per-piece, the figure that survives a change of pack
+  // size: ₹212 for 4 kg and ₹212 for 8 kg are the same rupees and a very
+  // different deal. Recomputed as the price is typed. Null for RS-priced
+  // items (their "quantity" is already rupees) and before a price is entered.
+  const currentUnitPrice = valid && parsed > 0 ? formatUnitPrice(parsed, quantity, unitType) : null;
+  const referenceUnitPrice = canCompare
+    ? formatUnitPrice(
+        reference as number,
+        referenceQuantity as number,
+        referenceUnitType as UnitType,
+      )
+    : null;
 
   const save = () => {
     if (!valid) {
@@ -293,30 +313,55 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
           </div>
         )}
 
-        {!editable ? null : reference !== null ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPrice(String(reference))}
-              className="h-9 rounded-full bg-ios-surface-2 px-3.5 text-[14px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator active:scale-95"
-            >
-              Same as last time · {formatPrice(reference)}
-            </button>
-            {valid ? (
-              <PriceDelta
-                current={parsed}
-                previous={reference}
-                currentQuantity={quantity}
-                currentUnitType={unitType}
-                previousQuantity={referenceQuantity ?? undefined}
-                previousUnitType={referenceUnitType ?? undefined}
-              />
+        {!editable ? null : (
+          <div className="space-y-2">
+            {reference !== null ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPrice(String(reference))}
+                  className="h-9 rounded-full bg-ios-surface-2 px-3.5 text-[14px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator active:scale-95"
+                >
+                  Same as last time · {formatPrice(reference)}
+                </button>
+                {valid ? (
+                  <PriceDelta
+                    current={parsed}
+                    previous={reference}
+                    currentQuantity={quantity}
+                    currentUnitType={unitType}
+                    previousQuantity={referenceQuantity ?? undefined}
+                    previousUnitType={referenceUnitType ?? undefined}
+                  />
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-[13px] text-ios-label-2">
+                First time buying this — the price becomes the baseline for next month.
+              </p>
+            )}
+
+            {/* The rate, right under the pill: the same ₹ over a bigger or
+                smaller pack is what the pill can't tell you. */}
+            {currentUnitPrice || referenceUnitPrice ? (
+              <p className="text-[13px] text-ios-label-2">
+                {currentUnitPrice ? (
+                  <>
+                    <span className="font-semibold tabular-nums text-ios-label">
+                      {currentUnitPrice}
+                    </span>{" "}
+                    at {formatQty(quantity, unitType)}
+                  </>
+                ) : null}
+                {currentUnitPrice && referenceUnitPrice ? " · " : null}
+                {referenceUnitPrice ? (
+                  <>
+                    <span className="tabular-nums">{referenceUnitPrice}</span> last time
+                  </>
+                ) : null}
+              </p>
             ) : null}
           </div>
-        ) : (
-          <p className="text-[13px] text-ios-label-2">
-            First time buying this — the price becomes the baseline for next month.
-          </p>
         )}
 
         {error ? <p className="text-[14px] text-ios-red">{error}</p> : null}
