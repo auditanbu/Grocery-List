@@ -182,7 +182,13 @@ model PriceHistory {
   purchasedAt DateTime @default(now())
 
   item Item         @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  list GroceryList? @relation(fields: [listId], references: [id], onDelete: SetNull)
+  /// Deleting a list deletes what was recorded on it. Detaching the rows
+  /// instead (SetNull) left them in the item's price history with no month
+  /// against them and no screen able to reach them, while they still quoted
+  /// a price and still counted as "last time" — so a list deleted after a
+  /// trial run kept steering real shopping. listId stays optional for the
+  /// rows already orphaned that way; `npm run db:audit-prices` lists them.
+  list GroceryList? @relation(fields: [listId], references: [id], onDelete: Cascade)
   shop Shop?        @relation(fields: [shopId], references: [id], onDelete: SetNull)
 
   @@index([itemId, purchasedAt])

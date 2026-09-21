@@ -71,7 +71,15 @@ export async function renameList(listId: number, name: string): Promise<ActionRe
   return { ok: true };
 }
 
-/** Admin only — a closed list is a shared family record, not something anyone can erase. */
+/**
+ * Admin only — a closed list is a shared family record, not something anyone
+ * can erase.
+ *
+ * The prices recorded on the list go with it, by the cascade on
+ * PriceHistory.listId. That is the point: a deleted list should stop
+ * influencing what the app says an item costs, and detaching its price rows
+ * instead left them quoting prices from a list nobody can look at.
+ */
 export async function deleteList(listId: number): Promise<ActionResult> {
   if (!(await isAdminSession())) return fail("Admin only.");
   await prisma.groceryList.delete({ where: { id: listId } });
