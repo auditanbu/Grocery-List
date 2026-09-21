@@ -8,22 +8,23 @@ import {
   CartIcon,
   CategoryIcon,
   CheckIcon,
-  FilterMenu,
+  FilterSheet,
   PencilIcon,
   ReopenIcon,
   ShopIcon,
+  selectedOption,
   type FilterOption,
-} from "@/components/FilterMenu";
-import { LanguageToggle } from "@/components/LanguageToggle";
+} from "@/components/FilterSheet";
+import { BurgerButton, HeaderMenu, type HeaderMenuItem } from "@/components/HeaderMenu";
 import { DraftEditor } from "@/components/list/DraftEditor";
-import { ExportPdfButton } from "@/components/list/ExportPdfButton";
+import { useExportPdf } from "@/components/list/ExportPdfButton";
 import { FinalizedList } from "@/components/list/FinalizedList";
 import { ListSearchBar } from "@/components/list/ListSearchBar";
 import { ShopAddSheet } from "@/components/list/ShopAddSheet";
 import { ShoppingView } from "@/components/list/ShoppingView";
 import { reopenList } from "@/lib/actions";
 import { formatIsoDate, monthKeyToLabel } from "@/lib/dates";
-import { useLanguage } from "@/lib/language";
+import { LANGUAGE_CODE, LANGUAGE_NAME, LANGUAGE_ORDER, useLanguage } from "@/lib/language";
 import { formatPrice } from "@/lib/units";
 import type { CategoryDTO, ListDetailDTO } from "@/lib/types";
 
@@ -47,12 +48,14 @@ const ICON_BUTTON =
 
 export function ListScreen({ list, categories }: ListScreenProps) {
   const router = useRouter();
-  const { language } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   const [mode, setMode] = useState<Mode>(list.status === "COMPLETED" ? "shopping" : "list");
   const [shopId, setShopId] = useState<number | null | undefined>(undefined);
   const [categoryId, setCategoryId] = useState<number | undefined>(undefined);
   const [query, setQuery] = useState("");
   const [addOpen, setAddOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [openSheet, setOpenSheet] = useState<"shop" | "category" | "language" | null>(null);
   const [pending, startTransition] = useTransition();
 
   // A completed list is a record, not a worksheet: it opens read-only and the
@@ -161,6 +164,17 @@ export function ListScreen({ list, categories }: ListScreenProps) {
         ? "No items for this shop."
         : "This list has no items yet.";
 
+  const pdf = useExportPdf({
+    listName: list.name,
+    shopName: selectedShopName,
+    // The PDF is the sheet you carry to one shop, so it follows the shop
+    // filter only — never the category filter or the search, either of which
+    // would silently half-print the sheet.
+    items: shopItems,
+    groupByShop: !selectedShopName,
+    language,
+  });
+
   const reopen = () => {
     startTransition(async () => {
       await reopenList(list.id);
@@ -170,6 +184,99 @@ export function ListScreen({ list, categories }: ListScreenProps) {
       router.refresh();
     });
   };
+
+  // Every header control except the view toggle now lives here. Conditions are
+  // the same ones that used to decide whether each icon rendered.
+  const menuItems: HeaderMenuItem[] = [];
+  if (!isDraft) {
+    menuItems.push({
+      key: "shop",
+      label: "Shop",
+      icon: <ShopIcon />,
+      detail: selectedOption(shopFilterOptions, shopId)?.label,
+      active: shopId !== undefined,
+      onSelect: () => setOpenSheet("shop"),
+    });
+    menuItems.push({
+      key: "category",
+      label: "Category",
+      icon: <CategoryIcon />,
+      detail: selectedOption(categoryFilterOptions, categoryId)?.label,
+      active: categoryId !== undefined,
+      onSelect: () => setOpenSheet("category"),
+    });
+  }
+  if (list.status === "FINALIZED") {
+    menuItems.push({
+      key: "pdf",
+      label: pdf.busy ? "Preparing PDF…" : "Export PDF",
+      icon: (
+        <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+          <path
+            d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+      detail: selectedShopName ?? "All shops",
+      disabled: pdf.busy || shopItems.length === 0,
+      onSelect: () => void pdf.exportPdf(),
+    });
+  }
+  if (!isDraft && mode === "shopping" && editable) {
+    menuItems.push({
+      key: "add",
+      label: "Add item",
+      icon: (
+        <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+          <path d="M12 6v12M6 12h12" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
+        </svg>
+      ),
+      onSelect: () => setAddOpen(true),
+    });
+  }
+  menuItems.push({
+    key: "language",
+    label: "Language",
+    // aria-hidden: the code is decoration here, and without it the row
+    // announces as "த Language Tamil".
+    icon: (
+      <span className="text-[12px] font-bold" aria-hidden>
+        {LANGUAGE_CODE[language]}
+      </span>
+    ),
+    detail: LANGUAGE_NAME[language],
+    onSelect: () => setOpenSheet("language"),
+  });
+  if (list.status === "FINALIZED") {
+    menuItems.push({
+      key: "reopen",
+      label: "Reopen as draft",
+      icon: <ReopenIcon />,
+      tone: "warn",
+      disabled: pending,
+      onSelect: reopen,
+    });
+  }
+  if (isCompleted) {
+    menuItems.push({
+      key: "edit",
+      label: unlocked ? "Finish editing" : "Edit this list",
+      icon: unlocked ? <CheckIcon /> : <PencilIcon />,
+      active: unlocked,
+      onSelect: () => {
+        setUnlocked((current) => !current);
+        setAddOpen(false);
+      },
+    });
+  }
+
+  const filterApplied = shopId !== undefined || categoryId !== undefined;
+
 
   return (
     // Extra bottom padding clears the fixed search bar. Kept here rather than
@@ -183,175 +290,85 @@ export function ListScreen({ list, categories }: ListScreenProps) {
         pair cancels the safe-area padding body applies so a pinned header
         clears the notch instead of sliding under it.
       */}
+      {/*
+        One pinned row: back, list name, what you have spent, the view toggle
+        and the menu. Everything else moved behind the menu, so the header
+        costs ~56px instead of ~130px and the list starts that much higher.
+      */}
       <header
-        className="sticky top-0 z-20 -mx-4 space-y-2 border-b border-ios-separator bg-ios-bg/90 px-4 pb-3 backdrop-blur-xl"
+        className="sticky top-0 z-20 -mx-4 flex items-center gap-2 border-b border-ios-separator bg-ios-bg/90 px-4 pb-2 backdrop-blur-xl"
         style={{
           marginTop: "calc(-1 * env(safe-area-inset-top))",
-          paddingTop: "calc(env(safe-area-inset-top) + 0.25rem)",
+          paddingTop: "calc(env(safe-area-inset-top) + 0.5rem)",
         }}
       >
-        <div className="flex items-center justify-between gap-2">
-          <Link
-            href="/grocery"
-            className="inline-flex min-w-0 items-center gap-1 text-[15px] text-ios-blue"
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4 flex-none" aria-hidden>
-              <path
-                d="M15 5l-7 7 7 7"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Lists
-          </Link>
+        <Link
+          href="/grocery"
+          aria-label="Back to lists"
+          title="Back to lists"
+          className="flex h-9 w-9 flex-none items-center justify-center rounded-full text-ios-blue active:opacity-60"
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
+            <path
+              d="M15 5l-7 7 7 7"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </Link>
 
-          {/* A FilterMenu grows to ~110px when a filter is on, so the row can
-              exceed the width two active filters leave. Scrolling is the
-              safety valve: it degrades instead of clipping or wrapping. */}
-          <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {/* Drafts are excluded — DraftEditor carries its own shop filter. */}
-            {!isDraft ? (
-              <>
-                <FilterMenu
-                  label="Shop"
-                  icon={<ShopIcon />}
-                  options={shopFilterOptions}
-                  value={shopId}
-                  defaultValue={undefined}
-                  onChange={setShopId}
-                />
-                <FilterMenu
-                  label="Category"
-                  icon={<CategoryIcon />}
-                  options={categoryFilterOptions}
-                  value={categoryId}
-                  defaultValue={undefined}
-                  onChange={setCategoryId}
-                />
-              </>
-            ) : null}
+        <h1 className="min-w-0 flex-1 truncate text-[20px] font-bold tracking-tight">
+          {list.name}
+        </h1>
 
-            {list.status === "FINALIZED" ? (
-              <ExportPdfButton
-                listName={list.name}
-                shopName={selectedShopName}
-                // The PDF is the sheet you carry to one shop, so it follows the
-                // shop filter only — never the category filter or the search,
-                // either of which would silently half-print the sheet.
-                items={shopItems}
-                groupByShop={!selectedShopName}
-                language={language}
-                variant="icon"
-              />
-            ) : null}
-
-            {!isDraft && mode === "shopping" && editable ? (
-              <button
-                type="button"
-                onClick={() => setAddOpen(true)}
-                aria-label="Add item"
-                title="Add item"
-                className={`${ICON_BUTTON} bg-ios-blue text-white`}
-              >
-                <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
-                  <path
-                    d="M12 6v12M6 12h12"
-                    stroke="currentColor"
-                    strokeWidth="2.25"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </button>
-            ) : null}
-
-            {/* Replaces the List/Shopping tabs: tap to shop, tap to come back.
-                Filled while shopping, and carrying the count the tab's badge
-                used to show. */}
-            {!isDraft ? (
-              <button
-                type="button"
-                onClick={() => setMode((current) => (current === "list" ? "shopping" : "list"))}
-                aria-pressed={mode === "shopping"}
-                aria-label={mode === "shopping" ? "Back to list" : "Go shopping"}
-                title={mode === "shopping" ? "Back to list" : "Go shopping"}
-                className={`relative ${ICON_BUTTON} ${
-                  mode === "shopping" ? "bg-ios-blue text-white" : "bg-ios-surface text-ios-blue"
-                }`}
-              >
-                <CartIcon />
-                {mode === "list" && outstanding > 0 ? (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-ios-red px-1 text-[10px] font-bold leading-none text-white ring-2 ring-ios-bg">
-                    {outstanding}
-                  </span>
-                ) : null}
-              </button>
-            ) : null}
-
-            <LanguageToggle />
-
-            {list.status === "FINALIZED" ? (
-              <button
-                type="button"
-                onClick={reopen}
-                disabled={pending}
-                aria-label="Reopen as draft"
-                title="Reopen as draft"
-                className={`${ICON_BUTTON} bg-ios-surface text-ios-blue disabled:opacity-50`}
-              >
-                <ReopenIcon />
-              </button>
-            ) : null}
-
-            {isCompleted ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setUnlocked((current) => !current);
-                  setAddOpen(false);
-                }}
-                aria-pressed={unlocked}
-                aria-label={unlocked ? "Finish editing" : "Edit this list"}
-                title={unlocked ? "Finish editing" : "Edit this list"}
-                className={`${ICON_BUTTON} ${
-                  unlocked ? "bg-ios-blue text-white" : "bg-ios-surface text-ios-blue"
-                }`}
-              >
-                {unlocked ? <CheckIcon /> : <PencilIcon />}
-              </button>
-            ) : null}
+        {mode === "shopping" ? (
+          <div className="flex-none text-right leading-tight">
+            <p className="text-[14px] font-semibold tabular-nums">
+              {purchasedCount}
+              <span className="text-ios-label-3">/{visibleItems.length}</span>
+            </p>
+            <p className="text-[11px] tabular-nums text-ios-label-2">{formatPrice(spent)}</p>
           </div>
-        </div>
+        ) : null}
 
-        <div className="flex items-start justify-between gap-3">
-          <h1 className="min-w-0 truncate text-[28px] font-bold leading-tight tracking-tight">
-            {list.name}
-          </h1>
-          {mode === "shopping" ? (
-            <div className="flex-none pt-1 text-right">
-              <p className="text-[15px] font-semibold leading-tight tabular-nums">
-                {purchasedCount}
-                <span className="text-ios-label-3">/{visibleItems.length}</span>
-              </p>
-              <p className="text-[12px] leading-tight tabular-nums text-ios-label-2">
-                {formatPrice(spent)}
-              </p>
-            </div>
-          ) : null}
-        </div>
+        {/* The one control kept out of the menu: switching views is the most
+            frequent thing you do here, and it should stay a single tap. */}
+        {!isDraft ? (
+          <button
+            type="button"
+            onClick={() => setMode((current) => (current === "list" ? "shopping" : "list"))}
+            aria-pressed={mode === "shopping"}
+            aria-label={mode === "shopping" ? "Back to list" : "Go shopping"}
+            title={mode === "shopping" ? "Back to list" : "Go shopping"}
+            className={`relative flex h-9 w-9 flex-none items-center justify-center rounded-full shadow-ios transition active:scale-95 ${
+              mode === "shopping" ? "bg-ios-blue text-white" : "bg-ios-surface text-ios-blue"
+            }`}
+          >
+            <CartIcon />
+            {mode === "list" && outstanding > 0 ? (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-ios-red px-1 text-[10px] font-bold leading-none text-white ring-2 ring-ios-bg">
+                {outstanding}
+              </span>
+            ) : null}
+          </button>
+        ) : null}
 
-        <p className="text-[13px] text-ios-label-2">
-          {monthKeyToLabel(list.monthKey)} · {STATUS_LABEL[list.status]} · {list.itemCount} items
-        </p>
+        <BurgerButton onClick={() => setMenuOpen(true)} marked={filterApplied} />
       </header>
 
       {/* Scrolls away: you read these once, so they don't earn pinned height. */}
-      <p className="px-1 text-[12px] text-ios-label-3">
-        Made {formatIsoDate(list.createdAt)}
-        {list.purchasedAt ? ` · Shopped ${formatIsoDate(list.purchasedAt)}` : ""}
-      </p>
+      <div className="px-1">
+        <p className="text-[13px] text-ios-label-2">
+          {monthKeyToLabel(list.monthKey)} · {STATUS_LABEL[list.status]} · {list.itemCount} items
+        </p>
+        <p className="text-[12px] text-ios-label-3">
+          Made {formatIsoDate(list.createdAt)}
+          {list.purchasedAt ? ` · Shopped ${formatIsoDate(list.purchasedAt)}` : ""}
+        </p>
+      </div>
 
       {isDraft ? (
         <DraftEditor list={list} />
@@ -372,6 +389,45 @@ export function ListScreen({ list, categories }: ListScreenProps) {
 
       {/* Drafts keep DraftEditor's own filtering, so no shared search there. */}
       {!isDraft ? <ListSearchBar value={query} onChange={setQuery} /> : null}
+
+      <HeaderMenu open={menuOpen} onOpenChange={setMenuOpen} items={menuItems} />
+
+      {/* Opened from a menu row; the menu closes first, so the two sheets
+          never stack. */}
+      <FilterSheet
+        open={openSheet === "shop"}
+        onClose={() => setOpenSheet(null)}
+        label="Shop"
+        options={shopFilterOptions}
+        value={shopId}
+        onChange={setShopId}
+      />
+      <FilterSheet
+        open={openSheet === "category"}
+        onClose={() => setOpenSheet(null)}
+        label="Category"
+        options={categoryFilterOptions}
+        value={categoryId}
+        onChange={setCategoryId}
+      />
+      <FilterSheet
+        open={openSheet === "language"}
+        onClose={() => setOpenSheet(null)}
+        label="Language"
+        options={LANGUAGE_ORDER.map((code) => ({
+          key: code,
+          label: LANGUAGE_NAME[code],
+          value: code,
+        }))}
+        value={language}
+        onChange={setLanguage}
+      />
+
+      {pdf.error ? (
+        <p className="rounded-ios bg-ios-red-soft px-4 py-3 text-[14px] text-ios-red">
+          {pdf.error}
+        </p>
+      ) : null}
 
       {/* Drafts add items from the full Add items page instead. */}
       {!isDraft ? (

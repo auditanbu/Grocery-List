@@ -21,15 +21,17 @@ type ExportPdfButtonProps = {
  * Generates the printable sheet in the browser, in whichever language the
  * app is currently displaying. jsPDF (and, for Tamil, html2canvas) are
  * imported lazily so neither lands in the initial bundle.
+ *
+ * Exposed as a hook as well as a button, so a header menu can trigger the
+ * same export from a plain row without rendering a button at all.
  */
-export function ExportPdfButton({
+export function useExportPdf({
   listName,
   shopName,
   items,
   groupByShop = true,
   language,
-  variant = "full",
-}: ExportPdfButtonProps) {
+}: Omit<ExportPdfButtonProps, "variant">) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,6 +59,13 @@ export function ExportPdfButton({
       setBusy(false);
     }
   };
+
+  return { exportPdf, busy, error };
+}
+
+export function ExportPdfButton({ variant = "full", ...options }: ExportPdfButtonProps) {
+  const { exportPdf, busy, error } = useExportPdf(options);
+  const items = options.items;
 
   const icon = (
     <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
