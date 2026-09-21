@@ -1,7 +1,8 @@
 "use client";
 
+import { SizeField } from "@/components/SizeField";
 import { hasTamilScript } from "@/lib/tanglish";
-import { UNIT_TYPES, unitOptionLabel, type UnitType } from "@/lib/units";
+import { UNIT_TYPES, formatQty, sizeOf, unitOptionLabel, type UnitType } from "@/lib/units";
 import type { CategoryDTO, ShopDTO } from "@/lib/types";
 
 export type NewItemDraft = {
@@ -11,6 +12,9 @@ export type NewItemDraft = {
   categoryId: number;
   unitType: UnitType;
   shopId: number | null;
+  /** Pack size, for countable items sold by the packet. Null when loose. */
+  sizeValue: number | null;
+  sizeUnit: UnitType | null;
 };
 
 /**
@@ -28,6 +32,8 @@ export function newItemDraft(query: string, categories: CategoryDTO[]): NewItemD
     categoryId: categories[0]?.id ?? 0,
     unitType: "COUNT",
     shopId: null,
+    sizeValue: null,
+    sizeUnit: null,
   };
 }
 
@@ -107,7 +113,15 @@ export function NewItemFields({ draft, onChange, categories, shops }: NewItemFie
             <button
               key={unit}
               type="button"
-              onClick={() => onChange({ ...draft, unitType: unit })}
+              onClick={() =>
+                onChange({
+                  ...draft,
+                  unitType: unit,
+                  // A size belongs to a pack, so it goes when the item stops
+                  // being counted in packs.
+                  ...(unit === "COUNT" ? {} : { sizeValue: null, sizeUnit: null }),
+                })
+              }
               className={chip(draft.unitType === unit)}
             >
               {unitOptionLabel(unit)}
@@ -115,6 +129,28 @@ export function NewItemFields({ draft, onChange, categories, shops }: NewItemFie
           ))}
         </div>
       </Field>
+
+      {draft.unitType === "COUNT" ? (
+        <Field
+          label={`Size${
+            sizeOf(draft.sizeValue, draft.sizeUnit)
+              ? ` (${formatQty(draft.sizeValue as number, draft.sizeUnit as UnitType)})`
+              : ""
+          }`}
+        >
+          <SizeField
+            value={draft.sizeValue}
+            unit={draft.sizeUnit}
+            clearable
+            onChange={(sizeValue, sizeUnit) => onChange({ ...draft, sizeValue, sizeUnit })}
+            aria-label="Size of one pack"
+          />
+          <p className="pt-1.5 text-[12px] text-ios-label-3">
+            What one comes in — a 200 g paste, a 500 ml bottle. Leave it empty
+            for anything sold loose.
+          </p>
+        </Field>
+      ) : null}
 
       <Field label="Shop by">
         <div className="flex flex-wrap gap-2">

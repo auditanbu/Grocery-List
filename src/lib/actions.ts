@@ -9,7 +9,7 @@ import { prisma } from "./prisma";
 import { COPYABLE_ITEM, getCopySource } from "./queries";
 import { listNameFor, monthKeyOf } from "./dates";
 import { hasTamilScript, toTanglish } from "./tanglish";
-import { normalizeQty, type UnitType } from "./units";
+import { normalizeQty, roundSize, type UnitType } from "./units";
 
 export type ActionResult<T = undefined> =
   | ({ ok: true } & (T extends undefined ? object : { data: T }))
@@ -118,6 +118,11 @@ export async function addListItem(input: {
   const unitType = input.unitType ?? (item.unitType as UnitType);
   const quantity = normalizeQty(input.quantity ?? Number(item.defaultQty), unitType);
   const shopId = input.shopId === undefined ? item.shopId : input.shopId;
+  // The size is the master item's today, not forever: the row keeps its own
+  // copy so re-sizing at the shop, or re-sizing the master item next month,
+  // leaves the other alone.
+  const sizeValue = item.sizeValue === null ? null : Number(item.sizeValue);
+  const sizeUnit = item.sizeUnit;
 
   const existing = await prisma.groceryListItem.findFirst({
     where: { listId: input.listId, itemId: input.itemId, shopId },
@@ -141,6 +146,8 @@ export async function addListItem(input: {
       itemId: input.itemId,
       quantity,
       unitType,
+      sizeValue,
+      sizeUnit,
       shopId,
       sortOrder: count,
     },
@@ -179,7 +186,14 @@ export async function copyPreviousList(input: {
   const sourceItems = await prisma.groceryListItem.findMany({
     where: { listId: source.id, ...COPYABLE_ITEM },
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
-    select: { itemId: true, quantity: true, unitType: true, shopId: true },
+    select: {
+      itemId: true,
+      quantity: true,
+      unitType: true,
+      sizeValue: true,
+      sizeUnit: true,
+      shopId: true,
+    },
   });
 
   const existing = await prisma.groceryListItem.findMany({
@@ -194,6 +208,8 @@ export async function copyPreviousList(input: {
     itemId: number;
     quantity: number;
     unitType: UnitType;
+    sizeValue: number | null;
+    sizeUnit: UnitType | null;
     shopId: number | null;
     sortOrder: number;
   }[] = [];
@@ -207,6 +223,10 @@ export async function copyPreviousList(input: {
       itemId: row.itemId,
       quantity: normalizeQty(Number(row.quantity), row.unitType as UnitType),
       unitType: row.unitType as UnitType,
+      // The size last month's shopping ended on — same reasoning as the
+      // quantity: what you walked out with is what to plan for.
+      sizeValue: row.sizeValue === null ? null : Number(row.sizeValue),
+      sizeUnit: row.sizeUnit as UnitType | null,
       shopId: row.shopId,
       sortOrder: existing.length + rows.length,
     });
@@ -232,6 +252,12 @@ export async function updateListItem(input: {
   quantity?: number;
   /** Set alongside quantity when a stepper promoted g/ml to kg/L. */
   unitType?: UnitType;
+  /**
+   * The pack size bought instead of the planned one — the shop had 150 g,
+   * not 200 g. Pass both fields together; null on either clears the size.
+   */
+  sizeValue?: number | null;
+  sizeUnit?: UnitType | null;
   shopId?: number | null;
   /** See addListItem — the "Edit" button on a closed list sets this. */
   allowClosed?: boolean;
@@ -244,11 +270,30 @@ export async function updateListItem(input: {
   if (row.list.status === "COMPLETED" && !input.allowClosed) return fail("This list is closed.");
 
   const unitType = input.unitType ?? (row.unitType as UnitType);
-  const data: { quantity?: number; unitType?: UnitType; shopId?: number | null } = {};
+  const data: {
+    quantity?: number;
+    unitType?: UnitType;
+    sizeValue?: number | null;
+    sizeUnit?: UnitType | null;
+    shopId?: number | null;
+  } = {};
   if (input.quantity !== undefined) {
     data.quantity = normalizeQty(input.quantity, unitType);
   }
   if (input.unitType !== undefined) data.unitType = input.unitType;
+  if (input.sizeValue !== undefined) {
+    // A size is whatever the packet says, so it is only sanity-checked and
+    // rounded — never snapped onto the quantity stepper's grid, which would
+    // turn a 75 g soap into 100 g.
+    const value =
+      input.sizeValue !== null && Number.isFinite(input.sizeValue) && input.sizeValue > 0
+        ? roundSize(input.sizeValue)
+        : null;
+    const unit = value === null ? null : (input.sizeUnit ?? (row.sizeUnit as UnitType | null));
+    if (value !== null && !unit) return fail("Pick a unit for the size.");
+    data.sizeValue = value;
+    data.sizeUnit = unit;
+  }
   if (input.shopId !== undefined) data.shopId = input.shopId;
 
   await prisma.groceryListItem.update({ where: { id: input.listItemId }, data });
@@ -345,11 +390,18 @@ export async function recordPurchase(input: {
   const previous = await prisma.priceHistory.findFirst({
     where: { itemId: row.itemId, NOT: { listId: row.listId } },
     orderBy: { purchasedAt: "desc" },
-    select: { price: true, quantity: true, unitType: true },
+    select: { price: true, quantity: true, unitType: true, sizeValue: true, sizeUnit: true },
   });
   const previousPrice = previous ? Number(previous.price) : null;
   const previousQuantity = previous ? Number(previous.quantity) : null;
   const previousUnitType = previous?.unitType ?? null;
+  // The size that price was paid for — without it, "₹95 last time" and
+  // "₹95 today" look identical even when the tube shrank from 200 g to 150 g.
+  const previousSizeValue =
+    previous?.sizeValue === null || previous?.sizeValue === undefined
+      ? null
+      : Number(previous.sizeValue);
+  const previousSizeUnit = previous?.sizeUnit ?? null;
   const purchasedAt = new Date();
 
   await prisma.$transaction([
@@ -361,6 +413,8 @@ export async function recordPurchase(input: {
         previousPrice,
         previousQuantity,
         previousUnitType,
+        previousSizeValue,
+        previousSizeUnit,
         purchasedAt,
       },
     }),
@@ -374,6 +428,8 @@ export async function recordPurchase(input: {
         price,
         quantity: row.quantity,
         unitType: row.unitType,
+        sizeValue: row.sizeValue,
+        sizeUnit: row.sizeUnit,
         purchasedAt,
       },
     }),
@@ -396,6 +452,8 @@ export async function undoPurchase(listItemId: number): Promise<ActionResult> {
         previousPrice: null,
         previousQuantity: null,
         previousUnitType: null,
+        previousSizeValue: null,
+        previousSizeUnit: null,
         purchasedAt: null,
       },
     }),
@@ -417,7 +475,13 @@ export async function upsertMasterItem(input: {
   shopId: number | null;
   defaultQty?: number;
   isActive?: boolean;
-  hasVariableUnit?: boolean;
+  /**
+   * Pack size — what one of this item comes in (a 200 g tube). Only
+   * countable items have one; null on either field means "sold loose",
+   * where the quantity is already the measure.
+   */
+  sizeValue?: number | null;
+  sizeUnit?: UnitType | null;
 }): Promise<ActionResult<{ id: number }>> {
   const nameEn = input.nameEn.trim();
   if (!nameEn) return fail("English name is required.");
@@ -454,6 +518,20 @@ export async function upsertMasterItem(input: {
 
   const defaultQty = normalizeQty(input.defaultQty ?? 1, input.unitType);
 
+  // A size only means something when the quantity counts packs: "2 kg, each
+  // 200 g" is nonsense, and silently keeping one would quietly skew every
+  // unit price for the item.
+  const sizeValue =
+    input.unitType === "COUNT" &&
+    input.sizeValue !== null &&
+    input.sizeValue !== undefined &&
+    Number.isFinite(input.sizeValue) &&
+    input.sizeValue > 0
+      ? roundSize(input.sizeValue)
+      : null;
+  const sizeUnit = sizeValue === null ? null : (input.sizeUnit ?? null);
+  if (sizeValue !== null && sizeUnit === null) return fail("Pick a unit for the size.");
+
   const clash = await prisma.item.findFirst({
     where: {
       nameEn,
@@ -473,7 +551,8 @@ export async function upsertMasterItem(input: {
     shopId: input.shopId,
     defaultQty,
     isActive: input.isActive ?? true,
-    hasVariableUnit: input.hasVariableUnit ?? false,
+    sizeValue,
+    sizeUnit,
   };
 
   const item = input.id
@@ -494,11 +573,23 @@ export async function updateMasterItemQuick(input: {
   unitType?: UnitType;
   shopId?: number | null;
 }): Promise<ActionResult> {
-  const data: { unitType?: UnitType; shopId?: number | null; defaultQty?: number } = {};
+  const data: {
+    unitType?: UnitType;
+    shopId?: number | null;
+    defaultQty?: number;
+    sizeValue?: number | null;
+    sizeUnit?: UnitType | null;
+  } = {};
   if (input.unitType !== undefined) {
     const current = await prisma.item.findUnique({ where: { id: input.itemId }, select: { defaultQty: true } });
     data.unitType = input.unitType;
     data.defaultQty = normalizeQty(Number(current?.defaultQty ?? 1), input.unitType);
+    // Same rule as the full form: a pack size only means something while the
+    // quantity counts packs.
+    if (input.unitType !== "COUNT") {
+      data.sizeValue = null;
+      data.sizeUnit = null;
+    }
   }
   if (input.shopId !== undefined) data.shopId = input.shopId;
 

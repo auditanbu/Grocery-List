@@ -33,14 +33,18 @@ export type MasterItemDTO = {
   shopId: number | null;
   shopName: string | null;
   isActive: boolean;
-  /** Sold in inconsistent pack sizes — allows quantity/unit edits while shopping. */
-  hasVariableUnit: boolean;
+  /** Pack size, e.g. 200 g of paste. Null for anything sold loose. */
+  sizeValue: number | null;
+  sizeUnit: UnitType | null;
   /** Most recent price paid, across all past lists. */
   lastPrice: number | null;
   lastPriceAt: string | null;
   /** Quantity/unit lastPrice bought, so "₹240" reads as "₹240 for 1 kg". */
   lastPriceQuantity: number | null;
   lastPriceUnitType: UnitType | null;
+  /** Pack size it was bought at — "₹95 for 1 × 200 g". */
+  lastPriceSizeValue: number | null;
+  lastPriceSizeUnit: UnitType | null;
   /** Where that purchase was made. Null when the row carried no shop. */
   lastPriceShopName: string | null;
 };
@@ -57,6 +61,9 @@ export type ListItemDTO = {
   categoryNameTa: string | null;
   unitType: UnitType;
   quantity: number;
+  /** Pack size this row is planned/bought at; changeable while shopping. */
+  sizeValue: number | null;
+  sizeUnit: UnitType | null;
   shopId: number | null;
   shopName: string | null;
   isPurchased: boolean;
@@ -66,13 +73,17 @@ export type ListItemDTO = {
   /** Quantity/unit that previousPrice was paid for, for a fair comparison. */
   previousQuantity: number | null;
   previousUnitType: UnitType | null;
+  /** ...and the pack size, where a packaged item's real amount lives. */
+  previousSizeValue: number | null;
+  previousSizeUnit: UnitType | null;
   /** Latest price from any earlier list — shown before the item is bought. */
   lastPrice: number | null;
   /** Quantity/unit that lastPrice was paid for, for a fair comparison. */
   lastPriceQuantity: number | null;
   lastPriceUnitType: UnitType | null;
-  /** Sold in inconsistent pack sizes — allows quantity/unit edits while shopping. */
-  hasVariableUnit: boolean;
+  /** ...and the pack size it was bought at. */
+  lastPriceSizeValue: number | null;
+  lastPriceSizeUnit: UnitType | null;
 };
 
 export type ListSummaryDTO = {
@@ -113,6 +124,9 @@ export type PriceHistoryDTO = {
   price: number;
   quantity: number;
   unitType: UnitType;
+  /** Pack size the price was paid for; null for items sold loose. */
+  sizeValue: number | null;
+  sizeUnit: UnitType | null;
   purchasedAt: string;
   shopName: string | null;
   listName: string | null;

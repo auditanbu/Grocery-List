@@ -8,7 +8,7 @@ import { PurchaseSheet } from "@/components/list/PurchaseSheet";
 import { groupByShop } from "@/components/list/DraftEditor";
 import { completeList } from "@/lib/actions";
 import { displayName, useLanguage } from "@/lib/language";
-import { formatPrice, formatQty } from "@/lib/units";
+import { formatPrice, formatQtyWithSize, sizeOf, totalAmount } from "@/lib/units";
 import type { ListDetailDTO, ListItemDTO } from "@/lib/types";
 
 type ShoppingViewProps = {
@@ -74,6 +74,15 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
             <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
               {shopItems.map((item) => {
                 const name = displayName(item, language);
+                const size = sizeOf(item.sizeValue, item.sizeUnit);
+                // Packs × size, so a row bought at 150 g is compared as
+                // 150 g and not as "one tube, same as ever".
+                const bought = totalAmount(item.quantity, item.unitType, size);
+                const previous = totalAmount(
+                  item.previousQuantity ?? item.quantity,
+                  item.previousUnitType ?? item.unitType,
+                  sizeOf(item.previousSizeValue, item.previousSizeUnit),
+                );
                 return (
                 <li key={item.id}>
                   <div className="flex w-full items-center gap-3 px-4 py-3">
@@ -129,10 +138,10 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
                             <PriceDelta
                               current={item.purchasePrice ?? 0}
                               previous={item.previousPrice}
-                              currentQuantity={item.quantity}
-                              currentUnitType={item.unitType}
-                              previousQuantity={item.previousQuantity ?? undefined}
-                              previousUnitType={item.previousUnitType ?? undefined}
+                              currentQuantity={bought.quantity}
+                              currentUnitType={bought.unit}
+                              previousQuantity={item.previousQuantity === null ? undefined : previous.quantity}
+                              previousUnitType={item.previousQuantity === null ? undefined : previous.unit}
                             />
                           </span>
                         ) : isCompleted ? (
@@ -148,7 +157,7 @@ export function ShoppingView({ list, items, editable, emptyMessage }: ShoppingVi
                         item.isPurchased ? "text-ios-label-3" : ""
                       }`}
                     >
-                      {formatQty(item.quantity, item.unitType)}
+                      {formatQtyWithSize(item.quantity, item.unitType, size)}
                     </span>
                   </div>
 

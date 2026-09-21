@@ -34,7 +34,10 @@ import {
   UNIT_TYPES,
   formatPrice,
   formatQty,
+  formatQtyWithSize,
   formatUnitPrice,
+  sizeOf,
+  totalAmount,
   unitOptionLabel,
   type UnitType,
 } from "@/lib/units";
@@ -507,16 +510,21 @@ export function AddItemsPage({ list, items, shops, categories }: AddItemsPagePro
                     item.lastPriceQuantity !== null &&
                     item.lastPriceUnitType !== null &&
                     item.lastPriceUnitType !== "RS";
-                  const lastQty = hasLastSize
-                    ? `for ${formatQty(item.lastPriceQuantity as number, item.lastPriceUnitType as UnitType)}`
+                  // Packs × the size it was bought at — "for 200 g", and a
+                  // per-kg figure that means the same thing next to it.
+                  const lastBought = hasLastSize
+                    ? totalAmount(
+                        item.lastPriceQuantity as number,
+                        item.lastPriceUnitType as UnitType,
+                        sizeOf(item.lastPriceSizeValue, item.lastPriceSizeUnit),
+                      )
+                    : null;
+                  const lastQty = lastBought
+                    ? `for ${formatQty(lastBought.quantity, lastBought.unit)}`
                     : null;
                   const unitPrice =
-                    hasLastSize && item.lastPrice !== null
-                      ? formatUnitPrice(
-                          item.lastPrice,
-                          item.lastPriceQuantity as number,
-                          item.lastPriceUnitType as UnitType,
-                        )
+                    lastBought && item.lastPrice !== null
+                      ? formatUnitPrice(item.lastPrice, lastBought.quantity, lastBought.unit)
                       : null;
                   // Where *that purchase* happened, not the item's default shop
                   // — the name line above already carries the default.
@@ -530,6 +538,9 @@ export function AddItemsPage({ list, items, shops, categories }: AddItemsPagePro
                           <p className="truncate text-[16px] font-medium">{name.primary}</p>
                           <p className="truncate text-[13px] text-ios-label-2">
                             {name.secondary}
+                            {sizeOf(item.sizeValue, item.sizeUnit)
+                              ? ` · ${formatQty(item.sizeValue as number, item.sizeUnit as UnitType)} each`
+                              : ""}
                             {item.shopName ? ` · ${item.shopName}` : ""}
                           </p>
                           {entry?.quantity === 0 ? (
@@ -548,11 +559,6 @@ export function AddItemsPage({ list, items, shops, categories }: AddItemsPagePro
                                   ? `Last paid ${formatPrice(item.lastPrice)}`
                                   : "No price yet"}
                               </span>
-                              {item.hasVariableUnit ? (
-                                <span className="flex-none rounded-full bg-ios-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-ios-label-2 ring-1 ring-inset ring-ios-separator">
-                                  Variable
-                                </span>
-                              ) : null}
                               <svg
                                 viewBox="0 0 24 24"
                                 className={`h-3 w-3 flex-none transition-transform ${expanded ? "rotate-180" : ""}`}
@@ -618,7 +624,12 @@ export function AddItemsPage({ list, items, shops, categories }: AddItemsPagePro
                                     <span className="text-[13px] font-medium tabular-nums">
                                       {formatPrice(entryRow.price)}
                                       <span className="ml-1.5 text-[12px] font-normal text-ios-label-2">
-                                        for {formatQty(entryRow.quantity, entryRow.unitType)}
+                                        for{" "}
+                                        {formatQtyWithSize(
+                                          entryRow.quantity,
+                                          entryRow.unitType,
+                                          sizeOf(entryRow.sizeValue, entryRow.sizeUnit),
+                                        )}
                                       </span>
                                     </span>
                                     <span className="text-[12px] text-ios-label-3">

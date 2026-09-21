@@ -48,6 +48,8 @@ export function useExportPdf({
           nameTl: item.nameTl,
           quantity: item.quantity,
           unitType: item.unitType,
+          sizeValue: item.sizeValue,
+          sizeUnit: item.sizeUnit,
           shopName: item.shopName,
           categoryName: item.categoryName,
         })),

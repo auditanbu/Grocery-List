@@ -6,14 +6,19 @@ import { useRouter } from "next/navigation";
 
 import { PriceDelta } from "@/components/PriceDelta";
 import { Sheet } from "@/components/Sheet";
+import { SizeField } from "@/components/SizeField";
 import { Stepper } from "@/components/Stepper";
 import { getItemPriceHistory, recordPurchase, undoPurchase, updateListItem } from "@/lib/actions";
 import { displayName, useLanguage } from "@/lib/language";
 import {
   formatPrice,
   formatQty,
+  formatQtyValue,
+  formatQtyWithSize,
   formatUnitPrice,
   projectPrice,
+  sizeOf,
+  totalAmount,
   unitGroup,
   type UnitType,
 } from "@/lib/units";
@@ -32,11 +37,16 @@ type PurchaseSheetProps = {
  * Prompted when an item is checked off while shopping: capture what was
  * actually paid and show live how it compares with last month.
  *
- * The quantity can be corrected here too, behind a small edit button —
- * what you meant to buy and what you walked out with often differ (the
- * store had 150 g not 200 g; you grabbed two). Items marked
- * `hasVariableUnit` (sold in inconsistent pack sizes) open with the editor
- * already showing, since those are expected to need it.
+ * Two things can be corrected here, and they are deliberately separate:
+ *
+ *   - the **size**, shown outright for anything sold in packs — the shop
+ *     only had the 150 g tube, not the 200 g one the list asks for;
+ *   - the **quantity**, behind a small edit button — you grabbed two.
+ *
+ * Both are applied before the price is recorded, so what you type is
+ * always the price for what actually went in the basket, and the
+ * comparison against last time is made on the total amount (packs × size)
+ * rather than on "one tube" either way.
  */
 export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: PurchaseSheetProps) {
   const router = useRouter();
@@ -44,6 +54,8 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState(0);
   const [unitType, setUnitType] = useState<UnitType>("COUNT");
+  const [sizeValue, setSizeValue] = useState<number | null>(null);
+  const [sizeUnit, setSizeUnit] = useState<UnitType | null>(null);
   const [history, setHistory] = useState<PriceHistoryDTO[] | null>(null);
   const [editingQuantity, setEditingQuantity] = useState(false);
   const [comparing, setComparing] = useState(false);
@@ -54,7 +66,9 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
     setPrice(item?.purchasePrice != null ? String(item.purchasePrice) : "");
     setQuantity(item?.quantity ?? 0);
     setUnitType(item?.unitType ?? "COUNT");
-    setEditingQuantity(item?.hasVariableUnit ?? false);
+    setSizeValue(item?.sizeValue ?? null);
+    setSizeUnit(item?.sizeUnit ?? null);
+    setEditingQuantity(false);
     setComparing(false);
     setError(null);
     setHistory(null);
@@ -66,23 +80,42 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
   if (!item) return null;
 
   const name = displayName(item, language);
-  const sizeChanged = quantity !== item.quantity || unitType !== item.unitType;
+  const size = sizeOf(sizeValue, sizeUnit);
+  const listSize = sizeOf(item.sizeValue, item.sizeUnit);
+  // Only items the master list gives a size to can be re-sized here —
+  // everything else carries its amount in the quantity.
+  const sizeable = listSize !== null;
+  const sizeChanged =
+    size?.value !== listSize?.value || size?.unit !== listSize?.unit;
+  const quantityChanged = quantity !== item.quantity || unitType !== item.unitType;
+
   const reference = item.purchasePrice != null ? item.previousPrice : item.lastPrice;
   const referenceQuantity = item.purchasePrice != null ? item.previousQuantity : item.lastPriceQuantity;
   const referenceUnitType = item.purchasePrice != null ? item.previousUnitType : item.lastPriceUnitType;
+  const referenceSize =
+    item.purchasePrice != null
+      ? sizeOf(item.previousSizeValue, item.previousSizeUnit)
+      : sizeOf(item.lastPriceSizeValue, item.lastPriceSizeUnit);
   const parsed = Number.parseFloat(price.replace(",", "."));
   const valid = Number.isFinite(parsed) && parsed >= 0;
 
-  const canCompare =
-    reference !== null && referenceQuantity !== null && referenceUnitType !== null;
+  // Packs × size — the amount both prices are actually about. A tube is a
+  // tube either way; 200 g against 150 g is what the comparison hangs on.
+  const bought = totalAmount(quantity, unitType, size);
+  const referenceBought =
+    referenceQuantity !== null && referenceUnitType !== null
+      ? totalAmount(referenceQuantity, referenceUnitType, referenceSize)
+      : null;
+
+  const canCompare = reference !== null && referenceBought !== null;
   const projected =
-    canCompare && unitGroup(referenceUnitType as UnitType) === unitGroup(unitType)
+    canCompare && unitGroup(referenceBought.unit) === unitGroup(bought.unit)
       ? projectPrice(
           reference as number,
-          referenceQuantity as number,
-          referenceUnitType as UnitType,
-          quantity,
-          unitType,
+          referenceBought.quantity,
+          referenceBought.unit,
+          bought.quantity,
+          bought.unit,
         )
       : null;
 
@@ -90,14 +123,16 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
   // size: ₹212 for 4 kg and ₹212 for 8 kg are the same rupees and a very
   // different deal. Recomputed as the price is typed. Null for RS-priced
   // items (their "quantity" is already rupees) and before a price is entered.
-  const currentUnitPrice = valid && parsed > 0 ? formatUnitPrice(parsed, quantity, unitType) : null;
+  const currentUnitPrice =
+    valid && parsed > 0 ? formatUnitPrice(parsed, bought.quantity, bought.unit) : null;
   const referenceUnitPrice = canCompare
-    ? formatUnitPrice(
-        reference as number,
-        referenceQuantity as number,
-        referenceUnitType as UnitType,
-      )
+    ? formatUnitPrice(reference as number, referenceBought.quantity, referenceBought.unit)
     : null;
+
+  // For a packaged item the quantity counts packs, so "1" on its own reads
+  // as nothing at all — say what it is a count of.
+  const packsLabel = (value: number, unit: UnitType) =>
+    sizeable ? `${formatQtyValue(value, unit)} ${value === 1 ? "pack" : "packs"}` : formatQty(value, unit);
 
   const save = () => {
     if (!valid) {
@@ -105,15 +140,16 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
       return;
     }
     startTransition(async () => {
-      if (sizeChanged) {
-        const sizeResult = await updateListItem({
+      if (quantityChanged || sizeChanged) {
+        const rowResult = await updateListItem({
           listItemId: item.id,
           quantity,
           unitType,
+          ...(sizeable ? { sizeValue: size?.value ?? null, sizeUnit: size?.unit ?? null } : {}),
           allowClosed,
         });
-        if (!sizeResult.ok) {
-          setError(sizeResult.error);
+        if (!rowResult.ok) {
+          setError(rowResult.error);
           return;
         }
       }
@@ -148,7 +184,7 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
       title={name.primary}
       subtitle={[
         name.secondary,
-        editable ? null : `List wants ${formatQty(item.quantity, item.unitType)}`,
+        editable ? null : `List wants ${formatQtyWithSize(item.quantity, item.unitType, listSize)}`,
         item.shopName,
       ]
         .filter(Boolean)
@@ -179,14 +215,44 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
       }
     >
       <div className="space-y-4 pb-3">
+        {/* Size first, and never behind a button: it is the thing that
+            actually differs at the shop, and it re-prices the item. */}
+        {editable && sizeable ? (
+          <div>
+            <span className="text-[13px] font-medium text-ios-label-2">
+              Size bought
+              {sizeChanged && listSize ? (
+                <span className="ml-1.5 font-normal text-ios-blue">
+                  (list wants {formatQty(listSize.value, listSize.unit)})
+                </span>
+              ) : null}
+            </span>
+            <div className="mt-1.5">
+              <SizeField
+                value={sizeValue}
+                unit={sizeUnit}
+                onChange={(nextValue, nextUnit) => {
+                  setSizeValue(nextValue);
+                  setSizeUnit(nextUnit);
+                }}
+                aria-label={`Size bought for ${item.nameEn}`}
+              />
+            </div>
+            <span className="mt-1.5 block text-[12px] text-ios-label-3">
+              Shop only had another size? Put it in here — the price you enter
+              below is taken as the price for this size.
+            </span>
+          </div>
+        ) : null}
+
         {editable ? (
           <div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-[13px] font-medium text-ios-label-2">
                 Quantity bought
-                {sizeChanged ? (
+                {quantityChanged ? (
                   <span className="ml-1.5 font-normal text-ios-blue">
-                    (list wanted {formatQty(item.quantity, item.unitType)})
+                    (list wanted {packsLabel(item.quantity, item.unitType)})
                   </span>
                 ) : null}
               </span>
@@ -194,10 +260,10 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
                 <button
                   type="button"
                   onClick={() => setEditingQuantity(true)}
-                  aria-label={`Edit quantity, currently ${formatQty(quantity, unitType)}`}
+                  aria-label={`Edit quantity, currently ${packsLabel(quantity, unitType)}`}
                   className="flex h-8 flex-none items-center gap-1.5 rounded-full bg-ios-surface-2 px-3 text-[14px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator transition active:scale-95"
                 >
-                  <span className="tabular-nums">{formatQty(quantity, unitType)}</span>
+                  <span className="tabular-nums">{packsLabel(quantity, unitType)}</span>
                   <svg viewBox="0 0 24 24" className="h-4 w-4 flex-none" aria-hidden>
                     <path
                       d="M4 20l.9-4.2L15.6 5.1a1.6 1.6 0 0 1 2.3 0l1 1a1.6 1.6 0 0 1 0 2.3L8.2 19.1 4 20zM14.8 6l3.2 3.2"
@@ -224,8 +290,8 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
                   aria-label={`Quantity for ${item.nameEn}`}
                 />
                 <span className="mt-1.5 block text-[12px] text-ios-label-3">
-                  {item.hasVariableUnit
-                    ? "Store had a different size or pack? Adjust it here — the price comparison accounts for the change."
+                  {sizeable
+                    ? "Took more than one? Adjust the count here — the price you enter below is taken as the price for all of them."
                     : "Bought a different amount? Adjust it here — the price you enter below is taken as the price for this quantity."}
                 </span>
               </div>
@@ -287,12 +353,12 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
                     <p className="text-[15px] font-semibold tabular-nums">
                       ≈ {formatPrice(projected)}
                       <span className="ml-1.5 text-[12px] font-normal text-ios-label-2">
-                        at {formatQty(quantity, unitType)}
+                        at {formatQtyWithSize(quantity, unitType, size)}
                       </span>
                     </p>
                     <p className="mt-0.5 text-[12px] text-ios-label-2">
                       Based on {formatPrice(reference as number)} for{" "}
-                      {formatQty(referenceQuantity as number, referenceUnitType as UnitType)}
+                      {referenceBought ? formatQty(referenceBought.quantity, referenceBought.unit) : null}
                     </p>
                   </>
                 ) : (
@@ -328,10 +394,10 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
                   <PriceDelta
                     current={parsed}
                     previous={reference}
-                    currentQuantity={quantity}
-                    currentUnitType={unitType}
-                    previousQuantity={referenceQuantity ?? undefined}
-                    previousUnitType={referenceUnitType ?? undefined}
+                    currentQuantity={bought.quantity}
+                    currentUnitType={bought.unit}
+                    previousQuantity={referenceBought?.quantity}
+                    previousUnitType={referenceBought?.unit}
                   />
                 ) : null}
               </div>
@@ -350,7 +416,7 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
                     <span className="font-semibold tabular-nums text-ios-label">
                       {currentUnitPrice}
                     </span>{" "}
-                    at {formatQty(quantity, unitType)}
+                    at {formatQtyWithSize(quantity, unitType, size)}
                   </>
                 ) : null}
                 {currentUnitPrice && referenceUnitPrice ? " · " : null}
@@ -389,7 +455,12 @@ export function PurchaseSheet({ item, editable = true, allowClosed, onClose }: P
                   <span className="text-[14px] font-medium tabular-nums">
                     {formatPrice(entry.price)}
                     <span className="ml-1.5 text-[12px] font-normal text-ios-label-2">
-                      for {formatQty(entry.quantity, entry.unitType)}
+                      for{" "}
+                      {formatQtyWithSize(
+                        entry.quantity,
+                        entry.unitType,
+                        sizeOf(entry.sizeValue, entry.sizeUnit),
+                      )}
                     </span>
                   </span>
                   {/* Shop first — where you bought it is what makes an old

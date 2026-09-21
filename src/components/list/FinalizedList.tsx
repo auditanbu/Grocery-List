@@ -2,7 +2,14 @@
 
 import { groupByShop } from "@/components/list/DraftEditor";
 import { displayName, useLanguage } from "@/lib/language";
-import { formatPrice, formatQty, projectPrice, unitGroup } from "@/lib/units";
+import {
+  formatPrice,
+  formatQtyWithSize,
+  projectPrice,
+  sizeOf,
+  totalAmount,
+  unitGroup,
+} from "@/lib/units";
 import type { ListItemDTO } from "@/lib/types";
 
 /**
@@ -13,13 +20,21 @@ import type { ListItemDTO } from "@/lib/types";
 function estimatedCost(item: ListItemDTO): number {
   if (item.lastPrice === null) return 0;
   if (item.lastPriceQuantity === null || item.lastPriceUnitType === null) return item.lastPrice;
-  if (unitGroup(item.lastPriceUnitType) !== unitGroup(item.unitType)) return item.lastPrice;
-  const projected = projectPrice(
-    item.lastPrice,
+  // Both sides as packs × size, so planning 150 g this month against a
+  // 200 g purchase last month estimates the smaller pack, not the old one.
+  const planned = totalAmount(item.quantity, item.unitType, sizeOf(item.sizeValue, item.sizeUnit));
+  const paid = totalAmount(
     item.lastPriceQuantity,
     item.lastPriceUnitType,
-    item.quantity,
-    item.unitType,
+    sizeOf(item.lastPriceSizeValue, item.lastPriceSizeUnit),
+  );
+  if (unitGroup(paid.unit) !== unitGroup(planned.unit)) return item.lastPrice;
+  const projected = projectPrice(
+    item.lastPrice,
+    paid.quantity,
+    paid.unit,
+    planned.quantity,
+    planned.unit,
   );
   return projected ?? item.lastPrice;
 }
@@ -76,7 +91,11 @@ export function FinalizedList({ items, shopName, emptyMessage }: FinalizedListPr
                       {name.primary}
                     </span>
                     <span className="flex-none text-[15px] font-semibold tabular-nums">
-                      {formatQty(item.quantity, item.unitType)}
+                      {formatQtyWithSize(
+                        item.quantity,
+                        item.unitType,
+                        sizeOf(item.sizeValue, item.sizeUnit),
+                      )}
                     </span>
                   </li>
                 );

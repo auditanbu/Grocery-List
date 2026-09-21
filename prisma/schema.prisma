@@ -94,10 +94,14 @@ model Item {
   /// Default shop ("From"); can be overridden per list item.
   shopId          Int?
   isActive        Boolean  @default(true)
-  /// Marked in the source spreadsheet as sold in inconsistent pack sizes
-  /// (soaps, pastes, shampoos, ...). Only these items expose the
-  /// quantity/unit editor while shopping and on the create/edit item form.
-  hasVariableUnit Boolean  @default(false)
+  /// Pack size — what one of this item comes in: a 200 g tube of paste, a
+  /// 500 ml bottle of dish wash. Null for anything sold loose, where the
+  /// quantity is already the measure (2 kg of dal). Only countable items
+  /// carry one: `defaultQty` then counts packs and the size says how big
+  /// each pack is, which is the part that changes at the shop when the
+  /// store only stocks 150 g.
+  sizeValue       Decimal? @db.Decimal(10, 2)
+  sizeUnit        UnitType?
   notes           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -141,6 +145,11 @@ model GroceryListItem {
   quantity Decimal  @db.Decimal(10, 2)
   /// Snapshot of the item's unit at the time it was added.
   unitType UnitType
+  /// Snapshot of the item's pack size, and the one field shopping is meant
+  /// to change: the list says 200 g, the shop only has 150 g, so the row is
+  /// re-sized before the price is recorded. Null for items sold loose.
+  sizeValue Decimal?  @db.Decimal(10, 2)
+  sizeUnit  UnitType?
   /// Shop this row must be bought from (overrides Item.shopId).
   shopId   Int?
 
@@ -154,6 +163,10 @@ model GroceryListItem {
   /// purchases (e.g. 150g this month vs. 200g last month).
   previousQuantity Decimal?  @db.Decimal(10, 2)
   previousUnitType UnitType?
+  /// ...and of the pack size it was paid for, since that is where a
+  /// packaged item's amount actually lives (1 × 200 g, then 1 × 150 g).
+  previousSizeValue Decimal?  @db.Decimal(10, 2)
+  previousSizeUnit  UnitType?
   purchasedAt      DateTime?
 
   sortOrder Int      @default(0)
@@ -179,6 +192,10 @@ model PriceHistory {
   price       Decimal  @db.Decimal(10, 2)
   quantity    Decimal  @db.Decimal(10, 2)
   unitType    UnitType
+  /// Pack size the price was paid for — "₹95 for 1 × 200 g". Null for
+  /// items sold loose.
+  sizeValue   Decimal?  @db.Decimal(10, 2)
+  sizeUnit    UnitType?
   purchasedAt DateTime @default(now())
 
   item Item         @relation(fields: [itemId], references: [id], onDelete: Cascade)

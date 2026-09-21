@@ -108,13 +108,13 @@ app works out of the box. To load your actual spreadsheet:
 The importer is idempotent (safe to re-run), creates categories/shops on
 demand, and reports anything it had to skip.
 
-Items sold in inconsistent pack sizes (soaps, pastes, shampoos, ...) can be
-marked for the quantity/unit editor by adding two optional columns to the
-same CSV: `Unit` (pack size, e.g. `200`) and `Unit Type` (`g` | `ml` | `kg` |
-`L` | blank). A row with a non-blank `Unit` is treated as marked, and its
-value becomes the item's default pack size — see
-`prisma/data/master-data.json`'s `unit`/`variableUnit` fields for the
-current set (synced from a supplementary spreadsheet).
+Items sold by the packet (soaps, pastes, shampoos, ...) carry a **pack
+size**, added through two optional columns on the same CSV: `Unit` (the
+size, e.g. `200`) and `Unit Type` (`g` | `ml` | `kg` | `L` | blank). A row
+with a non-blank `Unit` is treated as packaged: the item becomes countable
+at one pack, and `200 g` lands in `sizeValue`/`sizeUnit` rather than in the
+quantity — see `prisma/data/master-data.json`'s `unit`/`variableUnit`
+fields for the current set (synced from a supplementary spreadsheet).
 
 ## 2. Prisma schema
 
@@ -125,18 +125,21 @@ current set (synced from a supplementary spreadsheet).
 - **`Item`** — master catalogue: `Grocery`/`Grocery.1`/Tanglish names,
   `unitType`
   (`KG | G | L | ML | RS | COUNT`, from `Qty Type`), default shop, default
-  quantity, and `hasVariableUnit` — marks items sold in inconsistent pack
-  sizes, which get a quantity/unit editor on the create/edit form and while
-  shopping (see `src/lib/units.ts`'s `projectPrice` for how the price
-  comparison stays fair when the size changes between purchases).
+  quantity, and `sizeValue`/`sizeUnit` — the **pack size**, what one of the
+  item comes in (a 200 g tube of paste). Only countable items carry one:
+  the quantity then counts packs and the size says how big each is. Null
+  means the item is sold loose and its quantity is already the measure
+  (2 kg of dal).
 - **`GroceryList`** — one row per month (`monthKey = "YYYY-MM"`, unique),
   with `status: DRAFT | FINALIZED | COMPLETED`.
-- **`GroceryListItem`** — a line on a list: quantity, unit snapshot, shop
-  override, purchase state (`isPurchased`, `purchasePrice`,
-  `previousPrice`).
-- **`PriceHistory`** — append-only ledger of what was actually paid, used
-  to power the "cheaper/dearer than last time" comparison and the History
-  tab.
+- **`GroceryListItem`** — a line on a list: quantity, unit and pack-size
+  snapshot (`sizeValue`/`sizeUnit` — the size is re-typed while shopping
+  when the shop only has 150 g), shop override, purchase state
+  (`isPurchased`, `purchasePrice`, `previousPrice`, and the
+  `previousQuantity`/`previousSize*` the comparison needs).
+- **`PriceHistory`** — append-only ledger of what was actually paid, at
+  which quantity and pack size, used to power the "cheaper/dearer than last
+  time" comparison and the History tab.
 - **`FamilyMember`** / **`FamilyRelationship`** — the Family Tree module
   (see §6): one row per person, and a directed `PARENT_OF` or `SPOUSE_OF`
   edge between two of them.
@@ -218,14 +221,18 @@ once the list has been finalized and reality starts diverging from the plan:
   item is checked off the row's stepper drops away — its quantity is then
   the purchase sheet's business, because changing it has to re-price the
   item too.
-- **The purchase sheet can correct the quantity as well.** What you meant
-  to buy and what you walked out with often differ, and you usually only
-  notice at the till — so `PurchaseSheet` shows the amount next to a small
-  edit button, which reveals the same stepper. Saving applies the size
-  change before `recordPurchase`, so the price you type is recorded against
-  the quantity you actually bought and the `PriceHistory` row snapshots
-  both together. Items marked `hasVariableUnit` open with the editor
-  already showing, since those are expected to need it.
+- **The purchase sheet corrects the size and the quantity**, and keeps the
+  two apart because they go wrong for different reasons. For a packaged
+  item `PurchaseSheet` shows a **Size** box outright — the shop only had
+  the 150 g tube, which is the single most common surprise at the shelf —
+  while the **quantity** (how many packs) stays behind a small edit button.
+  Saving applies both through `updateListItem` before `recordPurchase`, so
+  the price you type is recorded against what actually went in the basket,
+  and the `PriceHistory` row snapshots quantity *and* size together.
+- **Every comparison runs on packs × size** (`totalAmount` in
+  `src/lib/units.ts`, then `projectPrice`). ₹95 for one 150 g tube against
+  ₹95 for one 200 g tube is dearer, not "same as last time", and the per-kg
+  figure under the price pill says by how much.
 - **Add item** (`ShopAddSheet`) covers what never made the list. It
   searches the master catalogue server-side, and anything genuinely new can
   be created on the spot — Tamil / Tanglish / English name, category, unit,

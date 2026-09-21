@@ -1,7 +1,13 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
-import { UNIT_LABEL, displayUnitFor, formatQtyValue, type UnitType } from "./units";
+import {
+  UNIT_LABEL,
+  displayUnitFor,
+  formatQtyValue,
+  sizeOf,
+  type UnitType,
+} from "./units";
 
 export type PdfItem = {
   nameEn: string;
@@ -10,6 +16,9 @@ export type PdfItem = {
   nameTl?: string | null;
   quantity: number;
   unitType: UnitType;
+  /** Pack size, for items bought by the packet. Null when sold loose. */
+  sizeValue?: number | null;
+  sizeUnit?: UnitType | null;
   shopName: string | null;
   categoryName: string | null;
 };
@@ -159,6 +168,20 @@ function buildLatinPdf(items: PdfItem[], options: PdfOptions): jsPDF {
   return doc;
 }
 
+/**
+ * A packaged item prints as its count against its pack size ("1 | 200 g")
+ * — which is the pair that matters at the counter — rather than "1 | nos",
+ * which would leave the size on the shelf label to guesswork.
+ */
+function unitCellFor(item: PdfItem, display: { unit: UnitType }, label: Record<UnitType, string>): string {
+  const size = sizeOf(item.sizeValue, item.sizeUnit);
+  if (size && item.unitType === "COUNT") {
+    const sizeDisplay = displayUnitFor(size.value, size.unit);
+    return `${formatQtyValue(sizeDisplay.quantity, sizeDisplay.unit)} ${label[sizeDisplay.unit]}`.trim();
+  }
+  return label[display.unit];
+}
+
 function rowFor(item: PdfItem, serial: number, language: PdfLanguage): string[] {
   const display = displayUnitFor(item.quantity, item.unitType);
   const name = language === "tl" ? (item.nameTl?.trim() || item.nameEn) : item.nameEn;
@@ -166,7 +189,7 @@ function rowFor(item: PdfItem, serial: number, language: PdfLanguage): string[] 
     String(serial),
     name,
     formatQtyValue(display.quantity, display.unit),
-    UNIT_LABEL[display.unit] || "nos",
+    unitCellFor(item, display, UNIT_LABEL) || "nos",
     "",
   ];
 }
@@ -290,7 +313,7 @@ function tamilRowHtml(row: TamilRow, rowIndex: number, scale: number): string {
     <td style="${pad} text-align:center;color:#666;">${serial}</td>
     <td style="${pad} font-weight:600;">${escapeHtml(item.nameTa)}</td>
     <td style="${pad} text-align:right;">${escapeHtml(formatQtyValue(display.quantity, display.unit))}</td>
-    <td style="${pad} text-align:center;">${escapeHtml(TAMIL_UNIT_LABEL[display.unit])}</td>
+    <td style="${pad} text-align:center;">${escapeHtml(unitCellFor(item, display, TAMIL_UNIT_LABEL))}</td>
     <td style="${pad}"></td>
   </tr>`;
 }

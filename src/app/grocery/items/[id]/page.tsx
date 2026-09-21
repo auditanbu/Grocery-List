@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { PriceDelta } from "@/components/PriceDelta";
 import { formatDate } from "@/lib/dates";
 import { getMasterItems, getPriceHistory } from "@/lib/queries";
-import { formatPrice, formatQty } from "@/lib/units";
+import { formatPrice, formatQtyWithSize, sizeOf, totalAmount } from "@/lib/units";
 
 export const dynamic = "force-dynamic";
 
@@ -53,13 +53,32 @@ export default async function ItemHistoryPage({ params }: { params: Promise<{ id
         <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
           {history.map((entry, index) => {
             const previousEntry = history[index + 1] ?? null;
+            // Compared on what was actually bought — packs × pack size —
+            // so a month where only the size changed still shows a delta.
+            const bought = totalAmount(
+              entry.quantity,
+              entry.unitType,
+              sizeOf(entry.sizeValue, entry.sizeUnit),
+            );
+            const previousBought = previousEntry
+              ? totalAmount(
+                  previousEntry.quantity,
+                  previousEntry.unitType,
+                  sizeOf(previousEntry.sizeValue, previousEntry.sizeUnit),
+                )
+              : null;
             return (
               <li key={entry.id} className="ios-row">
                 <span className="min-w-0 flex-1">
                   <span className="block text-[16px] font-medium">
                     {formatPrice(entry.price)}
                     <span className="ml-2 text-[13px] font-normal text-ios-label-2">
-                      for {formatQty(entry.quantity, entry.unitType)}
+                      for{" "}
+                      {formatQtyWithSize(
+                        entry.quantity,
+                        entry.unitType,
+                        sizeOf(entry.sizeValue, entry.sizeUnit),
+                      )}
                     </span>
                   </span>
                   <span className="block truncate text-[13px] text-ios-label-2">
@@ -70,10 +89,10 @@ export default async function ItemHistoryPage({ params }: { params: Promise<{ id
                 <PriceDelta
                   current={entry.price}
                   previous={previousEntry?.price ?? null}
-                  currentQuantity={entry.quantity}
-                  currentUnitType={entry.unitType}
-                  previousQuantity={previousEntry?.quantity}
-                  previousUnitType={previousEntry?.unitType}
+                  currentQuantity={bought.quantity}
+                  currentUnitType={bought.unit}
+                  previousQuantity={previousBought?.quantity}
+                  previousUnitType={previousBought?.unit}
                 />
               </li>
             );

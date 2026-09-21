@@ -22,9 +22,11 @@ export type MasterRow = {
   /** "From" — shop name */
   from: string;
   /**
-   * Marks an item as sold in inconsistent pack sizes (soaps, pastes,
-   * shampoos, ...) — from the supplementary "Unit"/"Unit Type" sheet.
-   * Only items marked here get the quantity/unit editor while shopping.
+   * Marks an item as sold by the packet (soaps, pastes, shampoos, ...) —
+   * from the supplementary "Unit"/"Unit Type" sheet. Together with `unit`
+   * and `qtyType` it becomes the item's pack size: the item turns
+   * countable at one pack, and "200 g" moves into `sizeValue`/`sizeUnit`,
+   * which is what gets changed at the shop when only 150 g is in stock.
    */
   variableUnit?: boolean;
   /** Pack size ("Unit" column) — overrides the default-quantity heuristic below. */
@@ -108,11 +110,27 @@ export async function importMasterData(prisma: PrismaClient, data: MasterData) {
       continue;
     }
 
-    const unitType = parseUnitType(row.qtyType);
+    const declaredUnit = parseUnitType(row.qtyType);
     const shopId = shopIds.get(row.from?.trim() ?? "") ?? null;
-    const hasVariableUnit = row.variableUnit ?? false;
-    const defaultQty =
-      row.unit !== undefined ? row.unit : unitType === "G" || unitType === "ML" ? 100 : 1;
+
+    // A marked row's "Unit"/"Qty Type" pair describes one packet, not an
+    // amount to buy: "200 g" of paste is the tube, and the quantity is how
+    // many tubes. Anything else keeps its measure in the quantity.
+    const packed =
+      (row.variableUnit ?? false) &&
+      row.unit !== undefined &&
+      declaredUnit !== "COUNT" &&
+      declaredUnit !== "RS";
+    const unitType = packed ? ("COUNT" as const) : declaredUnit;
+    const sizeValue = packed ? (row.unit as number) : null;
+    const sizeUnit = packed ? declaredUnit : null;
+    const defaultQty = packed
+      ? 1
+      : row.unit !== undefined
+        ? row.unit
+        : unitType === "G" || unitType === "ML"
+          ? 100
+          : 1;
     const existing = await prisma.item.findUnique({
       where: { nameEn_categoryId: { nameEn, categoryId } },
       select: { id: true },
@@ -130,7 +148,8 @@ export async function importMasterData(prisma: PrismaClient, data: MasterData) {
         unitType,
         shopId,
         isActive: true,
-        hasVariableUnit,
+        sizeValue,
+        sizeUnit,
         ...(row.unit !== undefined ? { defaultQty } : {}),
       },
       create: {
@@ -141,7 +160,8 @@ export async function importMasterData(prisma: PrismaClient, data: MasterData) {
         categoryId,
         shopId,
         defaultQty,
-        hasVariableUnit,
+        sizeValue,
+        sizeUnit,
       },
     });
 

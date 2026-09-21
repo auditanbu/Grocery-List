@@ -30,6 +30,8 @@ type LastPriceEntry = {
   at: Date;
   quantity: number;
   unitType: UnitType;
+  sizeValue: number | null;
+  sizeUnit: UnitType | null;
   shopName: string | null;
 };
 
@@ -52,6 +54,8 @@ async function lastPriceMap(itemIds: number[], excludeListId?: number) {
       purchasedAt: true,
       quantity: true,
       unitType: true,
+      sizeValue: true,
+      sizeUnit: true,
       shop: { select: { name: true } },
     },
   });
@@ -64,6 +68,8 @@ async function lastPriceMap(itemIds: number[], excludeListId?: number) {
         at: row.purchasedAt,
         quantity: num(row.quantity),
         unitType: row.unitType,
+        sizeValue: numOrNull(row.sizeValue),
+        sizeUnit: row.sizeUnit,
         shopName: row.shop?.name ?? null,
       });
     }
@@ -135,11 +141,14 @@ export async function getMasterItems(options?: {
     shopId: item.shopId,
     shopName: item.shop?.name ?? null,
     isActive: item.isActive,
-    hasVariableUnit: item.hasVariableUnit,
+    sizeValue: numOrNull(item.sizeValue),
+    sizeUnit: item.sizeUnit,
     lastPrice: last?.price ?? null,
     lastPriceAt: last?.at.toISOString() ?? null,
     lastPriceQuantity: last?.quantity ?? null,
     lastPriceUnitType: last?.unitType ?? null,
+    lastPriceSizeValue: last?.sizeValue ?? null,
+    lastPriceSizeUnit: last?.sizeUnit ?? null,
     lastPriceShopName: last?.shopName ?? null,
     };
   });
@@ -244,6 +253,8 @@ export async function getList(id: number): Promise<ListDetailDTO | null> {
       categoryNameTa: row.item.category.nameTa,
       unitType: row.unitType,
       quantity: num(row.quantity),
+      sizeValue: numOrNull(row.sizeValue),
+      sizeUnit: row.sizeUnit,
       shopId: row.shopId,
       shopName: row.shop?.name ?? null,
       isPurchased: row.isPurchased,
@@ -251,10 +262,13 @@ export async function getList(id: number): Promise<ListDetailDTO | null> {
       previousPrice: numOrNull(row.previousPrice),
       previousQuantity: numOrNull(row.previousQuantity),
       previousUnitType: row.previousUnitType,
+      previousSizeValue: numOrNull(row.previousSizeValue),
+      previousSizeUnit: row.previousSizeUnit,
       lastPrice: last?.price ?? null,
       lastPriceQuantity: last ? last.quantity : null,
       lastPriceUnitType: last ? last.unitType : null,
-      hasVariableUnit: row.item.hasVariableUnit,
+      lastPriceSizeValue: last ? last.sizeValue : null,
+      lastPriceSizeUnit: last ? last.sizeUnit : null,
     };
   });
 
@@ -280,6 +294,8 @@ export async function getPriceHistory(itemId: number): Promise<PriceHistoryDTO[]
     price: num(row.price),
     quantity: num(row.quantity),
     unitType: row.unitType,
+    sizeValue: numOrNull(row.sizeValue),
+    sizeUnit: row.sizeUnit,
     purchasedAt: row.purchasedAt.toISOString(),
     shopName: row.shop?.name ?? null,
     listName: row.list?.name ?? null,

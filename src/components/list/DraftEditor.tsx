@@ -16,7 +16,13 @@ import {
 } from "@/lib/actions";
 import { monthKeyToLabel } from "@/lib/dates";
 import { displayName, displayNameLine, useLanguage } from "@/lib/language";
-import { formatPrice, formatQty, type UnitType } from "@/lib/units";
+import {
+  formatPrice,
+  formatQty,
+  formatQtyWithSize,
+  sizeOf,
+  type UnitType,
+} from "@/lib/units";
 import type { ListDetailDTO, ListItemDTO, PriceHistoryDTO, ShopDTO } from "@/lib/types";
 
 type DraftEditorProps = {
@@ -220,7 +226,13 @@ export function DraftEditor({ list }: DraftEditorProps) {
                     <div className="flex items-start gap-3">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[16px] font-medium">{name.primary}</p>
-                        <p className="truncate text-[13px] text-ios-label-2">{name.secondary}</p>
+                        <p className="truncate text-[13px] text-ios-label-2">
+                          {name.secondary}
+                          {/* The pack size the stepper above is counting. */}
+                          {sizeOf(item.sizeValue, item.sizeUnit)
+                            ? ` · ${formatQty(item.sizeValue as number, item.sizeUnit as UnitType)} each`
+                            : ""}
+                        </p>
                         {stateOf(item).quantity === 0 ? (
                           <span className="mt-0.5 inline-flex items-center rounded-full bg-ios-orange/15 px-2 py-0.5 text-[11px] font-medium text-ios-orange">
                             Check availability
@@ -290,7 +302,12 @@ export function DraftEditor({ list }: DraftEditorProps) {
                                 <span className="text-[13px] font-medium tabular-nums">
                                   {formatPrice(entry.price)}
                                   <span className="ml-1.5 text-[12px] font-normal text-ios-label-2">
-                                    for {formatQty(entry.quantity, entry.unitType)}
+                                    for{" "}
+                                    {formatQtyWithSize(
+                                      entry.quantity,
+                                      entry.unitType,
+                                      sizeOf(entry.sizeValue, entry.sizeUnit),
+                                    )}
                                   </span>
                                 </span>
                                 <span className="text-[12px] text-ios-label-3">

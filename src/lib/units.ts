@@ -146,6 +146,64 @@ export function formatQtyValue(value: number, unit: UnitType): string {
   return fixed.includes(".") ? fixed.replace(/0+$/, "").replace(/\.$/, "") : fixed;
 }
 
+/**
+ * A pack size: what one of a countable item contains — a 200 g tube of
+ * paste, a 500 ml bottle of dish wash. Kept apart from the quantity, which
+ * counts packs: at the shop the number of tubes rarely changes, the size on
+ * the shelf does.
+ */
+export type PackSize = { value: number; unit: UnitType };
+
+/** A size is always a measure — never a count of things or a rupee amount. */
+export const SIZE_UNITS: UnitType[] = ["G", "ML", "KG", "L"];
+
+/** Pairs the two nullable columns a size is stored in back into one value. */
+export function sizeOf(
+  value: number | null | undefined,
+  unit: UnitType | null | undefined,
+): PackSize | null {
+  if (value === null || value === undefined || !Number.isFinite(value) || value <= 0) return null;
+  if (!unit) return null;
+  return { value, unit };
+}
+
+/**
+ * Sizes are whatever the packet says (75 g, 200 g, 1.5 L), so unlike a
+ * quantity they are never snapped onto the unit's step grid — only rounded
+ * to the two decimals the column stores.
+ */
+export function roundSize(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * What a row actually amounts to: packs × pack size (2 × 200 g = 400 g).
+ * Anything sold loose has no size and its quantity is already the measure.
+ *
+ * This is the figure every price comparison runs on, which is what keeps a
+ * size changed at the shop honest: ₹95 for 150 g is dearer than ₹95 for
+ * 200 g, even though both are "one tube for ₹95".
+ */
+export function totalAmount(
+  quantity: number,
+  unit: UnitType,
+  size: PackSize | null,
+): { quantity: number; unit: UnitType } {
+  if (!size || unit !== "COUNT") return { quantity, unit };
+  return { quantity: roundQty(quantity * size.value, size.unit), unit: size.unit };
+}
+
+/** "200 g" for a single pack, "2 × 200 g" for more, plain "2 kg" when loose. */
+export function formatQtyWithSize(
+  quantity: number,
+  unit: UnitType,
+  size: PackSize | null,
+): string {
+  if (!size || unit !== "COUNT") return formatQty(quantity, unit);
+  const sizeText = formatQty(size.value, size.unit);
+  return quantity === 1 ? sizeText : `${formatQtyValue(quantity, unit)} × ${sizeText}`;
+}
+
 /** "500 g", "1 kg", "1.5 kg", "₹10", "3" — kg/L under 1 shown as g/ml. */
 export function formatQty(value: number, unit: UnitType): string {
   const display = displayUnitFor(value, unit);

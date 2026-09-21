@@ -6,6 +6,7 @@ import { useMemo, useState, useTransition } from "react";
 
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { Sheet } from "@/components/Sheet";
+import { SizeField } from "@/components/SizeField";
 import { Stepper } from "@/components/Stepper";
 import {
   deleteCategory,
@@ -23,6 +24,7 @@ import {
   formatPrice,
   formatQty,
   normalizeQty,
+  sizeOf,
   unitOptionLabel,
   type UnitType,
 } from "@/lib/units";
@@ -44,7 +46,9 @@ type Draft = {
   shopId: number | null;
   defaultQty: number;
   isActive: boolean;
-  hasVariableUnit: boolean;
+  /** Pack size, for countable items sold in packs. Null when sold loose. */
+  sizeValue: number | null;
+  sizeUnit: UnitType | null;
 };
 
 /** True when the Tamil name was never actually set — it's just a copy of the English name. */
@@ -127,7 +131,8 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
       shopId: null,
       defaultQty: 1,
       isActive: true,
-      hasVariableUnit: false,
+      sizeValue: null,
+      sizeUnit: null,
     });
 
   const startEdit = (item: MasterItemDTO) =>
@@ -141,7 +146,8 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
       shopId: item.shopId,
       defaultQty: item.defaultQty || 1,
       isActive: item.isActive,
-      hasVariableUnit: item.hasVariableUnit,
+      sizeValue: item.sizeValue,
+      sizeUnit: item.sizeUnit,
     });
 
   const save = () => {
@@ -402,9 +408,9 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
                       <span className="block truncate text-[13px] text-ios-label-2">
                         {name.secondary} · {unitOptionLabel(item.unitType)}
                         {item.shopName ? ` · ${item.shopName}` : ""}
-                        {item.hasVariableUnit ? (
+                        {sizeOf(item.sizeValue, item.sizeUnit) ? (
                           <span className="ml-1.5 rounded-full bg-ios-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator">
-                            Variable
+                            {formatQty(item.sizeValue as number, item.sizeUnit as UnitType)}
                           </span>
                         ) : null}
                         {needsTamil(item) ? (
@@ -524,6 +530,9 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
                         ...draft,
                         unitType: unit,
                         defaultQty: normalizeQty(draft.defaultQty, unit),
+                        // A size only means something when the quantity counts
+                        // packs; measured items carry their amount already.
+                        ...(unit === "COUNT" ? {} : { sizeValue: null, sizeUnit: null }),
                       })
                     }
                     className={`h-10 rounded-full px-4 text-[15px] font-medium transition active:scale-95 ${
@@ -538,7 +547,7 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
               </div>
             </Field>
 
-            <Field label={`Unit size (${formatQty(draft.defaultQty, draft.unitType)})`}>
+            <Field label={`Default quantity (${formatQty(draft.defaultQty, draft.unitType)})`}>
               <Stepper
                 value={draft.defaultQty}
                 unit={draft.unitType}
@@ -546,33 +555,35 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
               />
             </Field>
 
-            <Field label="Variable size">
-              <button
-                type="button"
-                onClick={() => setDraft({ ...draft, hasVariableUnit: !draft.hasVariableUnit })}
-                className="flex w-full items-center justify-between gap-3 rounded-ios bg-ios-surface-2 px-4 py-3 text-left ring-1 ring-inset ring-ios-separator"
-              >
-                <span className="text-[15px] text-ios-label-1">
-                  Allow unit size changes while shopping
-                </span>
-                <span
-                  aria-hidden
-                  className={`relative h-7 w-12 flex-none rounded-full transition ${
-                    draft.hasVariableUnit ? "bg-ios-green" : "bg-ios-separator"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition ${
-                      draft.hasVariableUnit ? "left-[22px]" : "left-0.5"
-                    }`}
+            <Field
+              label={`Size${
+                sizeOf(draft.sizeValue, draft.sizeUnit)
+                  ? ` (${formatQty(draft.sizeValue as number, draft.sizeUnit as UnitType)})`
+                  : ""
+              }`}
+            >
+              {draft.unitType === "COUNT" ? (
+                <>
+                  <SizeField
+                    value={draft.sizeValue}
+                    unit={draft.sizeUnit}
+                    clearable
+                    onChange={(sizeValue, sizeUnit) => setDraft({ ...draft, sizeValue, sizeUnit })}
+                    aria-label="Size of one pack"
                   />
-                </span>
-              </button>
-              <p className="pt-1.5 text-[12px] text-ios-label-3">
-                For items sold in inconsistent pack sizes (soaps, pastes,
-                shampoos, ...) — like &ldquo;{formatQty(draft.defaultQty, draft.unitType)}&rdquo;
-                above, when a store only stocks a different size or pack.
-              </p>
+                  <p className="pt-1.5 text-[12px] text-ios-label-3">
+                    What one comes in — a 200 g paste, a 500 ml bottle. The
+                    quantity above stays the number of packs, and the size is
+                    what you change while shopping when the shop only has 150 g.
+                  </p>
+                </>
+              ) : (
+                <p className="text-[12px] text-ios-label-3">
+                  Items measured in {unitOptionLabel(draft.unitType)} carry their
+                  amount in the quantity already. Switch Unit type to Countable
+                  to give this item a pack size.
+                </p>
+              )}
             </Field>
 
             <Field label="Shop by (From)">
