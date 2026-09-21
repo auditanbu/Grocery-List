@@ -18,11 +18,9 @@ import {
   formatQtyValue,
   formatQtyWithSize,
   formatUnitPrice,
-  projectPrice,
   rateBasisLabel,
   sizeOf,
   totalAmount,
-  unitGroup,
   type RateBasis,
   type UnitType,
 } from "@/lib/units";
@@ -81,7 +79,6 @@ export function PurchaseSheet({
   const [history, setHistory] = useState<PriceHistoryDTO[] | null>(null);
   const [editingQuantity, setEditingQuantity] = useState(false);
   const [editingShop, setEditingShop] = useState(false);
-  const [comparing, setComparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -94,7 +91,6 @@ export function PurchaseSheet({
     setShopId(item?.shopId ?? null);
     setEditingQuantity(false);
     setEditingShop(false);
-    setComparing(false);
     setError(null);
     setHistory(null);
     if (item) {
@@ -136,16 +132,6 @@ export function PurchaseSheet({
       : null;
 
   const canCompare = reference !== null && referenceBought !== null;
-  const projected =
-    canCompare && unitGroup(referenceBought.unit) === unitGroup(bought.unit)
-      ? projectPrice(
-          reference as number,
-          referenceBought.quantity,
-          referenceBought.unit,
-          bought.quantity,
-          bought.unit,
-        )
-      : null;
 
   // The rate that survives a change of pack size: ₹212 for 4 kg and ₹212 for
   // 8 kg are the same rupees and a very different deal. Read off the total
@@ -260,14 +246,35 @@ export function PurchaseSheet({
       footer={
         editable ? (
           <div className="space-y-2">
-            <button
-              type="button"
-              onClick={save}
-              disabled={pending}
-              className="flex h-12 w-full items-center justify-center rounded-ios bg-ios-blue text-[17px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
-            >
-              {pending ? "Saving…" : item.isPurchased ? "Update price" : "Mark as bought"}
-            </button>
+            {/* One row: at the shelf this is a single motion — type what it
+                cost, confirm — and a field that scrolls with the body while
+                the button stays pinned makes you look in two places. */}
+            <div className="flex items-stretch gap-2">
+              <div className="flex min-w-0 flex-1 items-center rounded-ios bg-ios-surface-2 px-3 ring-1 ring-inset ring-ios-separator focus-within:ring-2 focus-within:ring-ios-blue">
+                <span className="flex-none text-[20px] font-semibold text-ios-label-2">₹</span>
+                <input
+                  autoFocus
+                  type="text"
+                  inputMode="decimal"
+                  value={price}
+                  onChange={(event) => setPrice(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") save();
+                  }}
+                  placeholder="0.00"
+                  aria-label="Price paid"
+                  className="h-12 w-full min-w-0 bg-transparent px-2 text-[20px] font-semibold tabular-nums outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={save}
+                disabled={pending}
+                className="flex h-12 flex-none items-center justify-center rounded-ios bg-ios-blue px-4 text-[16px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-50"
+              >
+                {pending ? "Saving…" : item.isPurchased ? "Update price" : "Mark as bought"}
+              </button>
+            </div>
             {item.isPurchased ? (
               <button
                 type="button"
@@ -358,129 +365,7 @@ export function PurchaseSheet({
           </div>
         ) : null}
 
-        {/* Where it was actually bought. The row's shop is a copy of the
-            master item's, taken when it was added, and until now nothing
-            could correct it once the list was finalized — so an item whose
-            usual shop changed stayed stranded under the old one. It also
-            decides which shop this price is recorded against. */}
-        {editable ? (
-          <div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[13px] font-medium text-ios-label-2">
-                Bought at
-                {shopChanged ? (
-                  <span className="ml-1.5 font-normal text-ios-blue">
-                    (list said {shopLabel(item.shopId)})
-                  </span>
-                ) : null}
-              </span>
-              {editingShop ? null : (
-                <button
-                  type="button"
-                  onClick={() => setEditingShop(true)}
-                  aria-label={`Change shop, currently ${shopLabel(shopId)}`}
-                  className="flex h-8 flex-none items-center gap-1.5 rounded-full bg-ios-surface-2 px-3 text-[14px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator transition active:scale-95"
-                >
-                  <span className="max-w-[9rem] truncate">{shopLabel(shopId)}</span>
-                  <PencilIcon />
-                </button>
-              )}
-            </div>
-
-            {editingShop ? (
-              <div className="mt-1.5 flex flex-wrap gap-2">
-                {[...shops.map((shop) => ({ id: shop.id as number | null, name: shop.name })), { id: null, name: "Not set" }].map(
-                  (shop) => (
-                    <button
-                      key={shop.id ?? "none"}
-                      type="button"
-                      onClick={() => setShopId(shop.id)}
-                      className={`h-10 rounded-full px-4 text-[15px] font-medium transition active:scale-95 ${
-                        shopId === shop.id
-                          ? "bg-ios-blue text-white"
-                          : "bg-ios-surface-2 text-ios-label-2 ring-1 ring-inset ring-ios-separator"
-                      }`}
-                    >
-                      {shop.name}
-                    </button>
-                  ),
-                )}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {editable ? (
-          <div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[13px] font-medium text-ios-label-2">Price paid</span>
-              {canCompare ? (
-                <button
-                  type="button"
-                  onClick={() => setComparing((current) => !current)}
-                  aria-pressed={comparing}
-                  aria-label="Compare with the last price paid"
-                  title="Compare with the last price paid"
-                  className={`flex h-8 w-8 flex-none items-center justify-center rounded-full transition active:scale-95 ${
-                    comparing
-                      ? "bg-ios-blue text-white"
-                      : "bg-ios-surface-2 text-ios-blue ring-1 ring-inset ring-ios-separator"
-                  }`}
-                >
-                  <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
-                    <path
-                      d="M12 4v16M5 8h14M5 8l-2.5 5.5h5L5 8zm14 0l-2.5 5.5h5L19 8z"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.7"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-              ) : null}
-            </div>
-            <div className="mt-1.5 flex items-center rounded-ios bg-ios-surface-2 px-4 ring-1 ring-inset ring-ios-separator focus-within:ring-2 focus-within:ring-ios-blue">
-              <span className="text-[22px] font-semibold text-ios-label-2">₹</span>
-              <input
-                autoFocus
-                type="text"
-                inputMode="decimal"
-                value={price}
-                onChange={(event) => setPrice(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") save();
-                }}
-                placeholder="0.00"
-                aria-label="Price paid"
-                className="h-14 w-full bg-transparent px-2 text-[22px] font-semibold tabular-nums outline-none"
-              />
-            </div>
-
-            {comparing ? (
-              <div className="mt-2 rounded-ios bg-ios-surface-2 p-3 ring-1 ring-inset ring-ios-separator">
-                {projected !== null ? (
-                  <>
-                    <p className="text-[15px] font-semibold tabular-nums">
-                      ≈ {formatPrice(projected)}
-                      <span className="ml-1.5 text-[12px] font-normal text-ios-label-2">
-                        at {formatQtyWithSize(quantity, unitType, size)}
-                      </span>
-                    </p>
-                    <p className="mt-0.5 text-[12px] text-ios-label-2">
-                      Based on {formatPrice(reference as number)} for{" "}
-                      {referenceBought ? formatQty(referenceBought.quantity, referenceBought.unit) : null}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-[13px] text-ios-label-2">
-                    Last bought in a different kind of unit — nothing to compare against.
-                  </p>
-                )}
-              </div>
-            ) : null}
-          </div>
-        ) : (
+        {editable ? null : (
           // Closed list: what was paid, stated, with nothing to type into.
           <div>
             <p className="text-[13px] font-medium text-ios-label-2">Price paid</p>
@@ -596,6 +481,59 @@ export function PurchaseSheet({
             </ul>
           )}
         </div>
+
+        {/* Where it was actually bought. Last, because it is the one field
+            you rarely touch: the row's shop is a copy of the master item's,
+            taken when it was added, and is usually already right. When it
+            is not — the master default changed after the list was made —
+            nothing else could correct it once the list was finalized, and
+            it decides which shop this price is recorded against. */}
+        {editable ? (
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[13px] font-medium text-ios-label-2">
+                Bought at
+                {shopChanged ? (
+                  <span className="ml-1.5 font-normal text-ios-blue">
+                    (list said {shopLabel(item.shopId)})
+                  </span>
+                ) : null}
+              </span>
+              {editingShop ? null : (
+                <button
+                  type="button"
+                  onClick={() => setEditingShop(true)}
+                  aria-label={`Change shop, currently ${shopLabel(shopId)}`}
+                  className="flex h-8 flex-none items-center gap-1.5 rounded-full bg-ios-surface-2 px-3 text-[14px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator transition active:scale-95"
+                >
+                  <span className="max-w-[9rem] truncate">{shopLabel(shopId)}</span>
+                  <PencilIcon />
+                </button>
+              )}
+            </div>
+
+            {editingShop ? (
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                {[...shops.map((shop) => ({ id: shop.id as number | null, name: shop.name })), { id: null, name: "Not set" }].map(
+                  (shop) => (
+                    <button
+                      key={shop.id ?? "none"}
+                      type="button"
+                      onClick={() => setShopId(shop.id)}
+                      className={`h-10 rounded-full px-4 text-[15px] font-medium transition active:scale-95 ${
+                        shopId === shop.id
+                          ? "bg-ios-blue text-white"
+                          : "bg-ios-surface-2 text-ios-label-2 ring-1 ring-inset ring-ios-separator"
+                      }`}
+                    >
+                      {shop.name}
+                    </button>
+                  ),
+                )}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </Sheet>
   );
