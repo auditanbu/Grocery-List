@@ -7,6 +7,7 @@ import { useMemo, useState, useTransition } from "react";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { Sheet } from "@/components/Sheet";
 import { SizeField } from "@/components/SizeField";
+import { SizePill } from "@/components/SizePill";
 import { Stepper } from "@/components/Stepper";
 import {
   deleteCategory,
@@ -398,21 +399,27 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
                     className="ios-row min-w-0 flex-1 text-left active:bg-ios-surface-2"
                   >
                     <span className="min-w-0 flex-1">
-                      <span
-                        className={`block truncate text-[16px] font-medium ${
-                          item.isActive ? "" : "text-ios-label-3 line-through"
-                        }`}
-                      >
-                        {name.primary}
+                      {/* The size rides with the name, as it does on every
+                          list screen — beside it, not in the subtitle, where
+                          a long name and a shop push it past the truncation
+                          and the one thing you match against the shelf is
+                          the first thing to disappear. */}
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={`truncate text-[16px] font-medium ${
+                            item.isActive ? "" : "text-ios-label-3 line-through"
+                          }`}
+                        >
+                          {name.primary}
+                        </span>
+                        <SizePill
+                          size={sizeOf(item.sizeValue, item.sizeUnit)}
+                          dimmed={!item.isActive}
+                        />
                       </span>
                       <span className="block truncate text-[13px] text-ios-label-2">
                         {name.secondary} · {unitOptionLabel(item.unitType)}
                         {item.shopName ? ` · ${item.shopName}` : ""}
-                        {sizeOf(item.sizeValue, item.sizeUnit) ? (
-                          <span className="ml-1.5 rounded-full bg-ios-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator">
-                            {formatQty(item.sizeValue as number, item.sizeUnit as UnitType)}
-                          </span>
-                        ) : null}
                         {needsTamil(item) ? (
                           <span className="ml-1.5 rounded-full bg-ios-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-ios-orange ring-1 ring-inset ring-ios-separator">
                             Needs Tamil
