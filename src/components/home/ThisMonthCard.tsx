@@ -1,14 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useTransition } from "react";
 
-import { deleteList } from "@/lib/actions";
-import { useAdmin } from "@/lib/admin-context";
 import { formatPrice } from "@/lib/units";
 import type { ListSummaryDTO } from "@/lib/types";
-import { TrashIcon } from "@/components/home/ListRow";
 
 const STATUS_STYLES: Record<ListSummaryDTO["status"], string> = {
   DRAFT: "bg-ios-surface-2 text-ios-label-2",
@@ -22,28 +17,17 @@ const STATUS_LABELS: Record<ListSummaryDTO["status"], string> = {
   COMPLETED: "Done",
 };
 
-/** One of this month's lists — the home page can now hold several. */
+/**
+ * One of this month's lists — the home page can now hold several. Tapping it
+ * opens the list; deleting one lives inside, in the list's own menu.
+ */
 export function ThisMonthCard({ list }: { list: ListSummaryDTO }) {
-  const router = useRouter();
-  const { isAdmin } = useAdmin();
-  const [pending, startTransition] = useTransition();
-
   const percent = list.itemCount === 0 ? 0 : Math.round((list.purchasedCount / list.itemCount) * 100);
-
-  const remove = (event: React.MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!window.confirm(`Delete "${list.name}"? This can't be undone.`)) return;
-    startTransition(async () => {
-      await deleteList(list.id);
-      router.refresh();
-    });
-  };
 
   return (
     <div className="ios-card relative overflow-hidden">
       <Link href={`/grocery/lists/${list.id}`} className="block active:opacity-70">
-        <div className={`p-5 ${isAdmin ? "pr-14" : ""}`}>
+        <div className="p-5">
           <div className="flex items-start justify-between gap-3">
             <p className="min-w-0 truncate text-[20px] font-semibold tracking-tight">{list.name}</p>
             <span
@@ -71,18 +55,6 @@ export function ThisMonthCard({ list }: { list: ListSummaryDTO }) {
           </div>
         </div>
       </Link>
-
-      {isAdmin ? (
-        <button
-          type="button"
-          onClick={remove}
-          disabled={pending}
-          aria-label={`Delete ${list.name}`}
-          className="absolute right-4 top-4 flex h-8 w-8 flex-none items-center justify-center rounded-full bg-ios-surface text-ios-red shadow-ios transition active:bg-ios-red-soft disabled:opacity-50"
-        >
-          <TrashIcon />
-        </button>
-      ) : null}
     </div>
   );
 }

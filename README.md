@@ -308,6 +308,12 @@ once the list has been finalized and reality starts diverging from the plan:
   first open through `getItemPriceHistory` and kept, so re-opening a row
   does not blink — the same shape the draft editor's price-history
   expander already uses.
+- **Deleting a list lives inside the list**, in its header menu (admin-only,
+  confirmed, red). It used to be a bin on the home card — on the very row
+  you tap to open the list, one slip from taking a month of items and the
+  prices recorded on them with it. The list page is where you can see what
+  you are about to lose, and after deleting there is nothing left to stay
+  on, so it returns to `/grocery`.
 - **A stray price can be taken out**, from the item's own page
   (*Show all*), admin-only and confirmed: `deletePriceEntry`. Price history
   is append-only otherwise, and stays that way — this is the one door, for

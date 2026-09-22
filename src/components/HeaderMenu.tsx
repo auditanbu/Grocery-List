@@ -10,8 +10,11 @@ export type HeaderMenuItem = {
   detail?: string;
   /** Renders the row in the accent colour — a filter that is currently on. */
   active?: boolean;
-  /** Destructive-ish or status-changing actions read in orange. */
-  tone?: "default" | "warn";
+  /**
+   * `warn` (orange) for status-changing actions — reopening a finalized
+   * list; `danger` (red) for the ones that destroy something.
+   */
+  tone?: "default" | "warn" | "danger";
   disabled?: boolean;
   onSelect: () => void;
 };
@@ -68,13 +71,21 @@ export function HeaderMenu({
                     ? "bg-ios-blue text-white"
                     : item.tone === "warn"
                       ? "bg-ios-surface-2 text-ios-orange"
-                      : "bg-ios-surface-2 text-ios-blue"
+                      : item.tone === "danger"
+                        ? "bg-ios-red-soft text-ios-red"
+                        : "bg-ios-surface-2 text-ios-blue"
                 }`}
               >
                 {item.icon}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[16px] font-medium">{item.label}</span>
+                <span
+                  className={`block truncate text-[16px] font-medium ${
+                    item.tone === "danger" ? "text-ios-red" : ""
+                  }`}
+                >
+                  {item.label}
+                </span>
                 {item.detail ? (
                   <span className="block truncate text-[13px] text-ios-label-2">{item.detail}</span>
                 ) : null}

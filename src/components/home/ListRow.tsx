@@ -1,11 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useTransition } from "react";
 
-import { deleteList } from "@/lib/actions";
-import { useAdmin } from "@/lib/admin-context";
 import { formatIsoDate, monthKeyToLabel } from "@/lib/dates";
 import { formatPrice } from "@/lib/units";
 import type { ListSummaryDTO } from "@/lib/types";
@@ -22,22 +18,12 @@ const STATUS_LABELS: Record<ListSummaryDTO["status"], string> = {
   COMPLETED: "Done",
 };
 
-/** A "Previous lists" row — a compact link, plus an admin-only delete affordance. */
+/**
+ * A "Previous lists" row — a compact link, and nothing else. Deleting a list
+ * lives inside the list, in its own menu: a bin sitting on the row you tap to
+ * open it is one slip away from taking a month's shopping with it.
+ */
 export function ListRow({ list }: { list: ListSummaryDTO }) {
-  const router = useRouter();
-  const { isAdmin } = useAdmin();
-  const [pending, startTransition] = useTransition();
-
-  const remove = (event: React.MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!window.confirm(`Delete "${list.name}"? This can't be undone.`)) return;
-    startTransition(async () => {
-      await deleteList(list.id);
-      router.refresh();
-    });
-  };
-
   return (
     <Link href={`/grocery/lists/${list.id}`} className="ios-row active:bg-ios-surface-2">
       <div className="min-w-0 flex-1">
@@ -57,19 +43,7 @@ export function ListRow({ list }: { list: ListSummaryDTO }) {
       <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_STYLES[list.status]}`}>
         {STATUS_LABELS[list.status]}
       </span>
-      {isAdmin ? (
-        <button
-          type="button"
-          onClick={remove}
-          disabled={pending}
-          aria-label={`Delete ${list.name}`}
-          className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-ios-red transition active:bg-ios-red-soft disabled:opacity-50"
-        >
-          <TrashIcon />
-        </button>
-      ) : (
-        <Chevron />
-      )}
+      <Chevron />
     </Link>
   );
 }

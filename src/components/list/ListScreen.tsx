@@ -16,13 +16,15 @@ import {
   type FilterOption,
 } from "@/components/FilterSheet";
 import { BurgerButton, HeaderMenu, type HeaderMenuItem } from "@/components/HeaderMenu";
+import { TrashIcon } from "@/components/home/ListRow";
 import { DraftEditor } from "@/components/list/DraftEditor";
 import { useExportPdf } from "@/components/list/ExportPdfButton";
 import { FinalizedList } from "@/components/list/FinalizedList";
 import { ListSearchBar } from "@/components/list/ListSearchBar";
 import { ShopAddSheet } from "@/components/list/ShopAddSheet";
 import { ShoppingView } from "@/components/list/ShoppingView";
-import { reopenList } from "@/lib/actions";
+import { deleteList, reopenList } from "@/lib/actions";
+import { useAdmin } from "@/lib/admin-context";
 import { formatIsoDate, monthKeyToLabel } from "@/lib/dates";
 import { LANGUAGE_CODE, LANGUAGE_NAME, LANGUAGE_ORDER, useLanguage } from "@/lib/language";
 import { formatPrice } from "@/lib/units";
@@ -48,6 +50,7 @@ const ICON_BUTTON =
 
 export function ListScreen({ list, categories }: ListScreenProps) {
   const router = useRouter();
+  const { isAdmin } = useAdmin();
   const { language, setLanguage } = useLanguage();
   const [mode, setMode] = useState<Mode>(list.status === "COMPLETED" ? "shopping" : "list");
   const [shopId, setShopId] = useState<number | null | undefined>(undefined);
@@ -175,6 +178,29 @@ export function ListScreen({ list, categories }: ListScreenProps) {
     language,
   });
 
+  // Deleting a list belongs in here, not on the card you tap to open it: it
+  // takes a month of prices with it, and a bin beside the row is one slip
+  // from doing that. Admin-only and confirmed, like every other destructive
+  // control; afterwards there is no list left to stay on.
+  const remove = () => {
+    if (
+      !window.confirm(
+        `Delete "${list.name}"? Its items and the prices recorded on it go too. This can't be undone.`,
+      )
+    ) {
+      return;
+    }
+    startTransition(async () => {
+      const result = await deleteList(list.id);
+      if (!result.ok) {
+        window.alert(result.error);
+        return;
+      }
+      router.replace("/grocery");
+      router.refresh();
+    });
+  };
+
   const reopen = () => {
     startTransition(async () => {
       await reopenList(list.id);
@@ -272,6 +298,17 @@ export function ListScreen({ list, categories }: ListScreenProps) {
         setUnlocked((current) => !current);
         setAddOpen(false);
       },
+    });
+  }
+
+  if (isAdmin) {
+    menuItems.push({
+      key: "delete",
+      label: "Delete list",
+      icon: <TrashIcon />,
+      tone: "danger",
+      disabled: pending,
+      onSelect: remove,
     });
   }
 
