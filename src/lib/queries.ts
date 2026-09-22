@@ -10,6 +10,7 @@ import type {
   ListSummaryDTO,
   MasterItemDTO,
   PriceHistoryDTO,
+  PriceMoveDTO,
   ShopDTO,
 } from "./types";
 
@@ -311,7 +312,7 @@ export async function getPriceHistory(itemId: number): Promise<PriceHistoryDTO[]
  * put exactly those rows, where only the amount changed, at the top of
  * "biggest price moves".
  */
-export async function getRecentPriceChanges(limit = 12) {
+export async function getRecentPriceChanges(limit = 12): Promise<PriceMoveDTO[]> {
   const rows = await prisma.priceHistory.findMany({
     orderBy: { purchasedAt: "desc" },
     take: 400,
@@ -339,6 +340,12 @@ export async function getRecentPriceChanges(limit = 12) {
         unitType: latest.unitType,
         current: num(latest.price),
         previous: num(previous.price),
+        // The latest purchase as it was actually made — packs and pack size
+        // kept apart, so the row can read "₹690.00 for 2 × 500 g" rather
+        // than quoting a price with no amount against it.
+        currentRawQuantity: num(latest.quantity),
+        currentSizeValue: numOrNull(latest.sizeValue),
+        currentSizeUnit: latest.sizeUnit,
         currentQuantity: current.quantity,
         currentUnitType: current.unit,
         previousQuantity: earlier.quantity,

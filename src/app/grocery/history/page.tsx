@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { PriceDelta } from "@/components/PriceDelta";
+import { PriceMoves } from "@/components/history/PriceMoves";
 import { monthKeyToLabel } from "@/lib/dates";
 import { getLists, getRecentPriceChanges } from "@/lib/queries";
 import { formatPrice, formatQty } from "@/lib/units";
@@ -29,30 +29,7 @@ export default async function HistoryPage() {
             Once you have bought an item in two different months, the change shows up here.
           </p>
         ) : (
-          <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
-            {changes.map((change) => (
-              <li key={change.itemId}>
-                <Link href={`/grocery/items/${change.itemId}`} className="ios-row active:bg-ios-surface-2">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[16px] font-medium">{change.nameTa}</span>
-                    <span className="block truncate text-[13px] text-ios-label-2">
-                      {change.nameEn} · {formatPrice(change.current)}
-                    </span>
-                  </span>
-                  {/* The amounts matter: without them a month where only
-                      the quantity changed reads as a price move. */}
-                  <PriceDelta
-                    current={change.current}
-                    previous={change.previous}
-                    currentQuantity={change.currentQuantity}
-                    currentUnitType={change.currentUnitType}
-                    previousQuantity={change.previousQuantity}
-                    previousUnitType={change.previousUnitType}
-                  />
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <PriceMoves changes={changes} />
         )}
       </section>
 

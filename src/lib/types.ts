@@ -119,6 +119,30 @@ export type ListDetailDTO = ListSummaryDTO & {
   copySource: CopySourceDTO | null;
 };
 
+/**
+ * One row of the History screen's "biggest price moves": an item's latest
+ * price against the one before it. The `current*`/`previous*` amounts are
+ * totals (packs × pack size), which is what the comparison runs on; the
+ * `currentRaw*` fields are the latest purchase as it was made, for display.
+ */
+export type PriceMoveDTO = {
+  itemId: number;
+  nameEn: string;
+  nameTa: string;
+  unitType: UnitType;
+  current: number;
+  previous: number;
+  currentRawQuantity: number;
+  currentSizeValue: number | null;
+  currentSizeUnit: UnitType | null;
+  currentQuantity: number;
+  currentUnitType: UnitType;
+  previousQuantity: number;
+  previousUnitType: UnitType;
+  /** The latest price restated at the earlier amount; the ranking runs on it. */
+  comparable: number | null;
+};
+
 export type PriceHistoryDTO = {
   id: number;
   price: number;

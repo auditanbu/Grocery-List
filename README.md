@@ -299,7 +299,15 @@ once the list has been finalized and reality starts diverging from the plan:
   moves** runs on the same figures, and is ranked by them: comparing the
   raw rupees made ₹690 for two packets against ₹340 for one look like a
   103% hike rather than the ₹5 a packet it is, and floated every such row
-  to the top of the list.
+  to the top of the list. Each of those rows names the amount the price was
+  paid for ("₹690.00 for 2 × 500 g" — a price with no amount against it
+  says nothing) and **opens in place** (`PriceMoves`): the last three
+  purchases unfold under it, with *Show all* going on to the item's own
+  page for the full record. One row at a time, since two open rows push the
+  rest of the comparison off-screen. The entries are fetched per item on
+  first open through `getItemPriceHistory` and kept, so re-opening a row
+  does not blink — the same shape the draft editor's price-history
+  expander already uses.
 - **Add item** (`ShopAddSheet`) covers what never made the list. It
   searches the master catalogue server-side, and anything genuinely new can
   be created on the spot — Tamil / Tanglish / English name, category, unit,
