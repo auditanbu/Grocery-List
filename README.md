@@ -272,8 +272,10 @@ once the list has been finalized and reality starts diverging from the plan:
   order the questions come at the shelf: how much did you take, what did it
   cost, done. The ₹ field and *Mark as bought* share that row — entering a
   price and confirming it is one motion — and Enter saves as well as the
-  button does. Under them is only what informs the number: the *same as
-  last time* pill, the live delta, and the tappable rate line. The sheet's
+  button does. Under them is only what informs the number: the shelf-price
+  chip, the live delta, and the tappable rate line. (A *same as last time*
+  pill that copied the old price in used to sit there; it went unused and
+  is gone.) The sheet's
   pinned footer is left for *Uncheck item*, and on an un-bought row there
   is no footer at all.
 - **The shelf prices one, the list counts eight.** A sticker saying ₹34 a

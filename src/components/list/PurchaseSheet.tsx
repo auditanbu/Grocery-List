@@ -446,36 +446,31 @@ export function PurchaseSheet({
               </button>
             ) : null}
 
-            {reference !== null ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPrice(String(reference))}
-                  className="h-9 rounded-full bg-ios-surface-2 px-3.5 text-[14px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator active:scale-95"
-                >
-                  Same as last time · {formatPrice(reference)}
-                </button>
-                {valid ? (
-                  <PriceDelta
-                    current={parsed}
-                    previous={reference}
-                    currentQuantity={bought.quantity}
-                    currentUnitType={bought.unit}
-                    previousQuantity={referenceBought?.quantity}
-                    previousUnitType={referenceBought?.unit}
-                  />
-                ) : null}
-              </div>
-            ) : (
+            {/* Cheaper or dearer, once there is a price to judge. There was a
+                "same as last time" button here to copy the old price in; it
+                went unused, and what it filled in was a guess the rate line
+                below states properly anyway. */}
+            {reference === null ? (
               <p className="text-[13px] text-ios-label-2">
                 First time buying this — the price becomes the baseline for next month.
               </p>
-            )}
+            ) : valid ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <PriceDelta
+                  current={parsed}
+                  previous={reference}
+                  currentQuantity={bought.quantity}
+                  currentUnitType={bought.unit}
+                  previousQuantity={referenceBought?.quantity}
+                  previousUnitType={referenceBought?.unit}
+                />
+              </div>
+            ) : null}
 
-            {/* The rate, right under the pill: the same ₹ over a bigger or
-                smaller pack is what the pill can't tell you. Tapping it
-                changes the pack size it is quoted against — per kg is the
-                shelf label, but the shop quotes you 100 g. */}
+            {/* The rate: the same ₹ over a bigger or smaller pack is what a
+                bare comparison can't tell you. Tapping it changes the pack
+                size it is quoted against — per kg is the shelf label, but
+                the shop quotes you 100 g. */}
             {currentUnitPrice || referenceUnitPrice ? (
               rateHint !== null ? (
                 <button
