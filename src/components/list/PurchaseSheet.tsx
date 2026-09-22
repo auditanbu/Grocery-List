@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { PriceDelta } from "@/components/PriceDelta";
@@ -49,11 +49,11 @@ type PurchaseSheetProps = {
  * Prompted when an item is checked off while shopping: capture what was
  * actually paid and show live how it compares with last month.
  *
- * Two things can be corrected here, and they are deliberately separate:
+ * Two things can be corrected here, each behind its own pill on one row:
  *
- *   - the **size**, shown outright for anything sold in packs — the shop
- *     only had the 150 g tube, not the 200 g one the list asks for;
- *   - the **quantity**, behind a small edit button — you grabbed two.
+ *   - the **size**, for anything sold in packs — the shop only had the
+ *     150 g tube, not the 200 g one the list asks for;
+ *   - the **quantity** — you grabbed two.
  *
  * Both are applied before the price is recorded, so what you type is
  * always the price for what actually went in the basket, and the
@@ -77,10 +77,12 @@ export function PurchaseSheet({
   const [sizeUnit, setSizeUnit] = useState<UnitType | null>(null);
   const [shopId, setShopId] = useState<number | null>(null);
   const [history, setHistory] = useState<PriceHistoryDTO[] | null>(null);
+  const [editingSize, setEditingSize] = useState(false);
   const [editingQuantity, setEditingQuantity] = useState(false);
   const [editingShop, setEditingShop] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const priceRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setPrice(item?.purchasePrice != null ? String(item.purchasePrice) : "");
@@ -90,11 +92,18 @@ export function PurchaseSheet({
     setSizeUnit(item?.sizeUnit ?? null);
     setShopId(item?.shopId ?? null);
     setEditingQuantity(false);
+    setEditingSize(false);
     setEditingShop(false);
     setError(null);
     setHistory(null);
     if (item) {
       getItemPriceHistory(item.itemId).then(setHistory);
+      // The price is what the sheet is for, so the cursor starts there and
+      // the phone's keyboard comes up with it. Done here rather than with
+      // `autoFocus`: the sheet is portalled and the same input is reused
+      // from one item to the next, so there is no fresh mount for that
+      // attribute to fire on.
+      requestAnimationFrame(() => priceRef.current?.focus());
     }
   }, [item]);
 
@@ -262,60 +271,71 @@ export function PurchaseSheet({
       }
     >
       <div className="space-y-4 pb-3">
-        {/* Size first, and never behind a button: it is the thing that
-            actually differs at the shop, and it re-prices the item. */}
-        {editable && sizeable ? (
-          <div>
-            <span className="text-[13px] font-medium text-ios-label-2">
-              Size bought
-              {sizeChanged && listSize ? (
-                <span className="ml-1.5 font-normal text-ios-blue">
-                  (list wants {formatQty(listSize.value, listSize.unit)})
-                </span>
-              ) : null}
-            </span>
-            <div className="mt-1.5">
-              <SizeField
-                value={sizeValue}
-                unit={sizeUnit}
-                onChange={(nextValue, nextUnit) => {
-                  setSizeValue(nextValue);
-                  setSizeUnit(nextUnit);
-                }}
-                aria-label={`Size bought for ${item.nameEn}`}
-              />
-            </div>
-            <span className="mt-1.5 block text-[12px] text-ios-label-3">
-              {listSize
-                ? "Shop only had another size? Put it in here — the price you enter below is taken as the price for this size."
-                : "What one comes in — a 200 g paste, a 650 ml bottle. Fill it in and the price you enter below is taken as the price for this size."}
-            </span>
-          </div>
-        ) : null}
-
+        {/* Size and quantity on one row, each behind its own pill: two
+            short facts about what went in the basket, and at the shelf you
+            usually change neither. Size sits left of quantity because it is
+            read that way — a 500 g packet, two of them. */}
         {editable ? (
           <div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-[13px] font-medium text-ios-label-2">
-                Quantity bought
-                {quantityChanged ? (
-                  <span className="ml-1.5 font-normal text-ios-blue">
-                    (list wanted {packsLabel(item.quantity, item.unitType)})
-                  </span>
-                ) : null}
+                {sizeable ? "Size & quantity" : "Quantity bought"}
               </span>
-              {editingQuantity ? null : (
-                <button
-                  type="button"
-                  onClick={() => setEditingQuantity(true)}
-                  aria-label={`Edit quantity, currently ${packsLabel(quantity, unitType)}`}
-                  className="flex h-8 flex-none items-center gap-1.5 rounded-full bg-ios-surface-2 px-3 text-[14px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator transition active:scale-95"
-                >
-                  <span className="tabular-nums">{packsLabel(quantity, unitType)}</span>
-                  <PencilIcon />
-                </button>
-              )}
+              <div className="flex flex-none items-center gap-2">
+                {sizeable && !editingSize ? (
+                  <button
+                    type="button"
+                    onClick={() => setEditingSize(true)}
+                    aria-label={
+                      size
+                        ? `Edit size, currently ${formatQty(size.value, size.unit)}`
+                        : "Add the size one comes in"
+                    }
+                    className="flex h-8 flex-none items-center gap-1.5 rounded-full bg-ios-surface-2 px-3 text-[14px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator transition active:scale-95"
+                  >
+                    <span className="tabular-nums">
+                      {size ? formatQty(size.value, size.unit) : "Add size"}
+                    </span>
+                    <PencilIcon />
+                  </button>
+                ) : null}
+                {editingQuantity ? null : (
+                  <button
+                    type="button"
+                    onClick={() => setEditingQuantity(true)}
+                    aria-label={`Edit quantity, currently ${packsLabel(quantity, unitType)}`}
+                    className="flex h-8 flex-none items-center gap-1.5 rounded-full bg-ios-surface-2 px-3 text-[14px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator transition active:scale-95"
+                  >
+                    <span className="tabular-nums">{packsLabel(quantity, unitType)}</span>
+                    <PencilIcon />
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Each editor opens under the row, so whichever pill you tapped
+                is the only thing that grows. */}
+            {editingSize ? (
+              <div className="mt-1.5">
+                <SizeField
+                  value={sizeValue}
+                  unit={sizeUnit}
+                  onChange={(nextValue, nextUnit) => {
+                    setSizeValue(nextValue);
+                    setSizeUnit(nextUnit);
+                  }}
+                  aria-label={`Size bought for ${item.nameEn}`}
+                />
+                <span className="mt-1.5 block text-[12px] text-ios-label-3">
+                  {sizeChanged && listSize
+                    ? `List wants ${formatQty(listSize.value, listSize.unit)}. `
+                    : ""}
+                  {listSize
+                    ? "Shop only had another size? Put it in here — the price you enter below is taken as the price for this size."
+                    : "What one comes in — a 200 g paste, a 650 ml bottle. Fill it in and the price you enter below is taken as the price for this size."}
+                </span>
+              </div>
+            ) : null}
 
             {editingQuantity ? (
               <div className="mt-1.5">
@@ -329,6 +349,9 @@ export function PurchaseSheet({
                   aria-label={`Quantity for ${item.nameEn}`}
                 />
                 <span className="mt-1.5 block text-[12px] text-ios-label-3">
+                  {quantityChanged
+                    ? `List wanted ${packsLabel(item.quantity, item.unitType)}. `
+                    : ""}
                   {sizeable
                     ? "Took more than one? Adjust the count here — the price you enter below is taken as the price for all of them."
                     : "Bought a different amount? Adjust it here — the price you enter below is taken as the price for this quantity."}
@@ -347,7 +370,7 @@ export function PurchaseSheet({
             <div className="flex min-w-0 flex-1 items-center rounded-ios bg-ios-surface-2 px-3 ring-1 ring-inset ring-ios-separator focus-within:ring-2 focus-within:ring-ios-blue">
               <span className="flex-none text-[20px] font-semibold text-ios-label-2">₹</span>
               <input
-                autoFocus
+                ref={priceRef}
                 type="text"
                 inputMode="decimal"
                 value={price}

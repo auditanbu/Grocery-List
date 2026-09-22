@@ -224,6 +224,10 @@ once the list has been finalized and reality starts diverging from the plan:
   number. The purchase sheet, whose title is plain text, appends it with
   `formatNameWithSize` instead, and follows the size *actually bought*, so
   correcting it to 150 g re-titles the sheet you are typing the price into.
+  The sheet opens with the cursor already in the price field (a ref, not
+  `autoFocus` — the sheet is portalled and reuses the same input from one
+  item to the next, so nothing remounts for that attribute to fire on), and
+  shows the last three prices paid, with *See all* for the rest.
   Loose items have no size and are untouched: their quantity is already the
   measure.
 - **Quantity is editable inline.** Every un-bought row carries the same
@@ -234,18 +238,20 @@ once the list has been finalized and reality starts diverging from the plan:
   item is checked off the row's stepper drops away — its quantity is then
   the purchase sheet's business, because changing it has to re-price the
   item too.
-- **The purchase sheet corrects the size and the quantity**, and keeps the
-  two apart because they go wrong for different reasons. For anything
-  counted in packs `PurchaseSheet` shows a **Size** box outright — the shop
-  only had the 150 g tube, which is the single most common surprise at the
-  shelf — while the **quantity** (how many packs) stays behind a small edit
-  button. The box appears whether or not a size has ever been filled in: an
-  item nobody has sized yet is exactly the one you are holding when you
-  notice it is a 650 ml bottle, and a size filled in there where the master
-  item has **none** seeds the master too (`updateListItem`), so next month's
-  list starts with it. Never an overwrite — a master item that already has a
-  size keeps it, because then the row really is the one-off. Items measured
-  in g/ml/kg/L carry their amount in the quantity and have no size to set.
+- **The purchase sheet corrects the size and the quantity** from one
+  **Size & quantity** row: two pills, size then quantity, each opening its
+  own editor underneath. They are kept apart because they go wrong for
+  different reasons — the shop only had the 150 g tube (size), or you
+  grabbed two (quantity) — but at the shelf you usually change neither, so
+  neither takes up room until tapped. The size pill is there for anything
+  counted in packs whether or not a size has ever been filled in (it reads
+  *Add size* then): the item nobody has sized yet is exactly the one you
+  are holding when you notice it is a 650 ml bottle, and a size filled in
+  where the master item has **none** seeds the master too
+  (`updateListItem`), so next month's list starts with it. Never an
+  overwrite — a master item that already has a size keeps it, because then
+  the row really is the one-off. Items measured in g/ml/kg/L carry their
+  amount in the quantity and have no size to set.
   Saving applies both through `updateListItem` before `recordPurchase`, so
   the price you type is recorded against what actually went in the basket,
   and the `PriceHistory` row snapshots quantity *and* size together.
