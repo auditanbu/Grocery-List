@@ -308,6 +308,16 @@ once the list has been finalized and reality starts diverging from the plan:
   first open through `getItemPriceHistory` and kept, so re-opening a row
   does not blink — the same shape the draft editor's price-history
   expander already uses.
+- **A stray price can be taken out**, from the item's own page
+  (*Show all*), admin-only and confirmed: `deletePriceEntry`. Price history
+  is append-only otherwise, and stays that way — this is the one door, for
+  the rows left behind by trying the app out, which otherwise sit in
+  "biggest price moves" forever pretending to be real moves. A price
+  recorded **on a list** is refused, because the list row still says what
+  was paid for it; unchecking the item there removes both together
+  (`undoPurchase`), which is the only way the two stay in step. The same
+  rows can be found and deleted from a terminal with
+  `npm run db:audit-prices -- --delete-ids 41,57`.
 - **Add item** (`ShopAddSheet`) covers what never made the list. It
   searches the master catalogue server-side, and anything genuinely new can
   be created on the spot — Tamil / Tanglish / English name, category, unit,

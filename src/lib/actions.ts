@@ -472,6 +472,33 @@ export async function recordPurchase(input: {
   return { ok: true, data: { previousPrice } };
 }
 
+/**
+ * Removes one recorded price — a row left behind by testing, or a figure
+ * typed against the wrong item. Price history is otherwise append-only, and
+ * stays that way: this is the one door, and it is deliberately narrow.
+ *
+ * A price recorded on a list is refused, because the list row still says
+ * what was paid for it. Unchecking the item there removes both together
+ * (`undoPurchase`), which is the only way the two stay in step.
+ */
+export async function deletePriceEntry(entryId: number): Promise<ActionResult> {
+  const entry = await prisma.priceHistory.findUnique({
+    where: { id: entryId },
+    include: { list: true },
+  });
+  if (!entry) return fail("That price has already been removed.");
+  if (entry.listId !== null) {
+    return fail(
+      `This price was recorded on ${entry.list?.name ?? "a list"} — uncheck the item there to remove it.`,
+    );
+  }
+
+  await prisma.priceHistory.delete({ where: { id: entryId } });
+  revalidatePath(`/grocery/items/${entry.itemId}`);
+  revalidatePath("/grocery/history");
+  return { ok: true };
+}
+
 export async function undoPurchase(listItemId: number): Promise<ActionResult> {
   const row = await prisma.groceryListItem.findUnique({ where: { id: listItemId } });
   if (!row) return fail("Item not found on this list.");

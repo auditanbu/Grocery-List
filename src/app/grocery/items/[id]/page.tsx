@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { DeletePriceEntry } from "@/components/history/DeletePriceEntry";
 import { PriceDelta } from "@/components/PriceDelta";
 import { formatDate } from "@/lib/dates";
 import { getMasterItems, getPriceHistory } from "@/lib/queries";
@@ -93,6 +94,16 @@ export default async function ItemHistoryPage({ params }: { params: Promise<{ id
                   currentUnitType={bought.unit}
                   previousQuantity={previousBought?.quantity}
                   previousUnitType={previousBought?.unit}
+                />
+                {/* The full record is the one place a stray price can be
+                    taken out of the history it keeps skewing. */}
+                <DeletePriceEntry
+                  entryId={entry.id}
+                  label={`${formatPrice(entry.price)} for ${formatQtyWithSize(
+                    entry.quantity,
+                    entry.unitType,
+                    sizeOf(entry.sizeValue, entry.sizeUnit),
+                  )}`}
                 />
               </li>
             );
