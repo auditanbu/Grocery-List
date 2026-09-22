@@ -276,6 +276,20 @@ once the list has been finalized and reality starts diverging from the plan:
   last time* pill, the live delta, and the tappable rate line. The sheet's
   pinned footer is left for *Uncheck item*, and on an un-bought row there
   is no footer at all.
+- **The shelf prices one, the list counts eight.** A sticker saying ₹34 a
+  soap, with 8 on the list, used to mean doing ₹272 in your head at the
+  shelf — and a slip there lands in `PriceHistory`, where every later
+  comparison reads it as a real price move. So the shelf figure is typed as
+  it is read and a chip under the field offers the product:
+  "₹34.00 each = ₹272.00 for 8 packs", one tap to fill it in. Weighed rows
+  get the other half — "₹60.00/kg = ₹90.00 for 1.5 kg" — quoted against
+  whichever basis the rate line is set to, so cycling that to 100 g makes
+  the chip read "₹42.00/100 g = ₹105.00 for 250 g", the way the shop quotes
+  it. `totalFromShelfPrice` (`src/lib/units.ts`) does the arithmetic on
+  `projectPrice`; the chip hides once tapped, so it can never offer to
+  multiply its own answer, and comes back the moment the field is edited by
+  hand. What is saved is unchanged — the total for the row — and RS-priced
+  rows, whose quantity is already rupees, get no chip.
 - **Every comparison runs on packs × size** (`totalAmount` in
   `src/lib/units.ts`, then `projectPrice`). ₹95 for one 150 g tube against
   ₹95 for one 200 g tube is dearer, not "same as last time", and the per-kg

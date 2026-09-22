@@ -299,6 +299,53 @@ export function unitPriceOf(price: number, quantity: number, unit: UnitType): nu
 }
 
 /**
+ * What a shelf label works out to for a whole row, and how that label reads.
+ *
+ * The sticker on the shelf prices *one* — one soap, one kilo — while the list
+ * counts eight of them, and doing that multiplication in your head at the
+ * shelf is where a wrong price gets into the history. So the figure is typed
+ * as it is read and multiplied out from the row's own quantity.
+ *
+ * Countable rows take the typed price per pack. Weighed rows take it as a
+ * rate against `basis` — per kg by default, or per 500/250/100 g when that is
+ * what the shop is quoting — and project it onto the amount on the list.
+ *
+ * Null when there is nothing to work out: an RS-priced row, whose "quantity"
+ * is already rupees, or a quantity that is not a real amount.
+ */
+export function totalFromShelfPrice(
+  shelfPrice: number,
+  quantity: number,
+  unit: UnitType,
+  basis: RateBasis = DEFAULT_RATE_BASIS,
+): { total: number; label: string } | null {
+  if (!Number.isFinite(shelfPrice) || shelfPrice <= 0) return null;
+  if (!Number.isFinite(quantity) || quantity <= 0) return null;
+
+  const group = unitGroup(unit);
+  if (group === "currency") return null;
+  if (group === "count") return { total: roundMoney(shelfPrice * quantity), label: "each" };
+
+  const label = rateBasisLabel(unit, basis);
+  if (label === null) return null;
+  // `basis` counts base units — grams for a weight, ml for a volume — which
+  // is exactly the amount the typed rate is the price of.
+  const total = projectPrice(
+    shelfPrice,
+    basis,
+    group === "weight" ? "G" : "ML",
+    quantity,
+    unit,
+  );
+  return total === null ? null : { total: roundMoney(total), label: `/${label}` };
+}
+
+/** Money never carries more than paise, and never float noise. */
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
  * The per-unit price in the unit people actually quote: per kg for weights,
  * per L for volumes, "each" for countables. Returns null when there is no
  * sensible figure — a missing quantity, or an RS-priced item, where the

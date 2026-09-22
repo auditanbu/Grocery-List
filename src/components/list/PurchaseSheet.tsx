@@ -20,6 +20,7 @@ import {
   formatUnitPrice,
   rateBasisLabel,
   sizeOf,
+  totalFromShelfPrice,
   totalAmount,
   type RateBasis,
   type UnitType,
@@ -77,6 +78,10 @@ export function PurchaseSheet({
   const [sizeUnit, setSizeUnit] = useState<UnitType | null>(null);
   const [shopId, setShopId] = useState<number | null>(null);
   const [history, setHistory] = useState<PriceHistoryDTO[] | null>(null);
+  // True while the field holds a total the shelf chip worked out, so the chip
+  // does not turn round and offer to multiply its own answer. Any keystroke
+  // in the field clears it.
+  const [priceIsProduct, setPriceIsProduct] = useState(false);
   const [editingSize, setEditingSize] = useState(false);
   const [editingQuantity, setEditingQuantity] = useState(false);
   const [editingShop, setEditingShop] = useState(false);
@@ -92,6 +97,7 @@ export function PurchaseSheet({
     setSizeUnit(item?.sizeUnit ?? null);
     setShopId(item?.shopId ?? null);
     setEditingQuantity(false);
+    setPriceIsProduct(false);
     setEditingSize(false);
     setEditingShop(false);
     setError(null);
@@ -142,6 +148,17 @@ export function PurchaseSheet({
     referenceQuantity !== null && referenceUnitType !== null
       ? totalAmount(referenceQuantity, referenceUnitType, referenceSize)
       : null;
+
+  // The shelf prices one — one soap, one kilo — and the list counts eight, so
+  // the multiplication is offered rather than left to be done at the shelf.
+  // Read off the live quantity, so bumping the count re-does the sum.
+  const shelf =
+    valid && parsed > 0 && !priceIsProduct
+      ? totalFromShelfPrice(parsed, quantity, unitType, basis)
+      : null;
+  // Nothing to apply when the answer is the number already typed: one pack,
+  // or a 1 kg row while the rate line is quoting per kg.
+  const showShelfChip = shelf !== null && Math.abs(shelf.total - parsed) >= 0.01;
 
   const canCompare = reference !== null && referenceBought !== null;
 
@@ -374,7 +391,10 @@ export function PurchaseSheet({
                 type="text"
                 inputMode="decimal"
                 value={price}
-                onChange={(event) => setPrice(event.target.value)}
+                onChange={(event) => {
+                  setPrice(event.target.value);
+                  setPriceIsProduct(false);
+                }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") save();
                 }}
@@ -406,6 +426,26 @@ export function PurchaseSheet({
 
         {!editable ? null : (
           <div className="space-y-2">
+            {showShelfChip && shelf ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setPrice(String(shelf.total));
+                  setPriceIsProduct(true);
+                  priceRef.current?.focus();
+                }}
+                aria-label={`Use ${formatPrice(shelf.total)} — ${formatPrice(parsed)}${
+                  shelf.label === "each" ? " each" : shelf.label
+                } for ${packsLabel(quantity, unitType)}`}
+                className="h-9 rounded-full bg-ios-blue-soft px-3.5 text-[14px] font-medium text-ios-blue ring-1 ring-inset ring-ios-blue/20 active:scale-95"
+              >
+                <span className="tabular-nums">{formatPrice(parsed)}</span>
+                {shelf.label === "each" ? " each" : shelf.label} ={" "}
+                <span className="font-semibold tabular-nums">{formatPrice(shelf.total)}</span> for{" "}
+                {packsLabel(quantity, unitType)}
+              </button>
+            ) : null}
+
             {reference !== null ? (
               <div className="flex flex-wrap items-center gap-2">
                 <button
