@@ -304,19 +304,42 @@ export async function getPriceHistory(itemId: number): Promise<PriceHistoryDTO[]
 }
 
 /**
- * Items whose latest two prices differ — powers the History screen.
+ * Every item with a price on record, newest purchase first — the History
+ * screen's whole subject, both the moves it ranks and the items its search
+ * reaches.
  *
- * Compared on what was actually bought (packs × pack size, as everywhere
- * else), never on the raw rupees: ₹690 for two 500 g packets against ₹340
- * for one is ₹5 dearer a packet, not ₹350 — and ranking on the raw figure
- * put exactly those rows, where only the amount changed, at the top of
- * "biggest price moves".
+ * Each item carries its latest purchase and the one before it, already
+ * totalled (packs × pack size, as everywhere else). An item bought only
+ * once has no `previous` and nothing to compare, which is not a reason to
+ * leave it out: what you last paid for it is exactly what you came to look
+ * up.
+ *
+ * Reads the whole table rather than a recent window, because an item that
+ * has not been bought for a year is precisely the one you cannot remember
+ * the price of. This is one household's shopping — the same order of
+ * magnitude as the master catalogue the Master List already ships whole to
+ * the browser to be searched.
  */
-export async function getRecentPriceChanges(limit = 12): Promise<PriceMoveDTO[]> {
+export async function getPurchasedItems(): Promise<PriceMoveDTO[]> {
   const rows = await prisma.priceHistory.findMany({
     orderBy: { purchasedAt: "desc" },
-    take: 400,
-    include: { item: true },
+    select: {
+      itemId: true,
+      price: true,
+      quantity: true,
+      unitType: true,
+      sizeValue: true,
+      sizeUnit: true,
+      purchasedAt: true,
+      item: {
+        select: {
+          nameEn: true,
+          nameTa: true,
+          nameTl: true,
+          category: { select: { nameEn: true } },
+        },
+      },
+    },
   });
 
   const byItem = new Map<number, typeof rows>();
@@ -327,53 +350,73 @@ export async function getRecentPriceChanges(limit = 12): Promise<PriceMoveDTO[]>
   const amountOf = (row: (typeof rows)[number]) =>
     totalAmount(num(row.quantity), row.unitType, sizeOf(numOrNull(row.sizeValue), row.sizeUnit));
 
-  const changes = [...byItem.values()]
-    .filter((entries) => entries.length >= 2)
-    .map((entries) => {
-      const [latest, previous] = entries;
-      const current = amountOf(latest);
-      const earlier = amountOf(previous);
-      return {
-        itemId: latest.itemId,
-        nameEn: latest.item.nameEn,
-        nameTa: latest.item.nameTa,
-        unitType: latest.unitType,
-        current: num(latest.price),
-        previous: num(previous.price),
-        // The latest purchase as it was actually made — packs and pack size
-        // kept apart, so the row can read "₹690.00 for 2 × 500 g" rather
-        // than quoting a price with no amount against it.
-        currentRawQuantity: num(latest.quantity),
-        currentSizeValue: numOrNull(latest.sizeValue),
-        currentSizeUnit: latest.sizeUnit,
-        currentQuantity: current.quantity,
-        currentUnitType: current.unit,
-        previousQuantity: earlier.quantity,
-        previousUnitType: earlier.unit,
-        // What the latest price works out to at the earlier amount — the
-        // figure the badge shows and the list is ranked on. Null when the
-        // two are not comparable (a weight against a count), which is not a
-        // price move anyone can read, so the row is dropped.
-        comparable: projectPrice(
-          num(latest.price),
-          current.quantity,
-          current.unit,
-          earlier.quantity,
-          earlier.unit,
-        ),
-      };
-    })
+  return [...byItem.values()].map((entries) => {
+    const [latest, previous] = entries;
+    const current = amountOf(latest);
+    const earlier = previous ? amountOf(previous) : null;
+    return {
+      itemId: latest.itemId,
+      nameEn: latest.item.nameEn,
+      nameTa: latest.item.nameTa,
+      nameTl: latest.item.nameTl,
+      categoryName: latest.item.category.nameEn,
+      unitType: latest.unitType,
+      current: num(latest.price),
+      previous: previous ? num(previous.price) : null,
+      purchasedAt: latest.purchasedAt.toISOString(),
+      // The latest purchase as it was actually made — packs and pack size
+      // kept apart, so a row can read "₹690.00 for 2 × 500 g" rather than
+      // quoting a price with no amount against it.
+      currentRawQuantity: num(latest.quantity),
+      currentSizeValue: numOrNull(latest.sizeValue),
+      currentSizeUnit: latest.sizeUnit,
+      currentQuantity: current.quantity,
+      currentUnitType: current.unit,
+      previousQuantity: earlier?.quantity ?? null,
+      previousUnitType: earlier?.unit ?? null,
+      // What the latest price works out to at the earlier amount — the
+      // figure the badge shows and the moves list is ranked on. Null when
+      // there is nothing to compare, or when the two are not comparable (a
+      // weight against a count), which is not a price move anyone can read.
+      comparable:
+        earlier === null
+          ? null
+          : projectPrice(
+              num(latest.price),
+              current.quantity,
+              current.unit,
+              earlier.quantity,
+              earlier.unit,
+            ),
+    };
+  });
+}
+
+/**
+ * "Biggest price moves": the items whose latest two prices actually differ,
+ * steepest first.
+ *
+ * Ranked on what was bought, never on the raw rupees: ₹690 for two 500 g
+ * packets against ₹340 for one is ₹5 dearer a packet, not ₹350 — and
+ * ranking on the raw figure floated exactly those rows, where only the
+ * amount changed, to the top.
+ *
+ * Pure, and given the same array the search is handed, so the two cannot
+ * drift apart.
+ */
+export function biggestMoves(items: PriceMoveDTO[], limit = 12): PriceMoveDTO[] {
+  return items
     .filter(
-      (change) =>
-        change.previous > 0 &&
-        change.comparable !== null &&
-        Math.round(Math.abs(change.comparable - change.previous) * 100) >= 1,
+      (item) =>
+        item.previous !== null &&
+        item.previous > 0 &&
+        item.comparable !== null &&
+        Math.round(Math.abs(item.comparable - item.previous) * 100) >= 1,
     )
     .sort(
       (a, b) =>
-        Math.abs((b.comparable as number) - b.previous) / b.previous -
-        Math.abs((a.comparable as number) - a.previous) / a.previous,
-    );
-
-  return changes.slice(0, limit);
+        Math.abs((b.comparable as number) - (b.previous as number)) / (b.previous as number) -
+        Math.abs((a.comparable as number) - (a.previous as number)) / (a.previous as number),
+    )
+    .slice(0, limit);
 }

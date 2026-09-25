@@ -85,6 +85,20 @@ export type NamedItem = {
 };
 
 /**
+ * Whether a typed search matches any of the names an item goes by — you
+ * think in whichever one you think in, and the item should turn up either
+ * way. `needle` is expected already lowercased and trimmed by the caller,
+ * which is filtering a list and should not redo that per row.
+ */
+export function matchesName(item: NamedItem, needle: string): boolean {
+  return (
+    item.nameTa.toLowerCase().includes(needle) ||
+    item.nameEn.toLowerCase().includes(needle) ||
+    (item.nameTl ?? "").toLowerCase().includes(needle)
+  );
+}
+
+/**
  * Picks which name leads and which trails as the caption. Tanglish falls
  * back to the Tamil name when none has been entered yet, so a half-filled
  * catalogue still reads sensibly rather than showing blanks.

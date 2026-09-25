@@ -70,8 +70,8 @@ export function PriceMoves({ changes }: { changes: PriceMoveDTO[] }) {
                 previous={change.previous}
                 currentQuantity={change.currentQuantity}
                 currentUnitType={change.currentUnitType}
-                previousQuantity={change.previousQuantity}
-                previousUnitType={change.previousUnitType}
+                previousQuantity={change.previousQuantity ?? undefined}
+                previousUnitType={change.previousUnitType ?? undefined}
               />
               <svg
                 viewBox="0 0 24 24"

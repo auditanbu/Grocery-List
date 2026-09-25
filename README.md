@@ -314,6 +314,21 @@ once the list has been finalized and reality starts diverging from the plan:
   prices recorded on them with it. The list page is where you can see what
   you are about to lose, and after deleting there is nothing left to stay
   on, so it returns to `/grocery`.
+- **The History tab searches everything ever bought**, from a field pinned
+  at the bottom where a thumb reaches it (the shopping list's own
+  `ListSearchBar`). The two standing sections answer "what changed" and
+  "what did each month cost"; the search answers the one they cannot —
+  *what did I last pay for this* — over every item with a price on record,
+  not just the dozen that moved. It matches the three names (`matchesName`,
+  `src/lib/language.tsx`) and the category, and while there is anything
+  typed the results take the screen, since a short list of matches under
+  two long lists that do not match is a screen you have to hunt through.
+  Results lead with the most recent purchase. An item bought only **once**
+  is in there, with no up/down badge to show (`PriceDelta` renders nothing
+  without an earlier price) but still opening onto what it cost. Both lists
+  come from one query, `getPurchasedItems`, with `biggestMoves` ranking a
+  slice of that same array, so the two can never disagree about what an
+  item last cost.
 - **A stray price can be taken out**, from the item's own page
   (*Show all*), admin-only and confirmed: `deletePriceEntry`. Price history
   is append-only otherwise, and stays that way — this is the one door, for
