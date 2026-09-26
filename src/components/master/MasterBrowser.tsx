@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
+import { CategoryIcon, CheckIcon } from "@/components/FilterSheet";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { Sheet } from "@/components/Sheet";
 import { SizeField } from "@/components/SizeField";
@@ -22,10 +23,14 @@ import { useAdmin } from "@/lib/admin-context";
 import { displayName, useLanguage } from "@/lib/language";
 import {
   UNIT_TYPES,
+  formatNameWithSize,
   formatPrice,
   formatQty,
+  formatQtyWithSize,
   normalizeQty,
+  projectPrice,
   sizeOf,
+  totalAmount,
   unitOptionLabel,
   type UnitType,
 } from "@/lib/units";
@@ -52,6 +57,57 @@ type Draft = {
   sizeUnit: UnitType | null;
 };
 
+/**
+ * What this item costs at the quantity it is normally bought in, worked out
+ * from the last price paid.
+ *
+ * The raw last price answers a question nobody asked: ₹660 meant three
+ * kilos of coriander that month, which tells you nothing about the kilo you
+ * put on next month's list. Projected onto the default quantity — the same
+ * arithmetic every price comparison uses — it reads as ₹220 for 1 kg.
+ *
+ * `forDefault` is false when the two cannot be converted (a weight against
+ * a count, after someone changed the unit type), in which case the price is
+ * the raw one and `amount` says what it actually bought, so the row is
+ * never quietly wrong.
+ */
+function lastPriceAt(
+  item: MasterItemDTO,
+): { price: number; amount: string; forDefault: boolean } | null {
+  if (item.lastPrice === null || item.lastPriceQuantity === null || item.lastPriceUnitType === null) {
+    return null;
+  }
+  const paid = totalAmount(
+    item.lastPriceQuantity,
+    item.lastPriceUnitType,
+    sizeOf(item.lastPriceSizeValue, item.lastPriceSizeUnit),
+  );
+  const wanted = totalAmount(item.defaultQty, item.unitType, sizeOf(item.sizeValue, item.sizeUnit));
+  const projected = projectPrice(
+    item.lastPrice,
+    paid.quantity,
+    paid.unit,
+    wanted.quantity,
+    wanted.unit,
+  );
+  if (projected === null) {
+    return {
+      price: item.lastPrice,
+      amount: formatQtyWithSize(
+        item.lastPriceQuantity,
+        item.lastPriceUnitType,
+        sizeOf(item.lastPriceSizeValue, item.lastPriceSizeUnit),
+      ),
+      forDefault: false,
+    };
+  }
+  return {
+    price: Math.round(projected * 100) / 100,
+    amount: formatQtyWithSize(item.defaultQty, item.unitType, sizeOf(item.sizeValue, item.sizeUnit)),
+    forDefault: true,
+  };
+}
+
 /** True when the Tamil name was never actually set — it's just a copy of the English name. */
 function needsTamil(item: MasterItemDTO): boolean {
   return item.nameTa.trim().toLowerCase() === item.nameEn.trim().toLowerCase();
@@ -75,6 +131,8 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
+  const [viewing, setViewing] = useState<MasterItemDTO | null>(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [categoryDrafts, setCategoryDrafts] = useState<
     Record<number, { nameEn: string; nameTa: string }>
@@ -110,6 +168,11 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
     }
     return [...grouped.entries()];
   }, [items, query, categoryId, needsTamilOnly, needsTanglishOnly, language]);
+
+  const categoryLabel = (category: CategoryDTO) =>
+    language === "ta" ? (category.nameTa ?? category.nameEn) : category.nameEn;
+  const selectedCategory = categories.find((category) => category.id === categoryId) ?? null;
+  const shownCount = groups.reduce((sum, [, group]) => sum + group.items.length, 0);
 
   const needsTamilCount = useMemo(() => items.filter(needsTamil).length, [items]);
   const needsTanglishCount = useMemo(() => items.filter(needsTanglish).length, [items]);
@@ -273,24 +336,47 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
 
   return (
     <div className="space-y-5">
+      {/* Everything that used to sit above the list — a row of category
+          pills you had to scroll sideways through, and a full-width "new
+          item" button — is an icon up here instead, so the list itself
+          starts at the top of the screen. */}
       <header className="flex items-end justify-between gap-3 pt-2">
-        <div>
-          <h1 className="text-[34px] font-bold leading-tight tracking-tight">Master List</h1>
-          <p className="text-[15px] text-ios-label-2">
-            {items.length} items · {categories.length} categories
+        <div className="min-w-0">
+          <h1 className="truncate text-[34px] font-bold leading-tight tracking-tight">
+            Master List
+          </h1>
+          <p className="truncate text-[15px] text-ios-label-2">
+            {selectedCategory
+              ? `${shownCount} in ${categoryLabel(selectedCategory)}`
+              : `${items.length} items · ${categories.length} categories`}
           </p>
         </div>
         <div className="flex flex-none items-center gap-2">
           <button
             type="button"
-            onClick={openCategories}
-            aria-label="Manage categories"
-            title="Manage categories"
-            className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-ios-surface text-ios-blue shadow-ios transition active:scale-95"
+            onClick={() => setCategoryPickerOpen(true)}
+            aria-label={
+              selectedCategory
+                ? `Category: ${categoryLabel(selectedCategory)} — change or clear`
+                : "Filter by category"
+            }
+            title="Category"
+            className={`flex h-9 w-9 flex-none items-center justify-center rounded-full shadow-ios transition active:scale-95 ${
+              selectedCategory ? "bg-ios-blue text-white" : "bg-ios-surface text-ios-blue"
+            }`}
           >
-            <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+            <CategoryIcon />
+          </button>
+          <button
+            type="button"
+            onClick={startNew}
+            aria-label="New master item"
+            title="New master item"
+            className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-ios-blue text-white shadow-ios transition active:scale-95"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
               <path
-                d="M4 6h16M4 12h10M4 18h6"
+                d="M12 6v12M6 12h12"
                 stroke="currentColor"
                 strokeWidth="2.25"
                 strokeLinecap="round"
@@ -308,23 +394,6 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
           placeholder="Search items, categories or shops"
           className="h-11 w-full rounded-ios bg-ios-surface px-4 text-[17px] shadow-ios outline-none focus:ring-2 focus:ring-ios-blue"
         />
-
-        <div className="-mx-4 overflow-x-auto px-4 pb-1">
-          <div className="flex w-max gap-2">
-            <FilterChip active={categoryId === null} onClick={() => setCategoryId(null)}>
-              All
-            </FilterChip>
-            {categories.map((category) => (
-              <FilterChip
-                key={category.id}
-                active={categoryId === category.id}
-                onClick={() => setCategoryId(category.id)}
-              >
-                {language === "ta" ? (category.nameTa ?? category.nameEn) : category.nameEn}
-              </FilterChip>
-            ))}
-          </div>
-        </div>
 
         {needsTamilCount > 0 || needsTanglishCount > 0 || isAdmin ? (
           <div className="flex flex-wrap items-center gap-2">
@@ -369,17 +438,6 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
         {autoFixMessage ? <p className="text-[13px] text-ios-label-2">{autoFixMessage}</p> : null}
       </div>
 
-      <button
-        type="button"
-        onClick={startNew}
-        className="flex h-12 w-full items-center justify-center gap-2 rounded-ios bg-ios-surface text-[17px] font-semibold text-ios-blue shadow-ios transition active:scale-[0.98]"
-      >
-        <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
-          <path d="M12 6v12M6 12h12" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" />
-        </svg>
-        New master item
-      </button>
-
       {groups.length === 0 ? (
         <p className="ios-card p-6 text-center text-[15px] text-ios-label-2">No items matched.</p>
       ) : (
@@ -391,12 +449,13 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
             <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
               {group.items.map((item) => {
                 const name = displayName(item, language);
+                const price = lastPriceAt(item);
                 return (
-                <li key={item.id} className="flex items-center">
+                <li key={item.id}>
                   <button
                     type="button"
-                    onClick={() => startEdit(item)}
-                    className="ios-row min-w-0 flex-1 text-left active:bg-ios-surface-2"
+                    onClick={() => setViewing(item)}
+                    className="ios-row w-full text-left active:bg-ios-surface-2"
                   >
                     <span className="min-w-0 flex-1">
                       {/* The size rides with the name, as it does on every
@@ -432,28 +491,21 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
                         ) : null}
                       </span>
                     </span>
-                    {item.lastPrice !== null ? (
-                      <span className="flex-none text-[13px] tabular-nums text-ios-label-2">
-                        {formatPrice(item.lastPrice)}
+                    {/* The price of one default quantity — what putting this
+                        on next month's list would cost — over the amount it
+                        is for, so the figure is never read against the wrong
+                        measure. */}
+                    {price ? (
+                      <span className="flex-none text-right">
+                        <span className="block text-[15px] font-semibold tabular-nums">
+                          {formatPrice(price.price)}
+                        </span>
+                        <span className="block text-[12px] text-ios-label-3">{price.amount}</span>
                       </span>
-                    ) : null}
+                    ) : (
+                      <span className="flex-none text-[12px] text-ios-label-3">Not bought yet</span>
+                    )}
                   </button>
-                  <Link
-                    href={`/grocery/items/${item.id}`}
-                    aria-label={`Price history for ${item.nameEn}`}
-                    className="flex h-11 w-11 flex-none items-center justify-center text-ios-label-3 active:opacity-60"
-                  >
-                    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden>
-                      <path
-                        d="M9 5l7 7-7 7"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </Link>
                 </li>
                 );
               })}
@@ -461,6 +513,98 @@ export function MasterBrowser({ items, categories, shops }: MasterBrowserProps) 
           </section>
         ))
       )}
+
+      {/* Opening an item shows it, rather than dropping you into a form:
+          most taps are to check what something is, or what it last cost,
+          and an editable field invites a change that was never intended.
+          Edit is one tap further in. */}
+      <Sheet
+        open={viewing !== null}
+        onClose={() => setViewing(null)}
+        title={
+          viewing
+            ? formatNameWithSize(
+                displayName(viewing, language).primary,
+                sizeOf(viewing.sizeValue, viewing.sizeUnit),
+              )
+            : ""
+        }
+        subtitle={
+          viewing
+            ? [displayName(viewing, language).secondary, viewing.categoryName]
+                .filter(Boolean)
+                .join(" · ")
+            : undefined
+        }
+        footer={
+          viewing ? (
+            <button
+              type="button"
+              onClick={() => {
+                const item = viewing;
+                setViewing(null);
+                startEdit(item);
+              }}
+              className="flex h-12 w-full items-center justify-center rounded-ios bg-ios-blue text-[17px] font-semibold text-white transition active:scale-[0.98]"
+            >
+              Edit item
+            </button>
+          ) : undefined
+        }
+      >
+        {viewing ? <ItemView item={viewing} /> : null}
+      </Sheet>
+
+      {/* One sheet for the whole of "category": pick one to filter by, and
+          the door to renaming them, which is the other thing you come to a
+          category list to do. */}
+      <Sheet
+        open={categoryPickerOpen}
+        onClose={() => setCategoryPickerOpen(false)}
+        title="Category"
+      >
+        <ul className="divide-y divide-ios-separator pb-2">
+          {[null, ...categories].map((category) => {
+            const isSelected = (category?.id ?? null) === categoryId;
+            return (
+              <li key={category?.id ?? "all"}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCategoryId(category?.id ?? null);
+                    setCategoryPickerOpen(false);
+                  }}
+                  className="ios-row w-full text-left active:bg-ios-surface-2"
+                >
+                  <span
+                    className={`min-w-0 flex-1 truncate text-[16px] ${
+                      isSelected ? "font-semibold text-ios-blue" : ""
+                    }`}
+                  >
+                    {category ? categoryLabel(category) : "All categories"}
+                  </span>
+                  <span className="flex-none text-[14px] tabular-nums text-ios-label-3">
+                    {category ? (categoryItemCounts.get(category.id) ?? 0) : items.length}
+                  </span>
+                  <span className="flex h-5 w-5 flex-none items-center justify-center text-ios-blue">
+                    {isSelected ? <CheckIcon /> : null}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <button
+          type="button"
+          onClick={() => {
+            setCategoryPickerOpen(false);
+            openCategories();
+          }}
+          className="mb-2 flex h-11 w-full items-center justify-center rounded-ios bg-ios-surface-2 text-[16px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator active:scale-[0.99]"
+        >
+          Manage categories
+        </button>
+      </Sheet>
 
       <Sheet
         open={draft !== null}
@@ -762,5 +906,61 @@ function FilterChip({
     >
       {children}
     </button>
+  );
+}
+
+
+/** What an item is, and what it last cost — the read-only half of the form. */
+function ItemView({ item }: { item: MasterItemDTO }) {
+  const price = lastPriceAt(item);
+  const size = sizeOf(item.sizeValue, item.sizeUnit);
+
+  return (
+    <div className="space-y-4 pb-3">
+      <div className="rounded-ios bg-ios-surface-2 p-4 ring-1 ring-inset ring-ios-separator">
+        {price ? (
+          <>
+            <p className="text-[28px] font-semibold leading-none tabular-nums">
+              {formatPrice(price.price)}
+            </p>
+            <p className="mt-1.5 text-[13px] text-ios-label-2">
+              {price.forDefault ? "for " : "last paid, for "}
+              {price.amount}
+              {item.lastPriceShopName ? ` · ${item.lastPriceShopName}` : ""}
+            </p>
+          </>
+        ) : (
+          <p className="text-[15px] text-ios-label-2">Never bought yet — no price on record.</p>
+        )}
+      </div>
+
+      <dl className="divide-y divide-ios-separator overflow-hidden rounded-ios bg-ios-surface-2 ring-1 ring-inset ring-ios-separator">
+        <ViewRow label="Tamil name" value={item.nameTa} />
+        <ViewRow label="Tanglish name" value={item.nameTl?.trim() || "—"} />
+        <ViewRow label="English name" value={item.nameEn} />
+        <ViewRow label="Category" value={item.categoryName} />
+        <ViewRow label="Unit type" value={unitOptionLabel(item.unitType)} />
+        <ViewRow label="Default quantity" value={formatQtyWithSize(item.defaultQty, item.unitType, size)} />
+        {size ? <ViewRow label="Size" value={formatQty(size.value, size.unit)} /> : null}
+        <ViewRow label="Shop by" value={item.shopName ?? "Not set"} />
+        {item.isActive ? null : <ViewRow label="Status" value="Hidden from search" />}
+      </dl>
+
+      <Link
+        href={`/grocery/items/${item.id}`}
+        className="flex h-11 w-full items-center justify-center rounded-ios bg-ios-surface-2 text-[16px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator active:scale-[0.99]"
+      >
+        Price history
+      </Link>
+    </div>
+  );
+}
+
+function ViewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 px-4 py-2.5">
+      <dt className="flex-none text-[13px] text-ios-label-2">{label}</dt>
+      <dd className="min-w-0 text-right text-[15px]">{value}</dd>
+    </div>
   );
 }

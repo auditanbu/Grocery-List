@@ -314,6 +314,26 @@ once the list has been finalized and reality starts diverging from the plan:
   prices recorded on them with it. The list page is where you can see what
   you are about to lose, and after deleting there is nothing left to stay
   on, so it returns to `/grocery`.
+- **The Master List opens each item as a card, not a form.** Most taps are
+  to check what something is or what it last cost, and a form invites a
+  change that was never intended — so a row opens read-only (names,
+  category, unit, default quantity, size, shop, the last price and a way
+  through to its history) with **Edit item** one tap further in, which
+  hands the same item to the form that was there before.
+- **Every row prices the default quantity** (`lastPriceAt` in
+  `MasterBrowser.tsx`, on `totalAmount` → `projectPrice`). The raw last
+  price answers a question nobody asked: ₹660 was three kilos of coriander
+  that month, which says nothing about the kilo you are about to put on
+  next month's list. The row reads ₹220.00 over "1 kg" instead — and when
+  the two amounts cannot be converted at all, it shows the price actually
+  paid over the amount it actually bought, rather than a converted figure
+  that would be wrong.
+- **The header carries the controls that used to sit above the list**: a
+  category icon (its own sheet, with the counts and a way through to
+  renaming categories) in place of a row of pills you scrolled sideways
+  through, and a **+** in place of a full-width "new master item" button.
+  The icon fills in when a category is chosen and the subtitle says which,
+  so a filter is never on without showing.
 - **The History tab searches everything ever bought**, from a field pinned
   at the bottom where a thumb reaches it (the shopping list's own
   `ListSearchBar`). The two standing sections answer "what changed" and
