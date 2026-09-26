@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { PriceMoves } from "@/components/history/PriceMoves";
 import { ListSearchBar } from "@/components/list/ListSearchBar";
 import { monthKeyToLabel } from "@/lib/dates";
@@ -47,12 +48,19 @@ export function HistoryScreen({ items, moves, lists }: HistoryScreenProps) {
   return (
     // Bottom padding clears the pinned search bar, as on the list screen.
     <div className="space-y-6 pb-16">
-      <header className="pt-2">
-        <h1 className="text-[34px] font-bold leading-tight tracking-tight">History</h1>
-        <p className="text-[15px] text-ios-label-2">
-          {completed.length} month{completed.length === 1 ? "" : "s"} recorded ·{" "}
-          {formatPrice(totalSpent)} total
-        </p>
+      {/* Same shape as the Master List's header: the page's own title, and
+          the language control where every other screen keeps it. */}
+      <header className="flex items-end justify-between gap-3 pt-2">
+        <div>
+          <h1 className="text-[34px] font-bold leading-tight tracking-tight">History</h1>
+          <p className="text-[15px] text-ios-label-2">
+            {completed.length} month{completed.length === 1 ? "" : "s"} recorded ·{" "}
+            {formatPrice(totalSpent)} total
+          </p>
+        </div>
+        <div className="flex flex-none items-center gap-2">
+          <LanguageToggle />
+        </div>
       </header>
 
       {needle ? (

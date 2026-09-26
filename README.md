@@ -328,7 +328,10 @@ once the list has been finalized and reality starts diverging from the plan:
   without an earlier price) but still opening onto what it cost. Both lists
   come from one query, `getPurchasedItems`, with `biggestMoves` ranking a
   slice of that same array, so the two can never disagree about what an
-  item last cost.
+  item last cost. The header carries the `LanguageToggle` the other screens
+  have, and the rows follow it through `displayName` rather than being
+  fixed to Tamil — a control that did not move what is under it would be
+  decoration.
 - **A stray price can be taken out**, from the item's own page
   (*Show all*), admin-only and confirmed: `deletePriceEntry`. Price history
   is append-only otherwise, and stays that way — this is the one door, for

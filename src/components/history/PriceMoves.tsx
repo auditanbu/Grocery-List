@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { PriceDelta } from "@/components/PriceDelta";
 import { getItemPriceHistory } from "@/lib/actions";
+import { displayName, useLanguage } from "@/lib/language";
 import { formatPrice, formatQtyWithSize, sizeOf } from "@/lib/units";
 import type { PriceHistoryDTO, PriceMoveDTO } from "@/lib/types";
 
@@ -23,6 +24,7 @@ const INLINE_ENTRIES = 3;
  * the list is comparing what moved against what else did.
  */
 export function PriceMoves({ changes }: { changes: PriceMoveDTO[] }) {
+  const { language } = useLanguage();
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [historyByItem, setHistoryByItem] = useState<
     Record<number, PriceHistoryDTO[] | undefined>
@@ -43,6 +45,7 @@ export function PriceMoves({ changes }: { changes: PriceMoveDTO[] }) {
       {changes.map((change) => {
         const expanded = expandedId === change.itemId;
         const history = historyByItem[change.itemId];
+        const name = displayName(change, language);
         return (
           <li key={change.itemId}>
             <button
@@ -52,12 +55,12 @@ export function PriceMoves({ changes }: { changes: PriceMoveDTO[] }) {
               className="ios-row w-full text-left active:bg-ios-surface-2"
             >
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[16px] font-medium">{change.nameTa}</span>
+                <span className="block truncate text-[16px] font-medium">{name.primary}</span>
                 {/* Wraps rather than truncates: the amount is the half of
                     this line that makes the price mean anything, and it is
                     the half that falls off the end. */}
                 <span className="block text-[13px] text-ios-label-2">
-                  {change.nameEn} · {formatPrice(change.current)} for{" "}
+                  {name.secondary} · {formatPrice(change.current)} for{" "}
                   {formatQtyWithSize(
                     change.currentRawQuantity,
                     change.unitType,
