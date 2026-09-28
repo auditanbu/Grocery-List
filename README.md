@@ -560,6 +560,14 @@ household's real total is this plus those two.
   methods are admin-only and confirmed. A person who has already paid for
   something is hidden rather than deleted — removing them would take their
   shares with them and silently rewrite balances that were already settled.
+- **Categories, people and methods are all managed from one sheet**
+  (`PeopleSheet.tsx`, opened from the header's people icon) — none of the
+  three exist until an admin adds one, or the demo seed does
+  (`seedExpenseDefaults` in `prisma/seed.ts`, additive-only: it fills
+  `ExpenseCategory`/`PaymentMethod` only when those tables are empty, and
+  never touches `ExpensePerson`). A fresh database with the seed never run
+  has zero categories, which otherwise shows up as an entry sheet with no
+  category to pick and no way to submit — this sheet is the fix.
 
 ### Trips
 
