@@ -78,33 +78,33 @@ model Shop {
 
 /// A master-data grocery item.
 model Item {
-  id              Int      @id @default(autoincrement())
-  nameTa          String
-  nameEn          String
+  id         Int       @id @default(autoincrement())
+  nameTa     String
+  nameEn     String
   /// "Tanglish" — the Tamil name written in Latin script
   /// (கடலை பருப்பு -> "Kadalai Paruppu"). Optional: null means nobody has
   /// supplied one yet, and the UI falls back to the Tamil name. Kept
   /// separate from nameEn because the English name is a *translation*
   /// ("Bengal gram"), not something you can read out loud at the shop.
-  nameTl          String?
-  unitType        UnitType @default(COUNT)
+  nameTl     String?
+  unitType   UnitType  @default(COUNT)
   /// Quantity pre-filled when the item is added to a list.
-  defaultQty      Decimal  @default(1) @db.Decimal(10, 2)
-  categoryId      Int
+  defaultQty Decimal   @default(1) @db.Decimal(10, 2)
+  categoryId Int
   /// Default shop ("From"); can be overridden per list item.
-  shopId          Int?
-  isActive        Boolean  @default(true)
+  shopId     Int?
+  isActive   Boolean   @default(true)
   /// Pack size — what one of this item comes in: a 200 g tube of paste, a
   /// 500 ml bottle of dish wash. Null for anything sold loose, where the
   /// quantity is already the measure (2 kg of dal). Only countable items
   /// carry one: `defaultQty` then counts packs and the size says how big
   /// each pack is, which is the part that changes at the shop when the
   /// store only stocks 150 g.
-  sizeValue       Decimal? @db.Decimal(10, 2)
-  sizeUnit        UnitType?
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  sizeValue  Decimal?  @db.Decimal(10, 2)
+  sizeUnit   UnitType?
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   category       Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   shop           Shop?             @relation(fields: [shopId], references: [id], onDelete: SetNull)
@@ -139,35 +139,35 @@ model GroceryList {
 
 /// One row of a monthly list.
 model GroceryListItem {
-  id       Int      @id @default(autoincrement())
-  listId   Int
-  itemId   Int
-  quantity Decimal  @db.Decimal(10, 2)
+  id        Int       @id @default(autoincrement())
+  listId    Int
+  itemId    Int
+  quantity  Decimal   @db.Decimal(10, 2)
   /// Snapshot of the item's unit at the time it was added.
-  unitType UnitType
+  unitType  UnitType
   /// Snapshot of the item's pack size, and the one field shopping is meant
   /// to change: the list says 200 g, the shop only has 150 g, so the row is
   /// re-sized before the price is recorded. Null for items sold loose.
   sizeValue Decimal?  @db.Decimal(10, 2)
   sizeUnit  UnitType?
   /// Shop this row must be bought from (overrides Item.shopId).
-  shopId   Int?
+  shopId    Int?
 
-  isPurchased      Boolean   @default(false)
+  isPurchased       Boolean   @default(false)
   /// Price actually paid, entered while shopping.
-  purchasePrice    Decimal?  @db.Decimal(10, 2)
+  purchasePrice     Decimal?  @db.Decimal(10, 2)
   /// Snapshot of the previous month's price, kept for the up/down indicator.
-  previousPrice    Decimal?  @db.Decimal(10, 2)
+  previousPrice     Decimal?  @db.Decimal(10, 2)
   /// Snapshot of the quantity/unit that previousPrice was paid for — needed
   /// to compare fairly when a variable-unit item's size changes between
   /// purchases (e.g. 150g this month vs. 200g last month).
-  previousQuantity Decimal?  @db.Decimal(10, 2)
-  previousUnitType UnitType?
+  previousQuantity  Decimal?  @db.Decimal(10, 2)
+  previousUnitType  UnitType?
   /// ...and of the pack size it was paid for, since that is where a
   /// packaged item's amount actually lives (1 × 200 g, then 1 × 150 g).
   previousSizeValue Decimal?  @db.Decimal(10, 2)
   previousSizeUnit  UnitType?
-  purchasedAt      DateTime?
+  purchasedAt       DateTime?
 
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
@@ -185,18 +185,18 @@ model GroceryListItem {
 /// Append-only record of what an item actually cost, used for
 /// "cheaper / dearer than last month" comparisons.
 model PriceHistory {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   itemId      Int
   listId      Int?
   shopId      Int?
-  price       Decimal  @db.Decimal(10, 2)
-  quantity    Decimal  @db.Decimal(10, 2)
+  price       Decimal   @db.Decimal(10, 2)
+  quantity    Decimal   @db.Decimal(10, 2)
   unitType    UnitType
   /// Pack size the price was paid for — "₹95 for 1 × 200 g". Null for
   /// items sold loose.
   sizeValue   Decimal?  @db.Decimal(10, 2)
   sizeUnit    UnitType?
-  purchasedAt DateTime @default(now())
+  purchasedAt DateTime  @default(now())
 
   item Item         @relation(fields: [itemId], references: [id], onDelete: Cascade)
   /// Deleting a list deletes what was recorded on it. Detaching the rows
@@ -238,16 +238,16 @@ model Vehicle {
 /// One refuel: how much, which vehicle, when, and (if the browser allowed
 /// it) where — captured automatically via the Geolocation API.
 model FuelEntry {
-  id          Int         @id @default(autoincrement())
-  vehicleId   Int
-  amount      Decimal     @db.Decimal(10, 2)
-  refueledAt  DateTime
-  latitude    Decimal?    @db.Decimal(9, 6)
-  longitude   Decimal?    @db.Decimal(9, 6)
+  id            Int      @id @default(autoincrement())
+  vehicleId     Int
+  amount        Decimal  @db.Decimal(10, 2)
+  refueledAt    DateTime
+  latitude      Decimal? @db.Decimal(9, 6)
+  longitude     Decimal? @db.Decimal(9, 6)
   /// A short human-readable area name resolved from lat/lng client-side (e.g. "Indiranagar, Bengaluru").
-  locationLabel String?     @db.VarChar(191)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  locationLabel String?  @db.VarChar(191)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   vehicle Vehicle @relation(fields: [vehicleId], references: [id])
 
@@ -323,4 +323,177 @@ model FamilyRelationship {
   @@unique([fromMemberId, toMemberId, type])
   @@index([fromMemberId])
   @@index([toMemberId])
+}
+
+// ---------------------------------------------------------------------------
+// Expense Tracker module
+// ---------------------------------------------------------------------------
+//
+// Everything the household spends that isn't groceries or fuel — those two
+// have their own modules and stay there, so this ledger's monthly total is
+// deliberately "everything else".
+//
+// One ledger doing two jobs, taken from the two apps it was modelled on:
+//   * a personal ledger (Wallet) — Expense rows under ExpenseCategory, capped
+//     by ExpenseBudget and totalled per month;
+//   * a shared one (Splitwise) — every Expense names who paid it, and may
+//     split across ExpensePerson via ExpenseShare, leaving balances that
+//     Settlement rows pay off.
+//
+// Balances are never stored: they are what the shares and settlements add up
+// to, worked out in src/lib/expenses/balances.ts. A stored balance is a second
+// source of truth that drifts the first time a row is edited.
+
+enum EntryKind {
+  EXPENSE
+  INCOME
+}
+
+/// How an expense divides between the people on it.
+///   EQUAL  — split evenly; the paise remainder lands on whoever paid.
+///   EXACT  — a typed amount each, which must sum to the expense.
+///   SHARES — weighted (2 shares to 1); percentages are this by another name.
+enum SplitMethod {
+  EQUAL
+  EXACT
+  SHARES
+}
+
+/// What an entry is for: Rent, School, Medical — or, for income, Salary.
+model ExpenseCategory {
+  id        Int       @id @default(autoincrement())
+  nameEn    String
+  nameTa    String?
+  /// Categories are listed for one kind or the other: you do not file a
+  /// salary under Medical, and an expense sheet should not offer it.
+  kind      EntryKind @default(EXPENSE)
+  sortOrder Int       @default(0)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  expenses Expense[]
+  budget   ExpenseBudget?
+
+  @@unique([nameEn, kind])
+  @@index([kind, sortOrder])
+}
+
+/// Someone who pays for things, or owes for them.
+///
+/// Kept apart from FamilyMember on purpose: that is a genealogy of 83 people
+/// including the long dead, and a picker over it would be unusable. This is
+/// the three or four people who actually share a bill.
+model ExpensePerson {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  /// One of the app's accent names (blue, green, orange, ...) — how the
+  /// person reads at a glance in a list of shares. Null means the default.
+  colorKey  String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  paidExpenses     Expense[]
+  shares           ExpenseShare[]
+  settlementsPaid  Settlement[]   @relation("SettlementFrom")
+  settlementsTaken Settlement[]   @relation("SettlementTo")
+}
+
+/// How it was paid — Cash, GPay, a particular card.
+///
+/// A label, not an account: it carries no balance, so nothing here can go out
+/// of step with a bank the app cannot see.
+model PaymentMethod {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  expenses Expense[]
+}
+
+/// One entry in the ledger: money out (EXPENSE) or money in (INCOME).
+model Expense {
+  id          Int          @id @default(autoincrement())
+  kind        EntryKind    @default(EXPENSE)
+  amount      Decimal      @db.Decimal(10, 2)
+  spentAt     DateTime
+  /// Sortable "YYYY-MM" derived from spentAt, so a month's entries are one
+  /// indexed lookup — the same key GroceryList sorts by.
+  monthKey    String
+  categoryId  Int
+  /// Who actually paid. Null when nobody has said — an entry still counts
+  /// towards the month's total, it just cannot take part in a balance.
+  paidById    Int?
+  methodId    Int?
+  note        String?
+  /// Null when the entry is one person's alone; set when shares exist.
+  splitMethod SplitMethod?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  category ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  paidBy   ExpensePerson?  @relation(fields: [paidById], references: [id], onDelete: SetNull)
+  method   PaymentMethod?  @relation(fields: [methodId], references: [id], onDelete: SetNull)
+  shares   ExpenseShare[]
+
+  @@index([monthKey])
+  @@index([categoryId])
+  @@index([paidById])
+  @@index([spentAt])
+}
+
+/// One person's part of a split expense. The shares of an expense always sum
+/// to its amount, to the paisa — enforced when they are written.
+model ExpenseShare {
+  id         Int     @id @default(autoincrement())
+  expenseId  Int
+  personId   Int
+  amount     Decimal @db.Decimal(10, 2)
+  /// Weight for a SHARES split ("2 shares to 1"), kept so the split can be
+  /// reopened and adjusted rather than re-derived from rupees. Null otherwise.
+  shareUnits Int?
+
+  expense Expense       @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  person  ExpensePerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([expenseId, personId])
+  @@index([personId])
+}
+
+/// Money actually handed over to clear a debt — Splitwise's "settle up".
+/// Not an expense: it moves what is already owed, it does not spend anything,
+/// so it never counts towards a month's total or a budget.
+model Settlement {
+  id           Int      @id @default(autoincrement())
+  fromPersonId Int
+  toPersonId   Int
+  amount       Decimal  @db.Decimal(10, 2)
+  settledAt    DateTime @default(now())
+  monthKey     String
+  note         String?
+  createdAt    DateTime @default(now())
+
+  fromPerson ExpensePerson @relation("SettlementFrom", fields: [fromPersonId], references: [id], onDelete: Cascade)
+  toPerson   ExpensePerson @relation("SettlementTo", fields: [toPersonId], references: [id], onDelete: Cascade)
+
+  @@index([monthKey])
+  @@index([fromPersonId])
+  @@index([toPersonId])
+}
+
+/// A category's monthly ceiling. One amount that applies every month, the way
+/// FuelBudget is one adjustable limit — a row per category per month is a lot
+/// of upkeep for a number a household sets once and revisits twice a year.
+model ExpenseBudget {
+  id         Int      @id @default(autoincrement())
+  categoryId Int      @unique
+  amount     Decimal  @db.Decimal(10, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 }

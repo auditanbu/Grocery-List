@@ -27,6 +27,33 @@ const MODULES = [
     ),
   },
   {
+    href: "/expenses",
+    name: "Expenses",
+    description: "Log what the household spends, split a bill, settle up, keep a category in budget.",
+    accent: "bg-ios-blue-soft text-ios-blue",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-7 w-7" aria-hidden>
+        <rect
+          x="3"
+          y="6"
+          width="18"
+          height="13"
+          rx="2.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+        />
+        <path
+          d="M3 10.5h18M7 15h4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
+  {
     href: "/petrol",
     name: "Petrol Card",
     description: "Log refuels by vehicle, track spend against a monthly budget.",

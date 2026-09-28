@@ -173,6 +173,48 @@ async function seedDemoCurrentMonth(prisma: ReturnType<typeof createScriptClient
   );
 }
 
+/**
+ * Starting categories and payment methods for the Expense Tracker.
+ *
+ * Only ever inserted into an empty table: renaming "Eating out" or deleting a
+ * method you never use is a decision, and re-running the seed should not
+ * quietly undo it.
+ */
+async function seedExpenseDefaults(prisma: ReturnType<typeof createScriptClient>) {
+  const categoryCount = await prisma.expenseCategory.count();
+  if (categoryCount === 0) {
+    const categories: { nameEn: string; nameTa: string; kind: "EXPENSE" | "INCOME" }[] = [
+      { nameEn: "Rent", nameTa: "வாடகை", kind: "EXPENSE" },
+      { nameEn: "School", nameTa: "பள்ளி", kind: "EXPENSE" },
+      { nameEn: "Medical", nameTa: "மருத்துவம்", kind: "EXPENSE" },
+      { nameEn: "Utilities", nameTa: "மின்சாரம் / தண்ணீர்", kind: "EXPENSE" },
+      { nameEn: "Eating out", nameTa: "வெளியில் சாப்பாடு", kind: "EXPENSE" },
+      { nameEn: "Travel", nameTa: "பயணம்", kind: "EXPENSE" },
+      { nameEn: "Shopping", nameTa: "ஷாப்பிங்", kind: "EXPENSE" },
+      { nameEn: "Household", nameTa: "வீட்டு செலவு", kind: "EXPENSE" },
+      { nameEn: "Gifts", nameTa: "பரிசு", kind: "EXPENSE" },
+      { nameEn: "Other", nameTa: "மற்றவை", kind: "EXPENSE" },
+      { nameEn: "Salary", nameTa: "சம்பளம்", kind: "INCOME" },
+      { nameEn: "Other income", nameTa: "பிற வருமானம்", kind: "INCOME" },
+    ];
+    await prisma.expenseCategory.createMany({
+      data: categories.map((category, index) => ({ ...category, sortOrder: index })),
+    });
+    console.log(`   categories: ${categories.length}`);
+  }
+
+  const methodCount = await prisma.paymentMethod.count();
+  if (methodCount === 0) {
+    const methods = ["Cash", "GPay", "Card", "Bank transfer"];
+    await prisma.paymentMethod.createMany({
+      data: methods.map((name, index) => ({ name, sortOrder: index })),
+    });
+    console.log(`   methods:    ${methods.length}`);
+  }
+
+  if (categoryCount > 0 && methodCount > 0) console.log("   already set up — nothing changed");
+}
+
 async function main() {
   const prisma = createScriptClient();
   try {
@@ -195,6 +237,9 @@ async function main() {
     console.log("✔ Family tree seeded");
     console.log(`   members:       ${familyResult.members.created} created, ${familyResult.members.updated} updated`);
     console.log(`   relationships: ${familyResult.relationships.created} created, ${familyResult.relationships.updated} updated`);
+
+    console.log("✔ Expense tracker seeded");
+    await seedExpenseDefaults(prisma);
 
     if (process.env.SEED_DEMO === "1") {
       await seedDemoHistory(prisma);

@@ -66,6 +66,18 @@ const MASTER_TAB: Tab = {
   ),
 };
 
+const EXPENSES_TAB: Tab = {
+  href: "/expenses",
+  label: "Expenses",
+  icon: (active) => (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden {...strokeProps}>
+      <rect x="3" y="6" width="18" height="12.5" rx="2.5" fill={active ? "currentColor" : "none"} />
+      <path d="M3 10h18" stroke={active ? "#fff" : "currentColor"} />
+      <path d="M7 14.5h3.5" stroke={active ? "#fff" : "currentColor"} />
+    </svg>
+  ),
+};
+
 const FAMILY_TAB: Tab = {
   href: "/family",
   label: "Family",
@@ -100,8 +112,9 @@ function isActive(pathname: string, href: string) {
 
 /*
  * Tabs are context-sensitive: inside a module with sub-pages, its own tabs
- * replace the flat module list. Five is the practical ceiling on an iPhone SE,
- * so the in-grocery bar drops the other modules rather than growing to six.
+ * replace the flat module list. Five is the practical ceiling on an iPhone SE
+ * — which the module list now sits exactly on — so the in-grocery bar drops
+ * the other modules rather than growing past it.
  */
 export function AppNav() {
   const pathname = usePathname() ?? "/";
@@ -109,7 +122,7 @@ export function AppNav() {
 
   const tabs: Tab[] = inGrocery
     ? [HOME_TAB, GROCERY_TAB, MASTER_TAB, HISTORY_TAB]
-    : [HOME_TAB, GROCERY_TAB, PETROL_TAB, FAMILY_TAB];
+    : [HOME_TAB, GROCERY_TAB, EXPENSES_TAB, PETROL_TAB, FAMILY_TAB];
 
   return (
     <>

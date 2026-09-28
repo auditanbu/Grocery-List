@@ -499,6 +499,68 @@ or parent from a person's card, or start an unconnected "New branch";
 `FamilyRelationship` graph into nested nodes for the UI, resolving each
 person's spouse(s) alongside them and their children below.
 
+## 7. Expense Tracker module
+
+Everything the household spends that is not groceries or fuel, at
+`/expenses`. Modelled on the two apps it was asked to be modelled on, which
+are two different ledgers:
+
+- **Wallet (BudgetBakers)** is personal — records under categories, capped by
+  budgets, totalled per month.
+- **Splitwise** is shared — who *paid*, how it *splits*, a running balance per
+  person, and *settle up* payments against it.
+
+This module is one ledger doing both: every entry has a category **and** a
+payer, and may split between people.
+
+### What was deliberately left out
+
+Wallet's accounts and balances, transfers, planned/recurring payments, receipt
+photos, multi-currency and bank sync; Splitwise's groups (a household is one
+group), comments and activity feed. **Payment method is a label** — Cash, GPay,
+a particular card — carrying no balance, so nothing here can drift out of step
+with a bank the app cannot see.
+
+**Grocery and petrol stay in their own modules.** This ledger's monthly total
+is deliberately "everything else", which is why the summary card says so: the
+household's real total is this plus those two.
+
+### How it hangs together
+
+- `ExpenseCategory` (per `EntryKind`, so a salary is never offered on an
+  expense sheet) · `ExpensePerson` · `PaymentMethod` · `Expense` ·
+  `ExpenseShare` · `Settlement` · `ExpenseBudget`.
+- `ExpensePerson` is **not** `FamilyMember`: the tree holds 83 people including
+  the long dead, and a split picker over it would be unusable. This is the
+  three or four who actually share a bill.
+- `ExpenseBudget` is one amount per category applying every month — the same
+  choice `FuelBudget` makes — rather than a row per category per month.
+- **Balances are computed, never stored** (`src/lib/expenses/balances.ts`, kept
+  free of the database like `prisma/price-audit.ts`). Net per person is what
+  they paid minus what they owe, plus settlements; `simplify()` then does
+  Splitwise's trick of repeatedly settling the largest debtor against the
+  largest creditor, so three people who owe each other in a circle make one
+  payment, not three. They are **all-time, not per month**: a September debt is
+  still a debt in October, and the settlement that clears it usually lands in a
+  different month from the expense that caused it.
+- Money is divided **in paise, as integers**. A third of ₹100 is not
+  representable in floating point, and a ledger that loses a paisa per split
+  stops adding up by the end of the month. An equal split of ₹100 three ways is
+  33.34 / 33.33 / 33.33 — the remainder goes to whoever paid, because they are
+  the one who handed over the odd amount.
+- An **EXACT** split that does not sum to the entry is refused, with the
+  shortfall named. The add sheet shows the same figure live while you type, so
+  it is visible before it is rejected. Percentages are `SHARES` by another
+  name, and Splitwise's "adjustment" is `EXACT` with the arithmetic done for
+  you, which is why there are three split methods rather than five.
+- A settlement is **not** an expense: it moves what is already owed, so it
+  never counts towards a month's total or a budget.
+- Admin gating follows the Petrol module: anyone can add and edit an entry;
+  deleting one, moving a budget, and adding or removing people, categories and
+  methods are admin-only and confirmed. A person who has already paid for
+  something is hidden rather than deleted — removing them would take their
+  shares with them and silently rewrite balances that were already settled.
+
 ## App structure
 
 ```
@@ -518,6 +580,7 @@ src/
     master/page.tsx         Master List tab — browse/search/edit the catalogue
     history/page.tsx        History tab — spend per month, biggest price moves
     items/[id]/page.tsx      Per-item price history
+    expenses/page.tsx      Expense Tracker — one month of the ledger
     api/health/route.ts      Liveness probe for the container health check
     family/page.tsx          Family Tree module
     manifest.ts              Web App Manifest
