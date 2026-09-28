@@ -561,6 +561,40 @@ household's real total is this plus those two.
   something is hidden rather than deleted — removing them would take their
   shares with them and silently rewrite balances that were already settled.
 
+### Trips
+
+A **trip** (`/expenses/trips/[id]`) is a named pot of expenses with a fixed
+roster — `ExpenseTrip` + `TripParticipant` — settled as its own self-contained
+unit rather than folded into the household's ongoing balance.
+
+- Every expense logged under a trip **defaults to an EQUAL split across the
+  whole roster**, chosen the moment the trip is picked in the entry sheet
+  (`chooseTrip` in `EntrySheet.tsx`). That is what makes "log a trip's
+  expenses, split the whole thing equally at the end" true without a second
+  kind of arithmetic: summing many equally-split expenses and settling once
+  at the end gives the same answer, to the paisa, as one lump equal split of
+  the total would — while staying editable per expense for the one person
+  who skipped a meal.
+- A trip's **balance and settle-up are scoped to that trip alone**
+  (`getTripBalances` in `queries.ts`, the same `netBalances`/`simplify` the
+  household view uses, just filtered to `tripId`). `Settlement.tripId` is set
+  when a trip's own "Settle up" is used, so the trip can read "fully settled"
+  independent of any other debt the same two people happen to owe each other
+  outside it. Trip debts still show up in the household-wide **Balances**
+  section too — real money owed is real money owed, and that section is
+  unscoped by design.
+- **Closing** a trip (`closedAt`) only hides it from the "add an expense"
+  trip picker; the balance and history stay visible and correct either way,
+  so it is a tidiness step, never a lock, and reopening is one tap.
+- **Deleting** a trip cascades its expenses — the same choice
+  `GroceryList → GroceryListItem` makes, since a trip's expenses are
+  meaningless once the trip itself is gone. Admin-only, and the confirmation
+  says how many expenses go with it.
+- Removing a person from a trip's roster is refused while they still hold a
+  share of one of its expenses (`updateTrip`) — the same "hide, don't
+  silently break the ledger" reasoning as removing a person from the app
+  entirely.
+
 ## App structure
 
 ```

@@ -12,6 +12,8 @@ import type {
   PaymentMethodDTO,
   SettlementDTO,
   TransferDTO,
+  TripDetailDTO,
+  TripSummaryDTO,
 } from "./types";
 
 type DecimalLike = { toNumber(): number } | number | null | undefined;
@@ -119,7 +121,7 @@ async function getBalances(
 export async function getExpenseMonth(monthKey: string): Promise<ExpenseMonthDTO> {
   const { start, end } = monthRange(monthKey);
 
-  const [rows, settlementRows, categories, people, methods] = await Promise.all([
+  const [rows, settlementRows, categories, people, methods, openTrips] = await Promise.all([
     prisma.expense.findMany({
       where: { spentAt: { gte: start, lt: end } },
       orderBy: [{ spentAt: "desc" }, { id: "desc" }],
@@ -127,6 +129,7 @@ export async function getExpenseMonth(monthKey: string): Promise<ExpenseMonthDTO
         category: true,
         paidBy: true,
         method: true,
+        trip: true,
         shares: { include: { person: true } },
       },
     }),
@@ -138,6 +141,7 @@ export async function getExpenseMonth(monthKey: string): Promise<ExpenseMonthDTO
     getExpenseCategories(),
     getPeople(),
     getPaymentMethods(),
+    getTrips({ openOnly: true }),
   ]);
 
   const entries: ExpenseDTO[] = rows.map((row) => ({
@@ -155,6 +159,8 @@ export async function getExpenseMonth(monthKey: string): Promise<ExpenseMonthDTO
     methodName: row.method?.name ?? null,
     note: row.note,
     splitMethod: row.splitMethod,
+    tripId: row.tripId,
+    tripName: row.trip?.name ?? null,
     shares: row.shares.map((share) => ({
       personId: share.personId,
       personName: share.person.name,
@@ -213,6 +219,7 @@ export async function getExpenseMonth(monthKey: string): Promise<ExpenseMonthDTO
     categories,
     people,
     methods,
+    openTrips,
   };
 }
 
@@ -224,4 +231,198 @@ export async function getExpenseMonths(): Promise<string[]> {
     orderBy: { monthKey: "desc" },
   });
   return rows.map((row) => row.monthKey);
+}
+
+/**
+ * A trip's own balance and simplified transfers — the same functions
+ * getExpenseMonth's household-wide balances use, just filtered to one
+ * trip's expenses and settlements, so a trip can read "settled" on its own
+ * without pulling in every other debt the same two people happen to owe
+ * each other elsewhere.
+ */
+async function getTripBalances(
+  tripId: number,
+  people: ExpensePersonDTO[],
+): Promise<{ balances: BalanceDTO[]; transfers: TransferDTO[] }> {
+  const [expenses, settlements] = await Promise.all([
+    prisma.expense.findMany({
+      where: { tripId, kind: "EXPENSE", shares: { some: {} } },
+      select: { paidById: true, shares: { select: { personId: true, amount: true } } },
+    }),
+    prisma.settlement.findMany({
+      where: { tripId },
+      select: { fromPersonId: true, toPersonId: true, amount: true },
+    }),
+  ]);
+
+  const net = netBalances({
+    expenses: expenses.map((expense) => ({
+      paidById: expense.paidById,
+      shares: expense.shares.map((share) => ({
+        personId: share.personId,
+        amountPaise: toPaise(num(share.amount)),
+      })),
+    })),
+    settlements: settlements.map((settlement) => ({
+      fromPersonId: settlement.fromPersonId,
+      toPersonId: settlement.toPersonId,
+      amountPaise: toPaise(num(settlement.amount)),
+    })),
+  });
+
+  const nameOf = new Map(people.map((person) => [person.id, person]));
+  const balances: BalanceDTO[] = [...net.entries()]
+    .filter(([, paise]) => paise !== 0)
+    .map(([personId, paise]) => ({
+      personId,
+      personName: nameOf.get(personId)?.name ?? "Someone",
+      colorKey: nameOf.get(personId)?.colorKey ?? null,
+      net: toRupees(paise),
+    }))
+    .sort((a, b) => b.net - a.net);
+
+  const transfers: TransferDTO[] = simplify(net).map((transfer) => ({
+    fromPersonId: transfer.fromPersonId,
+    fromName: nameOf.get(transfer.fromPersonId)?.name ?? "Someone",
+    toPersonId: transfer.toPersonId,
+    toName: nameOf.get(transfer.toPersonId)?.name ?? "Someone",
+    amount: toRupees(transfer.amountPaise),
+  }));
+
+  return { balances, transfers };
+}
+
+/**
+ * Every trip, newest first, with its total and whether it is fully settled.
+ * `openOnly` narrows to trips still taking new expenses — what the "add an
+ * expense" picker offers.
+ */
+export async function getTrips(options?: { openOnly?: boolean }): Promise<TripSummaryDTO[]> {
+  const trips = await prisma.expenseTrip.findMany({
+    where: options?.openOnly ? { closedAt: null } : undefined,
+    orderBy: [{ closedAt: "asc" }, { sortOrder: "asc" }, { id: "desc" }],
+    include: {
+      participants: { include: { person: true } },
+      expenses: { where: { kind: "EXPENSE" }, select: { amount: true } },
+    },
+  });
+
+  return Promise.all(
+    trips.map(async (trip) => {
+      const people = trip.participants.map((participant) => participant.person);
+      const total = trip.expenses.reduce((sum, expense) => sum + num(expense.amount), 0);
+      const { balances } = await getTripBalances(
+        trip.id,
+        people.map((person) => ({
+          id: person.id,
+          name: person.name,
+          colorKey: person.colorKey,
+          isActive: person.isActive,
+        })),
+      );
+      return {
+        id: trip.id,
+        name: trip.name,
+        closedAt: trip.closedAt ? trip.closedAt.toISOString() : null,
+        participantIds: people.map((person) => person.id),
+        participantNames: people.map((person) => person.name),
+        total,
+        settled: balances.length === 0,
+      };
+    }),
+  );
+}
+
+export async function getTripDetail(tripId: number): Promise<TripDetailDTO | null> {
+  const trip = await prisma.expenseTrip.findUnique({
+    where: { id: tripId },
+    include: { participants: { include: { person: true } } },
+  });
+  if (!trip) return null;
+
+  const [rows, settlementRows, categories, people, methods] = await Promise.all([
+    prisma.expense.findMany({
+      where: { tripId },
+      orderBy: [{ spentAt: "desc" }, { id: "desc" }],
+      include: {
+        category: true,
+        paidBy: true,
+        method: true,
+        trip: true,
+        shares: { include: { person: true } },
+      },
+    }),
+    prisma.settlement.findMany({
+      where: { tripId },
+      orderBy: [{ settledAt: "desc" }, { id: "desc" }],
+      include: { fromPerson: true, toPerson: true },
+    }),
+    getExpenseCategories(),
+    getPeople(),
+    getPaymentMethods(),
+  ]);
+
+  const entries: ExpenseDTO[] = rows.map((row) => ({
+    id: row.id,
+    kind: row.kind,
+    amount: num(row.amount),
+    spentAt: row.spentAt.toISOString(),
+    monthKey: row.monthKey,
+    categoryId: row.categoryId,
+    categoryNameEn: row.category.nameEn,
+    categoryNameTa: row.category.nameTa,
+    paidById: row.paidById,
+    paidByName: row.paidBy?.name ?? null,
+    methodId: row.methodId,
+    methodName: row.method?.name ?? null,
+    note: row.note,
+    splitMethod: row.splitMethod,
+    tripId: row.tripId,
+    tripName: row.trip?.name ?? null,
+    shares: row.shares.map((share) => ({
+      personId: share.personId,
+      personName: share.person.name,
+      amount: num(share.amount),
+      shareUnits: share.shareUnits,
+    })),
+  }));
+
+  const total = entries
+    .filter((entry) => entry.kind === "EXPENSE")
+    .reduce((sum, entry) => sum + entry.amount, 0);
+
+  const settlements: SettlementDTO[] = settlementRows.map((row) => ({
+    id: row.id,
+    fromPersonId: row.fromPersonId,
+    fromName: row.fromPerson.name,
+    toPersonId: row.toPersonId,
+    toName: row.toPerson.name,
+    amount: num(row.amount),
+    settledAt: row.settledAt.toISOString(),
+    note: row.note,
+  }));
+
+  const participants: ExpensePersonDTO[] = trip.participants.map((participant) => ({
+    id: participant.person.id,
+    name: participant.person.name,
+    colorKey: participant.person.colorKey,
+    isActive: participant.person.isActive,
+  }));
+
+  const { balances, transfers } = await getTripBalances(tripId, participants);
+
+  return {
+    id: trip.id,
+    name: trip.name,
+    closedAt: trip.closedAt ? trip.closedAt.toISOString() : null,
+    participants,
+    total,
+    entries,
+    balances,
+    transfers,
+    settlements,
+    categories,
+    people,
+    methods,
+  };
 }

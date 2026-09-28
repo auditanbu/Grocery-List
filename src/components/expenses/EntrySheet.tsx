@@ -42,11 +42,16 @@ export function EntrySheet({
   month,
   onClose,
   onDelete,
+  defaultTripId,
 }: {
   entry: ExpenseDTO | null;
   month: ExpenseMonthDTO;
   onClose: () => void;
   onDelete?: () => void;
+  /** Preselects a trip (and its equal split) on a brand-new entry — how the
+   *  trip page's own "Add expense" button opens this sheet already in
+   *  context, rather than making you pick the trip you are already inside. */
+  defaultTripId?: number;
 }) {
   const router = useRouter();
   const { language } = useLanguage();
@@ -62,10 +67,16 @@ export function EntrySheet({
   const [paidById, setPaidById] = useState<number | null>(entry?.paidById ?? null);
   const [methodId, setMethodId] = useState<number | null>(entry?.methodId ?? null);
   const [note, setNote] = useState(entry?.note ?? "");
+  const [tripId, setTripId] = useState<number | null>(entry?.tripId ?? defaultTripId ?? null);
 
-  const [splitOpen, setSplitOpen] = useState((entry?.shares.length ?? 0) > 0);
+  const defaultTrip = !entry && defaultTripId !== undefined
+    ? month.openTrips.find((trip) => trip.id === defaultTripId)
+    : undefined;
+  const [splitOpen, setSplitOpen] = useState((entry?.shares.length ?? 0) > 0 || defaultTrip !== undefined);
   const [splitMethod, setSplitMethod] = useState<SplitMethod>(entry?.splitMethod ?? "EQUAL");
-  const [splitWith, setSplitWith] = useState<number[]>(entry?.shares.map((share) => share.personId) ?? []);
+  const [splitWith, setSplitWith] = useState<number[]>(
+    entry?.shares.map((share) => share.personId) ?? defaultTrip?.participantIds ?? [],
+  );
   const [exact, setExact] = useState<Record<number, string>>(
     Object.fromEntries((entry?.shares ?? []).map((share) => [share.personId, String(share.amount)])),
   );
@@ -77,6 +88,21 @@ export function EntrySheet({
   const validAmount = Number.isFinite(parsedAmount) && parsedAmount > 0;
   const categories = month.categories.filter((category) => category.kind === kind);
   const people = month.people.filter((person) => person.isActive || splitWith.includes(person.id));
+
+  // Picking a trip is the "split this equally" gesture: it opens the split
+  // and sets it to the trip's whole roster, equally, which is what makes
+  // "add expenses, split the trip equally at the end" true without a
+  // second kind of arithmetic — see ExpenseTrip in schema.prisma. Still
+  // editable afterwards for the one person who skipped a meal.
+  const chooseTrip = (id: number | null) => {
+    setTripId(id);
+    if (id === null) return;
+    const trip = month.openTrips.find((candidate) => candidate.id === id);
+    if (!trip) return;
+    setSplitOpen(true);
+    setSplitMethod("EQUAL");
+    setSplitWith(trip.participantIds);
+  };
   const categoryName = (nameEn: string, nameTa: string | null) =>
     language === "ta" ? (nameTa ?? nameEn) : nameEn;
 
@@ -119,6 +145,7 @@ export function EntrySheet({
       methodId,
       note,
       split,
+      tripId: kind === "EXPENSE" ? tripId : null,
     };
 
     startTransition(async () => {
@@ -251,6 +278,36 @@ export function EntrySheet({
                   </Chip>
                 ))}
             </div>
+          </Field>
+        ) : null}
+
+        {kind === "EXPENSE" && (month.openTrips.length > 0 || entry?.tripName) ? (
+          <Field label="Trip">
+            <div className="flex flex-wrap gap-2">
+              {entry?.tripId && !month.openTrips.some((trip) => trip.id === entry.tripId) ? (
+                // A closed trip the entry already belongs to: shown so it
+                // isn't silently dropped by editing, but not selectable —
+                // the trip picker only offers still-open trips.
+                <Chip active onClick={() => chooseTrip(entry.tripId as number)}>
+                  {entry.tripName} (closed)
+                </Chip>
+              ) : null}
+              {month.openTrips.map((trip) => (
+                <Chip key={trip.id} active={tripId === trip.id} onClick={() => chooseTrip(trip.id)}>
+                  {trip.name}
+                </Chip>
+              ))}
+              {tripId !== null ? (
+                <Chip active={false} onClick={() => chooseTrip(null)}>
+                  Not a trip
+                </Chip>
+              ) : null}
+            </div>
+            {tripId !== null ? (
+              <p className="pt-1.5 text-[12px] text-ios-label-3">
+                Split equally across the trip below — adjust it if someone wasn&apos;t in on this one.
+              </p>
+            ) : null}
           </Field>
         ) : null}
 

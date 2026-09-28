@@ -8,6 +8,7 @@ import { AdminLoginButton } from "@/components/AdminLoginButton";
 import { Sheet } from "@/components/Sheet";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { EntrySheet } from "@/components/expenses/EntrySheet";
+import { NewTripSheet } from "@/components/expenses/NewTripSheet";
 import { PeopleSheet } from "@/components/expenses/PeopleSheet";
 import { deleteExpense, settleUp, setCategoryBudget } from "@/lib/expenses/actions";
 import { useAdmin } from "@/lib/admin-context";
@@ -29,6 +30,7 @@ export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
   const categoryName = useCategoryName();
   const [entrySheet, setEntrySheet] = useState<{ entry: ExpenseDTO | null } | null>(null);
   const [peopleOpen, setPeopleOpen] = useState(false);
+  const [newTripOpen, setNewTripOpen] = useState(false);
   const [settling, setSettling] = useState<TransferDTO | null>(null);
   const [budgetFor, setBudgetFor] = useState<{ id: number; name: string; budget: number | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -138,6 +140,50 @@ export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
         <p className="mt-2 text-[12px] text-ios-label-3">
           Groceries and petrol are tracked in their own modules and are not counted here.
         </p>
+      </section>
+
+      <section>
+        <div className="flex items-center justify-between px-1 pb-2">
+          <h2 className="text-[20px] font-semibold tracking-tight">Trips</h2>
+          <button
+            type="button"
+            onClick={() => setNewTripOpen(true)}
+            className="text-[14px] font-medium text-ios-blue active:opacity-60"
+          >
+            + New trip
+          </button>
+        </div>
+        {month.openTrips.length === 0 ? (
+          <p className="ios-card p-5 text-[15px] text-ios-label-2">
+            No open trips. Start one to log a trip's expenses separately and split the whole
+            thing equally when it's done.
+          </p>
+        ) : (
+          <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
+            {month.openTrips.map((trip) => (
+              <li key={trip.id}>
+                <Link href={`/expenses/trips/${trip.id}`} className="ios-row active:bg-ios-surface-2">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[16px] font-medium">{trip.name}</span>
+                    <span className="block truncate text-[13px] text-ios-label-2">
+                      {trip.participantNames.join(", ")}
+                    </span>
+                  </span>
+                  <span className="flex-none text-right">
+                    <span className="block text-[15px] font-semibold tabular-nums">
+                      {formatPrice(trip.total)}
+                    </span>
+                    <span
+                      className={`block text-[12px] ${trip.settled ? "text-ios-green" : "text-ios-label-3"}`}
+                    >
+                      {trip.settled ? "Settled" : "Unsettled"}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {/* Balances are all-time: a September debt is still a debt in October.
@@ -283,6 +329,7 @@ export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
                             {entry.note?.trim() || categoryName(entry.categoryNameEn, entry.categoryNameTa)}
                           </span>
                           <span className="block truncate text-[13px] text-ios-label-2">
+                            {entry.tripName ? `${entry.tripName} · ` : ""}
                             {categoryName(entry.categoryNameEn, entry.categoryNameTa)}
                             {entry.paidByName ? ` · ${entry.paidByName} paid` : ""}
                             {entry.methodName ? ` · ${entry.methodName}` : ""}
@@ -345,6 +392,8 @@ export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
       ) : null}
 
       <PeopleSheet open={peopleOpen} month={month} onClose={() => setPeopleOpen(false)} />
+
+      <NewTripSheet open={newTripOpen} people={month.people} onClose={() => setNewTripOpen(false)} />
 
       <SettleSheet
         transfer={settling}

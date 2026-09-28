@@ -47,6 +47,8 @@ export type ExpenseDTO = {
   note: string | null;
   splitMethod: SplitMethod | null;
   shares: ExpenseShareDTO[];
+  tripId: number | null;
+  tripName: string | null;
 };
 
 /** A category's month, and how that sits against its ceiling. */
@@ -86,6 +88,34 @@ export type SettlementDTO = {
   note: string | null;
 };
 
+/** One row of the trip list — enough to render it without opening it. */
+export type TripSummaryDTO = {
+  id: number;
+  name: string;
+  closedAt: string | null;
+  participantIds: number[];
+  participantNames: string[];
+  total: number;
+  /** True once every participant nets to zero on this trip alone. */
+  settled: boolean;
+};
+
+export type TripDetailDTO = {
+  id: number;
+  name: string;
+  closedAt: string | null;
+  participants: ExpensePersonDTO[];
+  total: number;
+  entries: ExpenseDTO[];
+  /** Scoped to this trip's own expenses and settlements — not the household-wide balance. */
+  balances: BalanceDTO[];
+  transfers: TransferDTO[];
+  settlements: SettlementDTO[];
+  categories: ExpenseCategoryDTO[];
+  people: ExpensePersonDTO[];
+  methods: PaymentMethodDTO[];
+};
+
 export type ExpenseMonthDTO = {
   monthKey: string;
   /** This month only. */
@@ -104,4 +134,6 @@ export type ExpenseMonthDTO = {
   categories: ExpenseCategoryDTO[];
   people: ExpensePersonDTO[];
   methods: PaymentMethodDTO[];
+  /** Open trips only — closed ones don't clutter the "add to a trip" picker. */
+  openTrips: TripSummaryDTO[];
 };

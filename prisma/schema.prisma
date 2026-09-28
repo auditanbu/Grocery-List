@@ -397,8 +397,9 @@ model ExpensePerson {
 
   paidExpenses     Expense[]
   shares           ExpenseShare[]
-  settlementsPaid  Settlement[]   @relation("SettlementFrom")
-  settlementsTaken Settlement[]   @relation("SettlementTo")
+  settlementsPaid  Settlement[]      @relation("SettlementFrom")
+  settlementsTaken Settlement[]      @relation("SettlementTo")
+  tripsOn          TripParticipant[]
 }
 
 /// How it was paid — Cash, GPay, a particular card.
@@ -440,10 +441,17 @@ model Expense {
   method   PaymentMethod?  @relation(fields: [methodId], references: [id], onDelete: SetNull)
   shares   ExpenseShare[]
 
+  /// The trip this was logged under, if any. Cascades: a trip's expenses are
+  /// meaningless once the trip itself is deleted, the same way a GroceryList
+  /// deletion takes its GroceryListItem rows with it.
+  tripId Int?
+  trip   ExpenseTrip? @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
   @@index([monthKey])
   @@index([categoryId])
   @@index([paidById])
   @@index([spentAt])
+  @@index([tripId])
 }
 
 /// One person's part of a split expense. The shares of an expense always sum
@@ -480,9 +488,16 @@ model Settlement {
   fromPerson ExpensePerson @relation("SettlementFrom", fields: [fromPersonId], references: [id], onDelete: Cascade)
   toPerson   ExpensePerson @relation("SettlementTo", fields: [toPersonId], references: [id], onDelete: Cascade)
 
+  /// Set when this payment was made to settle one specific trip, so the
+  /// trip's own balance can read "settled" without pulling in every other
+  /// debt the same two people happen to owe each other elsewhere.
+  tripId Int?
+  trip   ExpenseTrip? @relation(fields: [tripId], references: [id], onDelete: SetNull)
+
   @@index([monthKey])
   @@index([fromPersonId])
   @@index([toPersonId])
+  @@index([tripId])
 }
 
 /// A category's monthly ceiling. One amount that applies every month, the way
@@ -496,4 +511,46 @@ model ExpenseBudget {
   updatedAt  DateTime @updatedAt
 
   category ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+}
+
+/// A named pot of expenses with a fixed roster — "Goa trip", "Roommates,
+/// Sep" — settled as its own self-contained unit rather than folded into
+/// the household's ongoing balance.
+///
+/// Every expense logged under a trip defaults to an EQUAL split across the
+/// whole roster (see the entry sheet), which is what makes "split the trip
+/// equally at the end" true without a second, separate kind of arithmetic:
+/// summing many equally-split expenses and settling once at the end gives
+/// the same answer as one lump equal split of the total would, to the
+/// paisa (bar rounding landing on a different line item), while staying
+/// editable per expense for the one person who skipped a meal.
+model ExpenseTrip {
+  id        Int       @id @default(autoincrement())
+  name      String
+  /// Set once the trip is wound up. Only hides it from the "new expense"
+  /// trip picker — the balance and history stay visible and correct either
+  /// way, so closing is a tidiness step, never a lock.
+  closedAt  DateTime?
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  participants TripParticipant[]
+  expenses     Expense[]
+  settlements  Settlement[]
+
+  @@index([closedAt])
+}
+
+/// One person's membership on a trip's roster.
+model TripParticipant {
+  id       Int @id @default(autoincrement())
+  tripId   Int
+  personId Int
+
+  trip   ExpenseTrip   @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  person ExpensePerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, personId])
+  @@index([personId])
 }

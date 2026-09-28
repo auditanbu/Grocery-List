@@ -44,6 +44,7 @@ export type ExpenseInput = {
   methodId?: number | null;
   note?: string | null;
   split: SplitInput;
+  tripId?: number | null;
 };
 
 /**
@@ -144,6 +145,7 @@ export async function createExpense(input: ExpenseInput): Promise<ActionResult<{
       methodId: input.methodId ?? null,
       note: input.note?.trim() || null,
       splitMethod: resolved.shares.length > 0 ? input.split?.method ?? null : null,
+      tripId: input.tripId ?? null,
       shares: { create: resolved.shares },
     },
   });
@@ -177,6 +179,7 @@ export async function updateExpense(id: number, input: ExpenseInput): Promise<Ac
         methodId: input.methodId ?? null,
         note: input.note?.trim() || null,
         splitMethod: resolved.shares.length > 0 ? input.split?.method ?? null : null,
+        tripId: input.tripId ?? null,
         shares: { create: resolved.shares },
       },
     }),
@@ -371,4 +374,124 @@ export async function removePaymentMethod(id: number): Promise<ActionResult<{ de
   await prisma.paymentMethod.delete({ where: { id } });
   revalidatePath("/expenses");
   return { ok: true, data: { deleted: true } };
+}
+
+export async function createTrip(input: {
+  name: string;
+  participantIds: number[];
+}): Promise<ActionResult<{ id: number }>> {
+  const name = input.name.trim();
+  if (!name) return fail("Give the trip a name.");
+  if (input.participantIds.length === 0) return fail("Add at least one person to the trip.");
+
+  const trip = await prisma.expenseTrip.create({
+    data: {
+      name,
+      participants: {
+        create: [...new Set(input.participantIds)].map((personId) => ({ personId })),
+      },
+    },
+  });
+
+  revalidatePath("/expenses");
+  return { ok: true, data: { id: trip.id } };
+}
+
+/**
+ * Changes a trip's name and roster. Removing someone who already has shares
+ * or a payment on this trip is refused — their part of the history cannot be
+ * quietly dropped — name that person and ask them to be removed from the
+ * relevant expenses first.
+ */
+export async function updateTrip(input: {
+  id: number;
+  name: string;
+  participantIds: number[];
+}): Promise<ActionResult> {
+  const name = input.name.trim();
+  if (!name) return fail("Give the trip a name.");
+  const nextIds = new Set(input.participantIds);
+  if (nextIds.size === 0) return fail("A trip needs at least one person.");
+
+  const current = await prisma.tripParticipant.findMany({
+    where: { tripId: input.id },
+    select: { personId: true },
+  });
+  const removed = current.map((row) => row.personId).filter((id) => !nextIds.has(id));
+
+  if (removed.length > 0) {
+    const stillInUse = await prisma.expenseShare.count({
+      where: { personId: { in: removed }, expense: { tripId: input.id } },
+    });
+    if (stillInUse > 0) {
+      return fail("Someone you removed still has a share of an expense on this trip — fix that expense first.");
+    }
+  }
+
+  const currentIds = new Set(current.map((row) => row.personId));
+  const toAdd = [...nextIds].filter((id) => !currentIds.has(id));
+  const toRemove = [...currentIds].filter((id) => !nextIds.has(id));
+
+  await prisma.$transaction([
+    prisma.expenseTrip.update({ where: { id: input.id }, data: { name } }),
+    ...(toRemove.length > 0
+      ? [prisma.tripParticipant.deleteMany({ where: { tripId: input.id, personId: { in: toRemove } } })]
+      : []),
+    ...(toAdd.length > 0
+      ? [
+          prisma.tripParticipant.createMany({
+            data: toAdd.map((personId) => ({ tripId: input.id, personId })),
+          }),
+        ]
+      : []),
+  ]);
+
+  revalidatePath("/expenses");
+  return { ok: true };
+}
+
+export async function setTripClosed(id: number, closed: boolean): Promise<ActionResult> {
+  await prisma.expenseTrip.update({
+    where: { id },
+    data: { closedAt: closed ? new Date() : null },
+  });
+  revalidatePath("/expenses");
+  return { ok: true };
+}
+
+/** Admin only — deleting a trip takes every one of its expenses with it. */
+export async function deleteTrip(id: number): Promise<ActionResult> {
+  if (!(await isAdminSession())) return fail("Admin only.");
+  await prisma.expenseTrip.delete({ where: { id } });
+  revalidatePath("/expenses");
+  return { ok: true };
+}
+
+/**
+ * Settling a trip specifically — tagged so the trip reads "settled" on its
+ * own, independent of any other debt the same two people happen to owe each
+ * other outside this trip.
+ */
+export async function settleTrip(input: {
+  tripId: number;
+  fromPersonId: number;
+  toPersonId: number;
+  amount: number;
+}): Promise<ActionResult> {
+  if (!Number.isFinite(input.amount) || input.amount <= 0) return fail("Enter an amount.");
+  if (input.fromPersonId === input.toPersonId) return fail("Pick two different people.");
+
+  await prisma.settlement.create({
+    data: {
+      fromPersonId: input.fromPersonId,
+      toPersonId: input.toPersonId,
+      amount: money(input.amount),
+      settledAt: new Date(),
+      monthKey: monthKeyOf(),
+      tripId: input.tripId,
+    },
+  });
+
+  revalidatePath("/expenses");
+  return { ok: true };
 }
