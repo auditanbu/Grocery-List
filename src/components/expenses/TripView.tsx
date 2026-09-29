@@ -141,47 +141,63 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
 
   return (
     <div className="space-y-6 pb-4">
-      <Link href="/expenses" className="inline-flex items-center gap-1 pt-1 text-[15px] text-ios-blue">
-        <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-          <path
-            d="M15 5l-7 7 7 7"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        Expenses
-      </Link>
+      {/*
+        Pinned down through the trip name: on a long trip the name and the
+        options menu are worth having on hand while scrolling through
+        categories, balance and entries below — z-20 under AppNav (z-30) and
+        Sheet (z-50), the -mx-4/px-4 pair spans <main>'s gutter, and the
+        env() margin/padding pair cancels body's own safe-area padding so
+        the pinned header clears the notch instead of sliding under it.
+      */}
+      <div
+        className="sticky top-0 z-20 -mx-4 space-y-3 border-b border-ios-separator bg-ios-bg/90 px-4 pb-3 backdrop-blur-xl"
+        style={{
+          marginTop: "calc(-1 * env(safe-area-inset-top))",
+          paddingTop: "calc(env(safe-area-inset-top) + 1rem)",
+        }}
+      >
+        <Link href="/expenses" className="inline-flex items-center gap-1 text-[15px] text-ios-blue">
+          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+            <path
+              d="M15 5l-7 7 7 7"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          Expenses
+        </Link>
 
-      <header className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="truncate text-[30px] font-bold leading-tight tracking-tight">{trip.name}</h1>
-          <p className="truncate text-[15px] text-ios-label-2">
-            {trip.participants.map((person) => person.name).join(", ")}
-            {trip.closedAt ? " · Closed" : ""}
-          </p>
-        </div>
-        <div className="flex flex-none items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setMenuOpen(true)}
-            aria-label="Trip options"
-            className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-ios-surface text-ios-blue shadow-ios active:scale-95"
-          >
-            <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
-              <path
-                d="M4 7h16M4 12h16M4 17h16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-        </div>
-      </header>
+        <header className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="truncate text-[30px] font-bold leading-tight tracking-tight">{trip.name}</h1>
+            <p className="truncate text-[15px] text-ios-label-2">
+              {trip.participants.map((person) => person.name).join(", ")}
+              {trip.closedAt ? " · Closed" : ""}
+            </p>
+          </div>
+          <div className="flex flex-none items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              aria-label="Trip options"
+              className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-ios-surface text-ios-blue shadow-ios active:scale-95"
+            >
+              <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+                <path
+                  d="M4 7h16M4 12h16M4 17h16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
+        </header>
+      </div>
 
       {error ? (
         <p className="rounded-ios bg-ios-red-soft px-4 py-3 text-[14px] text-ios-red">{error}</p>
