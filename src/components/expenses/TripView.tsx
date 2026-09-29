@@ -194,6 +194,16 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
         </p>
       </section>
 
+      {trip.closedAt === null ? (
+        <button
+          type="button"
+          onClick={() => setEntrySheet({ open: true, entry: null })}
+          className="h-11 w-full rounded-ios bg-ios-blue text-[15px] font-semibold text-white active:scale-[0.99]"
+        >
+          + Add expense
+        </button>
+      ) : null}
+
       {categoryTotals.length > 0 ? (
         <section>
           <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">By category</h2>
@@ -288,15 +298,6 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
 
       <section>
         <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">Expenses</h2>
-        {trip.closedAt === null ? (
-          <button
-            type="button"
-            onClick={() => setEntrySheet({ open: true, entry: null })}
-            className="mb-3 h-11 w-full rounded-ios bg-ios-blue text-[15px] font-semibold text-white active:scale-[0.99]"
-          >
-            + Add expense
-          </button>
-        ) : null}
         {days.length === 0 ? (
           <p className="ios-card p-6 text-center text-[15px] text-ios-label-2">
             Nothing logged for this trip yet.
