@@ -28,6 +28,8 @@ const SPLIT_LABELS: Record<SplitMethod, string> = {
 /** How many category pills show before the rest fold behind the arrow. */
 const VISIBLE_CATEGORY_COUNT = 3;
 const RECENT_CATEGORIES_KEY = "grocery.expenseCategoryRecents";
+/** The household's usual way of paying — pre-selected on a new entry, still just a tap to change. */
+const DEFAULT_METHOD_NAME = "upi";
 
 /** Most-recently-used category ids, kept separately per entry kind. */
 function loadRecentCategoryIds(kind: EntryKind): number[] {
@@ -109,7 +111,13 @@ export function EntrySheet({
   );
   const [categoryId, setCategoryId] = useState<number | null>(entry?.categoryId ?? null);
   const [paidById, setPaidById] = useState<number | null>(entry?.paidById ?? null);
-  const [methodId, setMethodId] = useState<number | null>(entry?.methodId ?? null);
+  const [methodId, setMethodId] = useState<number | null>(
+    entry?.methodId ??
+      month.methods.find(
+        (method) => method.isActive && method.name.trim().toLowerCase() === DEFAULT_METHOD_NAME,
+      )?.id ??
+      null,
+  );
   const [note, setNote] = useState(entry?.note ?? "");
   const [tripId, setTripId] = useState<number | null>(entry?.tripId ?? defaultTripId ?? null);
 
