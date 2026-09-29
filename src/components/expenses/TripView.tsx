@@ -194,6 +194,16 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
         </p>
       </section>
 
+      {trip.closedAt === null ? (
+        <button
+          type="button"
+          onClick={() => setEntrySheet({ open: true, entry: null })}
+          className="h-11 w-full rounded-ios bg-ios-blue text-[15px] font-semibold text-white active:scale-[0.99]"
+        >
+          + Add expense
+        </button>
+      ) : null}
+
       {categoryTotals.length > 0 ? (
         <section>
           <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">By category</h2>
@@ -219,77 +229,75 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
               : "Fully settled — nobody owes anybody on this trip."}
           </p>
         ) : (
-          <>
-            <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
-              {trip.balances.map((balance) => (
-                <li key={balance.personId} className="ios-row">
-                  <span className="min-w-0 flex-1 truncate text-[16px] font-medium">
-                    {balance.personName}
-                  </span>
-                  <span
-                    className={`flex-none text-[15px] font-semibold tabular-nums ${
-                      balance.net > 0 ? "text-ios-green" : "text-ios-red"
-                    }`}
-                  >
-                    {balance.net > 0
-                      ? `is owed ${formatPrice(balance.net)}`
-                      : `owes ${formatPrice(Math.abs(balance.net))}`}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            {trip.transfers.length > 0 ? (
-              <ul className="mt-2 space-y-2">
-                {trip.transfers.map((transfer) => (
-                  <li
-                    key={`${transfer.fromPersonId}-${transfer.toPersonId}`}
-                    className="ios-card flex items-center gap-3 px-4 py-3"
-                  >
-                    <span className="flex min-w-0 flex-1 items-center gap-2 text-[15px]">
-                      <button
-                        type="button"
-                        onClick={() => setSettling(transfer)}
-                        aria-label={`Settle up: ${transfer.fromName} pays ${transfer.toName}`}
-                        title="Settle up"
-                        className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-ios-blue text-white active:scale-95"
-                      >
-                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden>
-                          <path
-                            d="M5 12.5l4.5 4.5L19 7"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </button>
-                      <span className="min-w-0 truncate">
-                        {transfer.fromName} → {transfer.toName}
-                      </span>
+          <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
+            {trip.balances.flatMap((balance) => {
+              if (balance.net > 0) {
+                return (
+                  <li key={balance.personId} className="ios-row">
+                    <span className="min-w-0 flex-1 truncate text-[16px] font-medium">
+                      {balance.personName}
                     </span>
-                    <span className="flex-none font-semibold tabular-nums text-[15px]">
-                      {formatPrice(transfer.amount)}
+                    <span className="flex-none text-[15px] font-semibold tabular-nums text-ios-green">
+                      is owed {formatPrice(balance.net)}
                     </span>
                   </li>
-                ))}
-              </ul>
-            ) : null}
-          </>
+                );
+              }
+
+              // Each debt this person still owes — usually just one, but the
+              // debt-minimising split can leave someone owing two different
+              // people, so a settle icon goes with each one.
+              const debts = trip.transfers.filter((transfer) => transfer.fromPersonId === balance.personId);
+              if (debts.length === 0) {
+                return (
+                  <li key={balance.personId} className="ios-row">
+                    <span className="min-w-0 flex-1 truncate text-[16px] font-medium">
+                      {balance.personName}
+                    </span>
+                    <span className="flex-none text-[15px] font-semibold tabular-nums text-ios-red">
+                      owes {formatPrice(Math.abs(balance.net))}
+                    </span>
+                  </li>
+                );
+              }
+
+              return debts.map((transfer) => (
+                <li key={`${balance.personId}-${transfer.toPersonId}`} className="ios-row">
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSettling(transfer)}
+                      aria-label={`Settle up: ${transfer.fromName} pays ${transfer.toName}`}
+                      title="Settle up"
+                      className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-ios-blue text-white active:scale-95"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden>
+                        <path
+                          d="M5 12.5l4.5 4.5L19 7"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    <span className="min-w-0 truncate text-[16px] font-medium">
+                      {transfer.fromName} owes {transfer.toName}
+                    </span>
+                  </span>
+                  <span className="flex-none text-[15px] font-semibold tabular-nums text-ios-red">
+                    {formatPrice(transfer.amount)}
+                  </span>
+                </li>
+              ));
+            })}
+          </ul>
         )}
       </section>
 
       <section>
         <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">Expenses</h2>
-        {trip.closedAt === null ? (
-          <button
-            type="button"
-            onClick={() => setEntrySheet({ open: true, entry: null })}
-            className="mb-3 h-11 w-full rounded-ios bg-ios-blue text-[15px] font-semibold text-white active:scale-[0.99]"
-          >
-            + Add expense
-          </button>
-        ) : null}
         {days.length === 0 ? (
           <p className="ios-card p-6 text-center text-[15px] text-ios-label-2">
             Nothing logged for this trip yet.
