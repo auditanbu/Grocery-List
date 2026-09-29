@@ -43,6 +43,9 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
   // Which balance row is unfolded to show what that person paid for — one
   // at a time, tap the same name again (or a different one) to change it.
   const [expandedPersonId, setExpandedPersonId] = useState<number | null>(null);
+  // Same idea for the category breakdown — its own toggle, independent of
+  // whichever balance row is open.
+  const [expandedCategoryId, setExpandedCategoryId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -227,14 +230,28 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
         <section>
           <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">By category</h2>
           <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
-            {categoryTotals.map((total) => (
-              <li key={total.categoryId} className="ios-row">
-                <span className="min-w-0 flex-1 truncate text-[16px] font-medium">{total.nameEn}</span>
-                <span className="flex-none text-[15px] font-semibold tabular-nums">
-                  {formatPrice(total.total)}
-                </span>
-              </li>
-            ))}
+            {categoryTotals.map((total) => {
+              const expanded = expandedCategoryId === total.categoryId;
+              return (
+                <li key={total.categoryId}>
+                  <div className="flex min-h-[3.25rem] items-center gap-3 px-4 py-2.5">
+                    <NameToggle
+                      name={total.nameEn}
+                      expanded={expanded}
+                      onClick={() => setExpandedCategoryId(expanded ? null : total.categoryId)}
+                    />
+                    <span className="flex-none text-[15px] font-semibold tabular-nums">
+                      {formatPrice(total.total)}
+                    </span>
+                  </div>
+                  {expanded ? (
+                    <CategoryEntries
+                      entries={trip.entries.filter((entry) => entry.categoryId === total.categoryId)}
+                    />
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         </section>
       ) : null}
@@ -571,6 +588,26 @@ function PersonEntries({ entries }: { entries: ExpenseDTO[] }) {
       {entries.map((entry) => (
         <li key={entry.id} className="flex items-center justify-between gap-3 text-[13px] text-ios-label-2">
           <span className="min-w-0 truncate">{entry.note?.trim() || entry.categoryNameEn}</span>
+          <span className="flex-none tabular-nums">{formatPrice(entry.amount)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** What a category row unfolds into — the entries filed under it on this trip. */
+function CategoryEntries({ entries }: { entries: ExpenseDTO[] }) {
+  if (entries.length === 0) {
+    return <p className="px-4 pb-3 text-[13px] text-ios-label-3">No expenses in this category yet.</p>;
+  }
+  return (
+    <ul className="space-y-1 px-4 pb-3">
+      {entries.map((entry) => (
+        <li key={entry.id} className="flex items-center justify-between gap-3 text-[13px] text-ios-label-2">
+          <span className="min-w-0 truncate">
+            {entry.note?.trim() || entry.categoryNameEn}
+            {entry.paidByName ? ` · ${entry.paidByName} paid` : ""}
+          </span>
           <span className="flex-none tabular-nums">{formatPrice(entry.amount)}</span>
         </li>
       ))}
