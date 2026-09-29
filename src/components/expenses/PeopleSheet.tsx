@@ -67,12 +67,15 @@ export function PeopleSheet({
           </p>
           {month.categories.length === 0 ? (
             <p className="rounded-ios bg-ios-surface-2 px-4 py-3 text-[14px] text-ios-label-2">
-              No categories yet — nothing to pick when adding an entry. Add the first one below.
+              No categories yet. Add the first one below — anyone can.
             </p>
           ) : (
             <ul className="divide-y divide-ios-separator overflow-hidden rounded-ios bg-ios-surface-2">
               {month.categories.map((category) => (
-                <li key={category.id} className="flex items-center gap-3 px-4 py-2.5">
+                <li
+                  key={category.id}
+                  className="flex items-center gap-3 px-4 py-2.5"
+                >
                   <span className="min-w-0 flex-1 truncate text-[15px]">
                     {categoryLabel(category.nameEn, category.nameTa)}
                   </span>
@@ -84,7 +87,8 @@ export function PeopleSheet({
                       type="button"
                       disabled={pending}
                       onClick={() => {
-                        if (!window.confirm(`Remove "${category.nameEn}"?`)) return;
+                        if (!window.confirm(`Remove "${category.nameEn}"?`))
+                          return;
                         run(() => removeExpenseCategory(category.id));
                       }}
                       className="h-8 flex-none rounded-full px-3 text-[13px] font-medium text-ios-red active:opacity-60"
@@ -97,52 +101,50 @@ export function PeopleSheet({
             </ul>
           )}
 
-          {isAdmin ? (
-            <div className="mt-2 space-y-2">
-              <div className="flex gap-2">
-                {(["EXPENSE", "INCOME"] as EntryKind[]).map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => setCategoryKind(option)}
-                    className={`h-9 flex-1 rounded-full text-[13px] font-medium transition active:scale-95 ${
-                      categoryKind === option
-                        ? "bg-ios-blue text-white"
-                        : "bg-ios-surface-2 text-ios-label-2 ring-1 ring-inset ring-ios-separator"
-                    }`}
-                  >
-                    {option === "EXPENSE" ? "For money out" : "For money in"}
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  value={categoryName}
-                  onChange={(event) => setCategoryName(event.target.value)}
-                  placeholder="Add a category"
-                  aria-label="Add a category"
-                  className="h-11 min-w-0 flex-1 rounded-ios bg-ios-surface-2 px-4 text-[16px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
-                />
+          <div className="mt-2 space-y-2">
+            <div className="flex gap-2">
+              {(["EXPENSE", "INCOME"] as EntryKind[]).map((option) => (
                 <button
+                  key={option}
                   type="button"
-                  disabled={pending || !categoryName.trim()}
-                  onClick={() =>
-                    run(async () => {
-                      const result = await upsertExpenseCategory({
-                        nameEn: categoryName,
-                        kind: categoryKind,
-                      });
-                      if (result.ok) setCategoryName("");
-                      return result;
-                    })
-                  }
-                  className="h-11 flex-none rounded-ios bg-ios-blue px-4 text-[15px] font-semibold text-white active:scale-95 disabled:opacity-50"
+                  onClick={() => setCategoryKind(option)}
+                  className={`h-9 flex-1 rounded-full text-[13px] font-medium transition active:scale-95 ${
+                    categoryKind === option
+                      ? "bg-ios-blue text-white"
+                      : "bg-ios-surface-2 text-ios-label-2 ring-1 ring-inset ring-ios-separator"
+                  }`}
                 >
-                  Add
+                  {option === "EXPENSE" ? "For money out" : "For money in"}
                 </button>
-              </div>
+              ))}
             </div>
-          ) : null}
+            <div className="flex gap-2">
+              <input
+                value={categoryName}
+                onChange={(event) => setCategoryName(event.target.value)}
+                placeholder="Add a category"
+                aria-label="Add a category"
+                className="h-11 min-w-0 flex-1 rounded-ios bg-ios-surface-2 px-4 text-[16px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
+              />
+              <button
+                type="button"
+                disabled={pending || !categoryName.trim()}
+                onClick={() =>
+                  run(async () => {
+                    const result = await upsertExpenseCategory({
+                      nameEn: categoryName,
+                      kind: categoryKind,
+                    });
+                    if (result.ok) setCategoryName("");
+                    return result;
+                  })
+                }
+                className="h-11 flex-none rounded-ios bg-ios-blue px-4 text-[15px] font-semibold text-white active:scale-95 disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+          </div>
         </section>
 
         <section>
@@ -151,13 +153,16 @@ export function PeopleSheet({
           </p>
           {month.people.length === 0 ? (
             <p className="rounded-ios bg-ios-surface-2 px-4 py-3 text-[14px] text-ios-label-2">
-              Nobody added yet. Add the two or three people who actually share costs — this list is
-              separate from the family tree.
+              Nobody added yet. Add the two or three people who actually share
+              costs — this list is separate from the family tree.
             </p>
           ) : (
             <ul className="divide-y divide-ios-separator overflow-hidden rounded-ios bg-ios-surface-2">
               {month.people.map((person) => (
-                <li key={person.id} className="flex items-center gap-3 px-4 py-2.5">
+                <li
+                  key={person.id}
+                  className="flex items-center gap-3 px-4 py-2.5"
+                >
                   <span
                     className={`min-w-0 flex-1 truncate text-[15px] ${
                       person.isActive ? "" : "text-ios-label-3 line-through"
@@ -216,7 +221,10 @@ export function PeopleSheet({
           </p>
           <ul className="divide-y divide-ios-separator overflow-hidden rounded-ios bg-ios-surface-2">
             {month.methods.map((method) => (
-              <li key={method.id} className="flex items-center gap-3 px-4 py-2.5">
+              <li
+                key={method.id}
+                className="flex items-center gap-3 px-4 py-2.5"
+              >
                 <span
                   className={`min-w-0 flex-1 truncate text-[15px] ${
                     method.isActive ? "" : "text-ios-label-3 line-through"
@@ -255,7 +263,9 @@ export function PeopleSheet({
                 disabled={pending || !methodName.trim()}
                 onClick={() =>
                   run(async () => {
-                    const result = await upsertPaymentMethod({ name: methodName });
+                    const result = await upsertPaymentMethod({
+                      name: methodName,
+                    });
                     if (result.ok) setMethodName("");
                     return result;
                   })

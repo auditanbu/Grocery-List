@@ -556,18 +556,20 @@ household's real total is this plus those two.
 - A settlement is **not** an expense: it moves what is already owed, so it
   never counts towards a month's total or a budget.
 - Admin gating follows the Petrol module: anyone can add and edit an entry;
-  deleting one, moving a budget, and adding or removing people, categories and
-  methods are admin-only and confirmed. A person who has already paid for
-  something is hidden rather than deleted — removing them would take their
-  shares with them and silently rewrite balances that were already settled.
-- **Categories, people and methods are all managed from one sheet**
-  (`PeopleSheet.tsx`, opened from the header's people icon) — none of the
-  three exist until an admin adds one, or the demo seed does
-  (`seedExpenseDefaults` in `prisma/seed.ts`, additive-only: it fills
-  `ExpenseCategory`/`PaymentMethod` only when those tables are empty, and
-  never touches `ExpensePerson`). A fresh database with the seed never run
-  has zero categories, which otherwise shows up as an entry sheet with no
-  category to pick and no way to submit — this sheet is the fix.
+  deleting one, moving a budget, adding or removing people and methods, and
+  renaming or removing a category are admin-only and confirmed. **Adding a
+  category is open to everyone** — an entry cannot be saved without one, so it
+  must never sit behind the PIN. A person who has already paid for something
+  is hidden rather than deleted — removing them would take their shares with
+  them and silently rewrite balances that were already settled.
+- **Categories and methods fill themselves in.** The deploy runs migrations but
+  never the seed, so `ensureExpenseDefaults` (`src/lib/expenses/queries.ts`)
+  inserts the defaults from `src/lib/expenses/defaults.ts` the first time the
+  page opens on an empty table — the same list `seedExpenseDefaults` uses. It
+  only ever touches an *empty* table, so edits and removals stick. New ones can
+  be added from the entry sheet itself (**+ New** under Category) or from the
+  People sheet (`PeopleSheet.tsx`, the header's people icon), which also holds
+  people and methods. People never auto-fill — that list is the household's.
 
 ### Trips
 

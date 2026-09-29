@@ -285,26 +285,46 @@ export async function removePerson(id: number): Promise<ActionResult<{ deleted: 
   return { ok: true, data: { deleted: true } };
 }
 
+/**
+ * Anyone can add a category — an entry cannot be saved without one, so this
+ * must never sit behind the PIN. Renaming an existing one stays admin-only.
+ */
 export async function upsertExpenseCategory(input: {
   id?: number;
   nameEn: string;
   nameTa?: string | null;
   kind: EntryKind;
-}): Promise<ActionResult> {
-  if (!(await isAdminSession())) return fail("Admin only.");
+}): Promise<ActionResult<{ id: number }>> {
+  if (input.id && !(await isAdminSession())) return fail("Admin only.");
   const nameEn = input.nameEn.trim();
   if (!nameEn) return fail("Give this category a name.");
 
-  const data = { nameEn, nameTa: input.nameTa?.trim() || null, kind: input.kind };
-  if (input.id) {
-    await prisma.expenseCategory.update({ where: { id: input.id }, data });
-  } else {
-    const count = await prisma.expenseCategory.count();
-    await prisma.expenseCategory.create({ data: { ...data, sortOrder: count } });
+  const clash = await prisma.expenseCategory.findFirst({
+    where: { nameEn, kind: input.kind, ...(input.id ? { NOT: { id: input.id } } : {}) },
+  });
+  if (clash) {
+    if (!input.id) {
+      // Asking for one that exists is as good as having made it — use it.
+      if (!clash.isActive) {
+        await prisma.expenseCategory.update({ where: { id: clash.id }, data: { isActive: true } });
+        revalidatePath("/expenses", "layout");
+      }
+      return { ok: true, data: { id: clash.id } };
+    }
+    return fail(`There is already a category called ${nameEn}.`);
   }
 
-  revalidatePath("/expenses");
-  return { ok: true };
+  const data = { nameEn, nameTa: input.nameTa?.trim() || null, kind: input.kind };
+  let id: number;
+  if (input.id) {
+    id = (await prisma.expenseCategory.update({ where: { id: input.id }, data })).id;
+  } else {
+    const count = await prisma.expenseCategory.count();
+    id = (await prisma.expenseCategory.create({ data: { ...data, sortOrder: count } })).id;
+  }
+
+  revalidatePath("/expenses", "layout");
+  return { ok: true, data: { id } };
 }
 
 /** Admin only — refused while entries still point at it, which is the DB's rule too. */

@@ -4,7 +4,12 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 import { Sheet } from "@/components/Sheet";
-import { createExpense, updateExpense, type SplitInput } from "@/lib/expenses/actions";
+import {
+  createExpense,
+  updateExpense,
+  upsertExpenseCategory,
+  type SplitInput,
+} from "@/lib/expenses/actions";
 import { useLanguage } from "@/lib/language";
 import { formatPrice } from "@/lib/units";
 import { allocateByShares, allocateEqually, toPaise, toRupees } from "@/lib/expenses/balances";
@@ -86,7 +91,15 @@ export function EntrySheet({
 
   const parsedAmount = Number.parseFloat(amount);
   const validAmount = Number.isFinite(parsedAmount) && parsedAmount > 0;
-  const categories = month.categories.filter((category) => category.kind === kind);
+  const [newCategoryOpen, setNewCategoryOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  // What was added from this sheet, shown at once rather than after the
+  // refresh brings it back in `month` — and kept if the refresh is slow.
+  const [addedCategories, setAddedCategories] = useState<ExpenseMonthDTO["categories"]>([]);
+  const categories = [
+    ...month.categories,
+    ...addedCategories.filter((added) => !month.categories.some((c) => c.id === added.id)),
+  ].filter((category) => category.kind === kind);
   const people = month.people.filter((person) => person.isActive || splitWith.includes(person.id));
 
   // Picking a trip is the "split this equally" gesture: it opens the split
@@ -121,6 +134,27 @@ export function EntrySheet({
 
   const assigned = preview ? [...preview.values()].reduce((sum, paise) => sum + paise, 0) : 0;
   const remainder = validAmount ? toPaise(parsedAmount) - assigned : 0;
+
+  const addCategory = () => {
+    const nameEn = newCategoryName.trim();
+    if (!nameEn) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await upsertExpenseCategory({ nameEn, kind });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setAddedCategories((current) => [
+        ...current,
+        { id: result.data.id, nameEn, nameTa: null, kind, budget: null },
+      ]);
+      setCategoryId(result.data.id);
+      setNewCategoryName("");
+      setNewCategoryOpen(false);
+      router.refresh();
+    });
+  };
 
   const save = () => {
     if (!validAmount) return setError("Enter an amount.");
@@ -234,7 +268,53 @@ export function EntrySheet({
                 {categoryName(category.nameEn, category.nameTa)}
               </Chip>
             ))}
+            {newCategoryOpen ? null : (
+              <Chip active={false} onClick={() => setNewCategoryOpen(true)}>
+                + New
+              </Chip>
+            )}
           </div>
+          {categories.length === 0 && !newCategoryOpen ? (
+            <p className="pt-1.5 text-[13px] text-ios-label-3">
+              No categories yet — tap + New to make one.
+            </p>
+          ) : null}
+          {newCategoryOpen ? (
+            <div className="mt-2 flex gap-2">
+              <input
+                autoFocus
+                value={newCategoryName}
+                onChange={(event) => setNewCategoryName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addCategory();
+                  }
+                }}
+                placeholder={kind === "INCOME" ? "e.g. Rent received" : "e.g. Petrol for trip"}
+                aria-label="New category name"
+                className="h-11 min-w-0 flex-1 rounded-ios bg-ios-surface-2 px-4 text-[16px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
+              />
+              <button
+                type="button"
+                disabled={pending || !newCategoryName.trim()}
+                onClick={addCategory}
+                className="h-11 flex-none rounded-ios bg-ios-blue px-4 text-[15px] font-semibold text-white active:scale-95 disabled:opacity-50"
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setNewCategoryOpen(false);
+                  setNewCategoryName("");
+                }}
+                className="h-11 flex-none px-2 text-[15px] text-ios-blue active:opacity-60"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : null}
         </Field>
 
         <Field label="When">

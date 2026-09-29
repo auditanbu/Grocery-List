@@ -16,6 +16,7 @@ import { dirname, join } from "node:path";
 import { createScriptClient, importMasterData, type MasterData } from "./master-import.js";
 import { importFamilyTree, type FamilyTreeData } from "./import-family-tree.js";
 import { monthKeyOf, listNameFor } from "../src/lib/dates.js";
+import { DEFAULT_CATEGORIES, DEFAULT_METHODS } from "../src/lib/expenses/defaults.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -183,20 +184,7 @@ async function seedDemoCurrentMonth(prisma: ReturnType<typeof createScriptClient
 async function seedExpenseDefaults(prisma: ReturnType<typeof createScriptClient>) {
   const categoryCount = await prisma.expenseCategory.count();
   if (categoryCount === 0) {
-    const categories: { nameEn: string; nameTa: string; kind: "EXPENSE" | "INCOME" }[] = [
-      { nameEn: "Rent", nameTa: "வாடகை", kind: "EXPENSE" },
-      { nameEn: "School", nameTa: "பள்ளி", kind: "EXPENSE" },
-      { nameEn: "Medical", nameTa: "மருத்துவம்", kind: "EXPENSE" },
-      { nameEn: "Utilities", nameTa: "மின்சாரம் / தண்ணீர்", kind: "EXPENSE" },
-      { nameEn: "Eating out", nameTa: "வெளியில் சாப்பாடு", kind: "EXPENSE" },
-      { nameEn: "Travel", nameTa: "பயணம்", kind: "EXPENSE" },
-      { nameEn: "Shopping", nameTa: "ஷாப்பிங்", kind: "EXPENSE" },
-      { nameEn: "Household", nameTa: "வீட்டு செலவு", kind: "EXPENSE" },
-      { nameEn: "Gifts", nameTa: "பரிசு", kind: "EXPENSE" },
-      { nameEn: "Other", nameTa: "மற்றவை", kind: "EXPENSE" },
-      { nameEn: "Salary", nameTa: "சம்பளம்", kind: "INCOME" },
-      { nameEn: "Other income", nameTa: "பிற வருமானம்", kind: "INCOME" },
-    ];
+    const categories = DEFAULT_CATEGORIES;
     await prisma.expenseCategory.createMany({
       data: categories.map((category, index) => ({ ...category, sortOrder: index })),
     });
@@ -205,7 +193,7 @@ async function seedExpenseDefaults(prisma: ReturnType<typeof createScriptClient>
 
   const methodCount = await prisma.paymentMethod.count();
   if (methodCount === 0) {
-    const methods = ["Cash", "GPay", "Card", "Bank transfer"];
+    const methods = DEFAULT_METHODS;
     await prisma.paymentMethod.createMany({
       data: methods.map((name, index) => ({ name, sortOrder: index })),
     });

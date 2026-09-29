@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "../prisma";
 import { netBalances, simplify, toPaise, toRupees } from "./balances";
+import { DEFAULT_CATEGORIES, DEFAULT_METHODS } from "./defaults";
 import type {
   BalanceDTO,
   CategoryTotalDTO,
@@ -26,6 +27,31 @@ function num(value: DecimalLike): number {
 function monthRange(monthKey: string): { start: Date; end: Date } {
   const [year, month] = monthKey.split("-").map(Number);
   return { start: new Date(year, month - 1, 1), end: new Date(year, month, 1) };
+}
+
+/**
+ * Fills the category and method tables when they are empty. The deploy runs
+ * migrations but never the seed, so a fresh database would otherwise open an
+ * entry sheet with nothing to pick. Only an empty table is touched — once a
+ * list exists, what the household made of it is left alone.
+ */
+async function ensureExpenseDefaults(): Promise<void> {
+  const [categoryCount, methodCount] = await Promise.all([
+    prisma.expenseCategory.count(),
+    prisma.paymentMethod.count(),
+  ]);
+  if (categoryCount === 0) {
+    await prisma.expenseCategory.createMany({
+      data: DEFAULT_CATEGORIES.map((category, index) => ({ ...category, sortOrder: index })),
+      skipDuplicates: true,
+    });
+  }
+  if (methodCount === 0) {
+    await prisma.paymentMethod.createMany({
+      data: DEFAULT_METHODS.map((name, index) => ({ name, sortOrder: index })),
+      skipDuplicates: true,
+    });
+  }
 }
 
 export async function getPeople(): Promise<ExpensePersonDTO[]> {
@@ -120,6 +146,7 @@ async function getBalances(
 
 export async function getExpenseMonth(monthKey: string): Promise<ExpenseMonthDTO> {
   const { start, end } = monthRange(monthKey);
+  await ensureExpenseDefaults();
 
   const [rows, settlementRows, categories, people, methods, openTrips] = await Promise.all([
     prisma.expense.findMany({
@@ -339,6 +366,7 @@ export async function getTripDetail(tripId: number): Promise<TripDetailDTO | nul
     include: { participants: { include: { person: true } } },
   });
   if (!trip) return null;
+  await ensureExpenseDefaults();
 
   const [rows, settlementRows, categories, people, methods] = await Promise.all([
     prisma.expense.findMany({
