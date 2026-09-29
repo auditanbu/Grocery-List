@@ -5,16 +5,15 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 import { AdminLoginButton } from "@/components/AdminLoginButton";
-import { Sheet } from "@/components/Sheet";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { EntrySheet } from "@/components/expenses/EntrySheet";
 import { NewTripSheet } from "@/components/expenses/NewTripSheet";
 import { PeopleSheet } from "@/components/expenses/PeopleSheet";
-import { deleteExpense, settleUp, setCategoryBudget } from "@/lib/expenses/actions";
+import { deleteExpense } from "@/lib/expenses/actions";
 import { useAdmin } from "@/lib/admin-context";
 import { formatIsoDate, monthKeyToLabel, shiftMonthKey } from "@/lib/dates";
 import { formatPrice } from "@/lib/units";
-import type { ExpenseDTO, ExpenseMonthDTO, TransferDTO } from "@/lib/expenses/types";
+import type { ExpenseDTO, ExpenseMonthDTO } from "@/lib/expenses/types";
 
 export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
   const router = useRouter();
@@ -22,8 +21,6 @@ export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
   const [entrySheet, setEntrySheet] = useState<{ entry: ExpenseDTO | null } | null>(null);
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [newTripOpen, setNewTripOpen] = useState(false);
-  const [settling, setSettling] = useState<TransferDTO | null>(null);
-  const [budgetFor, setBudgetFor] = useState<{ id: number; name: string; budget: number | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -37,8 +34,6 @@ export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
     }
     return [...grouped.entries()];
   }, [month.entries]);
-
-  const spendCategories = month.categoryTotals.filter((total) => total.kind === "EXPENSE");
 
   const remove = (entry: ExpenseDTO) => {
     if (!window.confirm(`Delete ${formatPrice(entry.amount)} from this month? This can't be undone.`)) {
@@ -177,123 +172,6 @@ export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
         )}
       </section>
 
-      {/* Balances are all-time: a September debt is still a debt in October.
-          Nothing shows until something is actually split. */}
-      {month.balances.length > 0 ? (
-        <section>
-          <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">Balances</h2>
-          <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
-            {month.balances.map((balance) => (
-              <li key={balance.personId} className="ios-row">
-                <span className="min-w-0 flex-1 truncate text-[16px] font-medium">
-                  {balance.personName}
-                </span>
-                <span
-                  className={`flex-none text-[15px] font-semibold tabular-nums ${
-                    balance.net > 0 ? "text-ios-green" : "text-ios-red"
-                  }`}
-                >
-                  {balance.net > 0
-                    ? `is owed ${formatPrice(balance.net)}`
-                    : `owes ${formatPrice(Math.abs(balance.net))}`}
-                </span>
-              </li>
-            ))}
-          </ul>
-
-          {month.transfers.length > 0 ? (
-            <ul className="mt-2 space-y-2">
-              {month.transfers.map((transfer) => (
-                <li
-                  key={`${transfer.fromPersonId}-${transfer.toPersonId}`}
-                  className="ios-card flex items-center gap-3 px-4 py-3"
-                >
-                  <span className="min-w-0 flex-1 text-[15px]">
-                    {transfer.fromName} → {transfer.toName}{" "}
-                    <span className="font-semibold tabular-nums">{formatPrice(transfer.amount)}</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setSettling(transfer)}
-                    className="h-9 flex-none rounded-full bg-ios-blue px-4 text-[14px] font-semibold text-white active:scale-95"
-                  >
-                    Settle up
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </section>
-      ) : null}
-
-      {spendCategories.length > 0 ? (
-        <section>
-          <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">Categories</h2>
-          <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
-            {spendCategories.map((total) => {
-              const over = total.budget !== null && total.total > total.budget;
-              const percent =
-                total.budget && total.budget > 0
-                  ? Math.min(100, Math.round((total.total / total.budget) * 100))
-                  : 0;
-              return (
-                <li key={total.categoryId}>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      isAdmin
-                        ? setBudgetFor({
-                            id: total.categoryId,
-                            name: total.nameEn,
-                            budget: total.budget,
-                          })
-                        : undefined
-                    }
-                    disabled={!isAdmin}
-                    className="ios-row w-full text-left active:bg-ios-surface-2 disabled:active:bg-transparent"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-baseline justify-between gap-3">
-                        <span className="truncate text-[16px] font-medium">
-                          {total.nameEn}
-                        </span>
-                        <span
-                          className={`flex-none text-[15px] font-semibold tabular-nums ${
-                            over ? "text-ios-red" : ""
-                          }`}
-                        >
-                          {formatPrice(total.total)}
-                        </span>
-                      </span>
-                      {total.budget !== null ? (
-                        <>
-                          <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-ios-surface-2">
-                            <span
-                              className={`block h-full rounded-full ${over ? "bg-ios-red" : "bg-ios-blue"}`}
-                              style={{ width: `${over ? 100 : percent}%` }}
-                            />
-                          </span>
-                          <span
-                            className={`mt-1 block text-[12px] ${over ? "text-ios-red" : "text-ios-label-3"}`}
-                          >
-                            {over
-                              ? `${formatPrice(total.total - total.budget)} over ${formatPrice(total.budget)}`
-                              : `of ${formatPrice(total.budget)}`}
-                          </span>
-                        </>
-                      ) : null}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          {isAdmin ? (
-            <p className="px-1 pt-1.5 text-[12px] text-ios-label-3">Tap a category to set its monthly limit.</p>
-          ) : null}
-        </section>
-      ) : null}
-
       <section>
         <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">Entries</h2>
         {days.length === 0 ? (
@@ -385,165 +263,7 @@ export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
       <PeopleSheet open={peopleOpen} month={month} onClose={() => setPeopleOpen(false)} />
 
       <NewTripSheet open={newTripOpen} people={month.people} onClose={() => setNewTripOpen(false)} />
-
-      <SettleSheet
-        transfer={settling}
-        pending={pending}
-        onClose={() => setSettling(null)}
-        onSettle={(amount) => {
-          const transfer = settling;
-          if (!transfer) return;
-          startTransition(async () => {
-            const result = await settleUp({
-              fromPersonId: transfer.fromPersonId,
-              toPersonId: transfer.toPersonId,
-              amount,
-            });
-            if (!result.ok) {
-              setError(result.error);
-              return;
-            }
-            setSettling(null);
-            router.refresh();
-          });
-        }}
-      />
-
-      <BudgetSheet
-        category={budgetFor}
-        pending={pending}
-        onClose={() => setBudgetFor(null)}
-        onSave={(amount) => {
-          const category = budgetFor;
-          if (!category) return;
-          startTransition(async () => {
-            const result = await setCategoryBudget(category.id, amount);
-            if (!result.ok) {
-              setError(result.error);
-              return;
-            }
-            setBudgetFor(null);
-            router.refresh();
-          });
-        }}
-      />
     </div>
-  );
-}
-
-function SettleSheet({
-  transfer,
-  pending,
-  onClose,
-  onSettle,
-}: {
-  transfer: TransferDTO | null;
-  pending: boolean;
-  onClose: () => void;
-  onSettle: (amount: number) => void;
-}) {
-  const [amount, setAmount] = useState("");
-  const value = Number.parseFloat(amount || String(transfer?.amount ?? 0));
-
-  return (
-    <Sheet
-      open={transfer !== null}
-      onClose={onClose}
-      title="Settle up"
-      subtitle={transfer ? `${transfer.fromName} pays ${transfer.toName}` : undefined}
-      footer={
-        <button
-          type="button"
-          disabled={pending || !Number.isFinite(value) || value <= 0}
-          onClick={() => onSettle(value)}
-          className="flex h-12 w-full items-center justify-center rounded-ios bg-ios-blue text-[17px] font-semibold text-white active:scale-[0.98] disabled:opacity-50"
-        >
-          {pending ? "Saving…" : "Record payment"}
-        </button>
-      }
-    >
-      <div className="space-y-3 pb-3">
-        <div className="flex items-center rounded-ios bg-ios-surface-2 px-3 ring-1 ring-inset ring-ios-separator focus-within:ring-2 focus-within:ring-ios-blue">
-          <span className="text-[20px] font-semibold text-ios-label-2">₹</span>
-          <input
-            autoFocus
-            inputMode="decimal"
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-            placeholder={transfer ? String(transfer.amount) : "0.00"}
-            aria-label="Amount settled"
-            className="h-12 w-full bg-transparent px-2 text-[20px] font-semibold tabular-nums outline-none"
-          />
-        </div>
-        <p className="text-[12px] text-ios-label-3">
-          Part of a debt can be paid off — the balance keeps whatever is left.
-        </p>
-      </div>
-    </Sheet>
-  );
-}
-
-function BudgetSheet({
-  category,
-  pending,
-  onClose,
-  onSave,
-}: {
-  category: { id: number; name: string; budget: number | null } | null;
-  pending: boolean;
-  onClose: () => void;
-  onSave: (amount: number | null) => void;
-}) {
-  const [amount, setAmount] = useState("");
-  const value = Number.parseFloat(amount);
-
-  return (
-    <Sheet
-      open={category !== null}
-      onClose={onClose}
-      title="Monthly limit"
-      subtitle={category?.name}
-      footer={
-        <div className="space-y-2">
-          <button
-            type="button"
-            disabled={pending || !Number.isFinite(value) || value <= 0}
-            onClick={() => onSave(value)}
-            className="flex h-12 w-full items-center justify-center rounded-ios bg-ios-blue text-[17px] font-semibold text-white active:scale-[0.98] disabled:opacity-50"
-          >
-            {pending ? "Saving…" : "Set limit"}
-          </button>
-          {category?.budget !== null && category !== null ? (
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => onSave(null)}
-              className="h-11 w-full text-[16px] font-medium text-ios-red active:opacity-60"
-            >
-              Remove the limit
-            </button>
-          ) : null}
-        </div>
-      }
-    >
-      <div className="space-y-3 pb-3">
-        <div className="flex items-center rounded-ios bg-ios-surface-2 px-3 ring-1 ring-inset ring-ios-separator focus-within:ring-2 focus-within:ring-ios-blue">
-          <span className="text-[20px] font-semibold text-ios-label-2">₹</span>
-          <input
-            autoFocus
-            inputMode="decimal"
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-            placeholder={category?.budget !== null && category ? String(category.budget) : "0.00"}
-            aria-label="Monthly limit"
-            className="h-12 w-full bg-transparent px-2 text-[20px] font-semibold tabular-nums outline-none"
-          />
-        </div>
-        <p className="text-[12px] text-ios-label-3">
-          One limit that applies every month, not a figure to re-enter each time.
-        </p>
-      </div>
-    </Sheet>
   );
 }
 
