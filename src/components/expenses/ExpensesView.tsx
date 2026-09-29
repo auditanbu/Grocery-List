@@ -13,21 +13,12 @@ import { PeopleSheet } from "@/components/expenses/PeopleSheet";
 import { deleteExpense, settleUp, setCategoryBudget } from "@/lib/expenses/actions";
 import { useAdmin } from "@/lib/admin-context";
 import { formatIsoDate, monthKeyToLabel, shiftMonthKey } from "@/lib/dates";
-import { useLanguage } from "@/lib/language";
 import { formatPrice } from "@/lib/units";
 import type { ExpenseDTO, ExpenseMonthDTO, TransferDTO } from "@/lib/expenses/types";
-
-/** Categories carry both names; which one leads follows the app-wide toggle. */
-function useCategoryName() {
-  const { language } = useLanguage();
-  return (nameEn: string, nameTa: string | null) =>
-    language === "ta" ? (nameTa ?? nameEn) : nameEn;
-}
 
 export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
   const router = useRouter();
   const { isAdmin } = useAdmin();
-  const categoryName = useCategoryName();
   const [entrySheet, setEntrySheet] = useState<{ entry: ExpenseDTO | null } | null>(null);
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [newTripOpen, setNewTripOpen] = useState(false);
@@ -253,7 +244,7 @@ export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
                       isAdmin
                         ? setBudgetFor({
                             id: total.categoryId,
-                            name: categoryName(total.nameEn, total.nameTa),
+                            name: total.nameEn,
                             budget: total.budget,
                           })
                         : undefined
@@ -264,7 +255,7 @@ export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline justify-between gap-3">
                         <span className="truncate text-[16px] font-medium">
-                          {categoryName(total.nameEn, total.nameTa)}
+                          {total.nameEn}
                         </span>
                         <span
                           className={`flex-none text-[15px] font-semibold tabular-nums ${
@@ -326,11 +317,11 @@ export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
                       >
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[16px] font-medium">
-                            {entry.note?.trim() || categoryName(entry.categoryNameEn, entry.categoryNameTa)}
+                            {entry.note?.trim() || entry.categoryNameEn}
                           </span>
                           <span className="block truncate text-[13px] text-ios-label-2">
                             {entry.tripName ? `${entry.tripName} · ` : ""}
-                            {categoryName(entry.categoryNameEn, entry.categoryNameTa)}
+                            {entry.categoryNameEn}
                             {entry.paidByName ? ` · ${entry.paidByName} paid` : ""}
                             {entry.methodName ? ` · ${entry.methodName}` : ""}
                           </span>

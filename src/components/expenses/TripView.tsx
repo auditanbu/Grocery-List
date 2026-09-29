@@ -17,7 +17,6 @@ import {
 } from "@/lib/expenses/actions";
 import { useAdmin } from "@/lib/admin-context";
 import { formatIsoDate } from "@/lib/dates";
-import { useLanguage } from "@/lib/language";
 import { formatPrice } from "@/lib/units";
 import type {
   ExpenseDTO,
@@ -25,13 +24,6 @@ import type {
   TransferDTO,
   TripDetailDTO,
 } from "@/lib/expenses/types";
-
-/** Categories carry both names; which one leads follows the app-wide toggle. */
-function useCategoryName() {
-  const { language } = useLanguage();
-  return (nameEn: string, nameTa: string | null) =>
-    language === "ta" ? (nameTa ?? nameEn) : nameEn;
-}
 
 /**
  * One trip's own page: its expenses, its total, and its balance — settled
@@ -41,7 +33,6 @@ function useCategoryName() {
 export function TripView({ trip }: { trip: TripDetailDTO }) {
   const router = useRouter();
   const { isAdmin } = useAdmin();
-  const categoryName = useCategoryName();
   const [entrySheet, setEntrySheet] = useState<{ open: boolean; entry: ExpenseDTO | null }>({
     open: false,
     entry: null,
@@ -277,10 +268,10 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
                       >
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[16px] font-medium">
-                            {entry.note?.trim() || categoryName(entry.categoryNameEn, entry.categoryNameTa)}
+                            {entry.note?.trim() || entry.categoryNameEn}
                           </span>
                           <span className="block truncate text-[13px] text-ios-label-2">
-                            {categoryName(entry.categoryNameEn, entry.categoryNameTa)}
+                            {entry.categoryNameEn}
                             {entry.paidByName ? ` · ${entry.paidByName} paid` : ""}
                           </span>
                         </span>

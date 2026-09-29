@@ -13,7 +13,6 @@ import {
   upsertPerson,
 } from "@/lib/expenses/actions";
 import { useAdmin } from "@/lib/admin-context";
-import { useLanguage } from "@/lib/language";
 import type { EntryKind, ExpenseMonthDTO } from "@/lib/expenses/types";
 
 /**
@@ -34,15 +33,13 @@ export function PeopleSheet({
 }) {
   const router = useRouter();
   const { isAdmin } = useAdmin();
-  const { language } = useLanguage();
   const [personName, setPersonName] = useState("");
   const [methodName, setMethodName] = useState("");
   const [categoryName, setCategoryName] = useState("");
   const [categoryKind, setCategoryKind] = useState<EntryKind>("EXPENSE");
+  const [renaming, setRenaming] = useState<{ id: number; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const categoryLabel = (nameEn: string, nameTa: string | null) =>
-    language === "ta" ? (nameTa ?? nameEn) : nameEn;
 
   const run = (action: () => Promise<{ ok: boolean; error?: string }>) => {
     setError(null);
@@ -53,6 +50,22 @@ export function PeopleSheet({
         return;
       }
       router.refresh();
+    });
+  };
+
+  const saveRename = (category: ExpenseMonthDTO["categories"][number]) => {
+    if (!renaming) return;
+    const nameEn = renaming.name.trim();
+    if (!nameEn) return;
+    run(async () => {
+      const result = await upsertExpenseCategory({
+        id: category.id,
+        nameEn,
+        nameTa: category.nameTa,
+        kind: category.kind,
+      });
+      if (result.ok) setRenaming(null);
+      return result;
     });
   };
 
@@ -71,33 +84,77 @@ export function PeopleSheet({
             </p>
           ) : (
             <ul className="divide-y divide-ios-separator overflow-hidden rounded-ios bg-ios-surface-2">
-              {month.categories.map((category) => (
-                <li
-                  key={category.id}
-                  className="flex items-center gap-3 px-4 py-2.5"
-                >
-                  <span className="min-w-0 flex-1 truncate text-[15px]">
-                    {categoryLabel(category.nameEn, category.nameTa)}
-                  </span>
-                  <span className="flex-none rounded-full bg-ios-surface px-2 py-0.5 text-[11px] font-medium text-ios-label-3 ring-1 ring-inset ring-ios-separator">
-                    {category.kind === "INCOME" ? "Income" : "Expense"}
-                  </span>
-                  {isAdmin ? (
+              {month.categories.map((category) =>
+                renaming?.id === category.id ? (
+                  <li key={category.id} className="flex items-center gap-2 px-4 py-2">
+                    <input
+                      autoFocus
+                      value={renaming.name}
+                      onChange={(event) => setRenaming({ id: category.id, name: event.target.value })}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          saveRename(category);
+                        }
+                        if (event.key === "Escape") setRenaming(null);
+                      }}
+                      aria-label={`Rename ${category.nameEn}`}
+                      className="h-9 min-w-0 flex-1 rounded-ios bg-ios-surface px-3 text-[15px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
+                    />
                     <button
                       type="button"
-                      disabled={pending}
-                      onClick={() => {
-                        if (!window.confirm(`Remove "${category.nameEn}"?`))
-                          return;
-                        run(() => removeExpenseCategory(category.id));
-                      }}
-                      className="h-8 flex-none rounded-full px-3 text-[13px] font-medium text-ios-red active:opacity-60"
+                      disabled={pending || !renaming.name.trim()}
+                      onClick={() => saveRename(category)}
+                      className="h-8 flex-none rounded-full px-3 text-[13px] font-semibold text-ios-blue active:opacity-60 disabled:opacity-50"
                     >
-                      Remove
+                      Save
                     </button>
-                  ) : null}
-                </li>
-              ))}
+                    <button
+                      type="button"
+                      onClick={() => setRenaming(null)}
+                      className="h-8 flex-none px-2 text-[13px] text-ios-label-2 active:opacity-60"
+                    >
+                      Cancel
+                    </button>
+                  </li>
+                ) : (
+                  <li
+                    key={category.id}
+                    className="flex items-center gap-3 px-4 py-2.5"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-[15px]">
+                      {category.nameEn}
+                    </span>
+                    <span className="flex-none rounded-full bg-ios-surface px-2 py-0.5 text-[11px] font-medium text-ios-label-3 ring-1 ring-inset ring-ios-separator">
+                      {category.kind === "INCOME" ? "Income" : "Expense"}
+                    </span>
+                    {isAdmin ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => setRenaming({ id: category.id, name: category.nameEn })}
+                          className="h-8 flex-none rounded-full px-3 text-[13px] font-medium text-ios-blue active:opacity-60"
+                        >
+                          Rename
+                        </button>
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => {
+                            if (!window.confirm(`Remove "${category.nameEn}"?`))
+                              return;
+                            run(() => removeExpenseCategory(category.id));
+                          }}
+                          className="h-8 flex-none rounded-full px-3 text-[13px] font-medium text-ios-red active:opacity-60"
+                        >
+                          Remove
+                        </button>
+                      </>
+                    ) : null}
+                  </li>
+                ),
+              )}
             </ul>
           )}
 
