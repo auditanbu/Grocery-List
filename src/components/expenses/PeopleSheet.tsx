@@ -13,7 +13,6 @@ import {
   upsertPerson,
 } from "@/lib/expenses/actions";
 import { useAdmin } from "@/lib/admin-context";
-import { useLanguage } from "@/lib/language";
 import type { EntryKind, ExpenseMonthDTO } from "@/lib/expenses/types";
 
 /**
@@ -34,15 +33,12 @@ export function PeopleSheet({
 }) {
   const router = useRouter();
   const { isAdmin } = useAdmin();
-  const { language } = useLanguage();
   const [personName, setPersonName] = useState("");
   const [methodName, setMethodName] = useState("");
   const [categoryName, setCategoryName] = useState("");
   const [categoryKind, setCategoryKind] = useState<EntryKind>("EXPENSE");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const categoryLabel = (nameEn: string, nameTa: string | null) =>
-    language === "ta" ? (nameTa ?? nameEn) : nameEn;
 
   const run = (action: () => Promise<{ ok: boolean; error?: string }>) => {
     setError(null);
@@ -77,7 +73,7 @@ export function PeopleSheet({
                   className="flex items-center gap-3 px-4 py-2.5"
                 >
                   <span className="min-w-0 flex-1 truncate text-[15px]">
-                    {categoryLabel(category.nameEn, category.nameTa)}
+                    {category.nameEn}
                   </span>
                   <span className="flex-none rounded-full bg-ios-surface px-2 py-0.5 text-[11px] font-medium text-ios-label-3 ring-1 ring-inset ring-ios-separator">
                     {category.kind === "INCOME" ? "Income" : "Expense"}
