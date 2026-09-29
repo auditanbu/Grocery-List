@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { Sheet } from "@/components/Sheet";
 import {
@@ -10,7 +10,6 @@ import {
   upsertExpenseCategory,
   type SplitInput,
 } from "@/lib/expenses/actions";
-import { useLanguage } from "@/lib/language";
 import { formatPrice } from "@/lib/units";
 import { allocateByShares, allocateEqually, toPaise, toRupees } from "@/lib/expenses/balances";
 import type {
@@ -25,6 +24,34 @@ const SPLIT_LABELS: Record<SplitMethod, string> = {
   EXACT: "Exact amounts",
   SHARES: "Shares",
 };
+
+/** How many category pills show before the rest fold behind the arrow. */
+const VISIBLE_CATEGORY_COUNT = 3;
+const RECENT_CATEGORIES_KEY = "grocery.expenseCategoryRecents";
+
+/** Most-recently-used category ids, kept separately per entry kind. */
+function loadRecentCategoryIds(kind: EntryKind): number[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(RECENT_CATEGORIES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as Partial<Record<EntryKind, number[]>>;
+    return Array.isArray(parsed[kind]) ? (parsed[kind] as number[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentCategoryIds(kind: EntryKind, ids: number[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(RECENT_CATEGORIES_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Partial<Record<EntryKind, number[]>>) : {};
+    window.localStorage.setItem(RECENT_CATEGORIES_KEY, JSON.stringify({ ...parsed, [kind]: ids }));
+  } catch {
+    // Best-effort — a missed write just means recency resets next time.
+  }
+}
 
 /** The datetime-local value for an ISO string, in the browser's own timezone. */
 function localInputValue(iso: string): string {
@@ -59,9 +86,21 @@ export function EntrySheet({
   defaultTripId?: number;
 }) {
   const router = useRouter();
-  const { language } = useLanguage();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  // The amount is the first thing you type on every entry, so the caret
+  // should already be sitting there when the sheet finishes its slide-in —
+  // an effect + ref outlasts the entrance animation more reliably than the
+  // plain `autoFocus` attribute does on its own.
+  const amountInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      amountInputRef.current?.focus();
+      amountInputRef.current?.select();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   const [kind, setKind] = useState<EntryKind>(entry?.kind ?? "EXPENSE");
   const [amount, setAmount] = useState(entry ? String(entry.amount) : "");
@@ -102,6 +141,45 @@ export function EntrySheet({
   ].filter((category) => category.kind === kind);
   const people = month.people.filter((person) => person.isActive || splitWith.includes(person.id));
 
+  // Recently used categories lead the row, so the ones you actually pick
+  // most weeks don't hide behind a scroll or an alphabetical accident.
+  const [recentCategoryIds, setRecentCategoryIds] = useState<number[]>(() => loadRecentCategoryIds(kind));
+  useEffect(() => {
+    setRecentCategoryIds(loadRecentCategoryIds(kind));
+  }, [kind]);
+  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
+
+  const orderedCategories = useMemo(() => {
+    const byId = new Map(categories.map((category) => [category.id, category] as const));
+    const recent = recentCategoryIds
+      .map((id) => byId.get(id))
+      .filter((category): category is (typeof categories)[number] => category !== undefined);
+    const seen = new Set(recent.map((category) => category.id));
+    return [...recent, ...categories.filter((category) => !seen.has(category.id))];
+  }, [categories, recentCategoryIds]);
+
+  const selectedCategoryIndex = categoryId === null
+    ? -1
+    : orderedCategories.findIndex((category) => category.id === categoryId);
+  // Never hide the category that's actually selected behind the fold.
+  const categoriesShown = categoriesExpanded || selectedCategoryIndex >= VISIBLE_CATEGORY_COUNT;
+  const visibleCategories = categoriesShown
+    ? orderedCategories
+    : orderedCategories.slice(0, VISIBLE_CATEGORY_COUNT);
+  const hasMoreCategories = orderedCategories.length > VISIBLE_CATEGORY_COUNT;
+
+  const markRecentCategory = (id: number) => {
+    setRecentCategoryIds((current) => {
+      const next = [id, ...current.filter((existing) => existing !== id)].slice(0, 8);
+      saveRecentCategoryIds(kind, next);
+      return next;
+    });
+  };
+  const selectCategory = (id: number) => {
+    setCategoryId(id);
+    markRecentCategory(id);
+  };
+
   // Picking a trip is the "split this equally" gesture: it opens the split
   // and sets it to the trip's whole roster, equally, which is what makes
   // "add expenses, split the trip equally at the end" true without a
@@ -116,9 +194,6 @@ export function EntrySheet({
     setSplitMethod("EQUAL");
     setSplitWith(trip.participantIds);
   };
-  const categoryName = (nameEn: string, nameTa: string | null) =>
-    language === "ta" ? (nameTa ?? nameEn) : nameEn;
-
   // What each person would owe as it stands — the same functions the server
   // will use, so what is shown is what gets stored.
   const preview = useMemo(() => {
@@ -150,6 +225,7 @@ export function EntrySheet({
         { id: result.data.id, nameEn, nameTa: null, kind, budget: null },
       ]);
       setCategoryId(result.data.id);
+      markRecentCategory(result.data.id);
       setNewCategoryName("");
       setNewCategoryOpen(false);
       router.refresh();
@@ -247,6 +323,7 @@ export function EntrySheet({
         <div className="flex items-center rounded-ios bg-ios-surface-2 px-3 ring-1 ring-inset ring-ios-separator focus-within:ring-2 focus-within:ring-ios-blue">
           <span className="text-[22px] font-semibold text-ios-label-2">₹</span>
           <input
+            ref={amountInputRef}
             autoFocus
             inputMode="decimal"
             value={amount}
@@ -258,16 +335,40 @@ export function EntrySheet({
         </div>
 
         <Field label="Category">
-          <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
+          <div className="flex flex-wrap items-center gap-2">
+            {visibleCategories.map((category) => (
               <Chip
                 key={category.id}
                 active={categoryId === category.id}
-                onClick={() => setCategoryId(category.id)}
+                onClick={() => selectCategory(category.id)}
               >
-                {categoryName(category.nameEn, category.nameTa)}
+                {category.nameEn}
               </Chip>
             ))}
+            {hasMoreCategories ? (
+              <button
+                type="button"
+                onClick={() => setCategoriesExpanded((current) => !current)}
+                aria-expanded={categoriesShown}
+                aria-label={categoriesShown ? "Show fewer categories" : "Show more categories"}
+                className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-ios-surface-2 text-ios-label-2 ring-1 ring-inset ring-ios-separator transition active:scale-95"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className={`h-4 w-4 transition-transform ${categoriesShown ? "rotate-180" : ""}`}
+                  aria-hidden
+                >
+                  <path
+                    d="M6 9l6 6 6-6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            ) : null}
             {newCategoryOpen ? null : (
               <Chip active={false} onClick={() => setNewCategoryOpen(true)}>
                 + New
