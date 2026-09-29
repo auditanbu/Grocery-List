@@ -8,6 +8,8 @@ type SheetProps = {
   onClose: () => void;
   title: string;
   subtitle?: string;
+  /** An extra icon button in the header, beside the close button — e.g. an edit toggle. */
+  headerAction?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
 };
@@ -16,7 +18,7 @@ type SheetProps = {
  * iOS sheet: slides up from the bottom on iPhone, centres as a card on
  * iPad and desktop. Closes on backdrop tap or Escape.
  */
-export function Sheet({ open, onClose, title, subtitle, children, footer }: SheetProps) {
+export function Sheet({ open, onClose, title, subtitle, headerAction, children, footer }: SheetProps) {
   // Portalled to <body>. A `position: fixed` element is positioned against
   // the nearest ancestor with a filter, backdrop-filter or transform rather
   // than against the viewport — and these sheets are opened from buttons that
@@ -67,21 +69,24 @@ export function Sheet({ open, onClose, title, subtitle, children, footer }: Shee
               <h2 className="text-[19px] font-semibold tracking-tight">{title}</h2>
               {subtitle ? <p className="text-[13px] text-ios-label-2">{subtitle}</p> : null}
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="-mr-1 -mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-ios-surface-2 text-ios-label-2 transition active:scale-95"
-              aria-label="Close"
-            >
-              <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
-                <path
-                  d="M6 6l12 12M18 6L6 18"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
+            <div className="-mr-1 -mt-1 flex flex-none items-center gap-2">
+              {headerAction}
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-ios-surface-2 text-ios-label-2 transition active:scale-95"
+                aria-label="Close"
+              >
+                <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+                  <path
+                    d="M6 6l12 12M18 6L6 18"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
