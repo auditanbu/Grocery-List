@@ -69,15 +69,50 @@ export function PeopleSheet({
     });
   };
 
+  // One tap instead of tapping Remove on each leftover default in turn.
+  // removeExpenseCategory already refuses anything still tied to an
+  // expense, so this can only ever clear out the truly unused ones.
+  const removeUnused = () => {
+    if (
+      !window.confirm(
+        "Remove every category that isn't used by any expense yet? Ones still in use are kept automatically.",
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const results = await Promise.all(
+        month.categories.map((category) => removeExpenseCategory(category.id)),
+      );
+      if (results.length > 0 && results.every((result) => !result.ok)) {
+        setError("Nothing to remove — every category is still in use.");
+      }
+      router.refresh();
+    });
+  };
+
   return (
     <Sheet open={open} onClose={onClose} title="People, categories & methods">
       <div className="space-y-5 pb-3">
         {error ? <p className="text-[14px] text-ios-red">{error}</p> : null}
 
         <section>
-          <p className="pb-1.5 text-[13px] font-medium text-ios-label-2">
-            Categories — what an entry is filed under
-          </p>
+          <div className="flex items-center justify-between gap-3 pb-1.5">
+            <p className="text-[13px] font-medium text-ios-label-2">
+              Categories — what an entry is filed under
+            </p>
+            {isAdmin && month.categories.length > 0 ? (
+              <button
+                type="button"
+                disabled={pending}
+                onClick={removeUnused}
+                className="flex-none text-[13px] font-medium text-ios-red active:opacity-60 disabled:opacity-50"
+              >
+                Remove unused
+              </button>
+            ) : null}
+          </div>
           {month.categories.length === 0 ? (
             <p className="rounded-ios bg-ios-surface-2 px-4 py-3 text-[14px] text-ios-label-2">
               No categories yet. Add the first one below — anyone can.
