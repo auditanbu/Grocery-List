@@ -85,7 +85,7 @@ export function Sheet({ open, onClose, title, subtitle, children, footer }: Shee
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 pb-2">{children}</div>
+        <div className="flex-1 overflow-x-hidden overflow-y-auto px-5 pb-2">{children}</div>
 
         {footer ? (
           <div
