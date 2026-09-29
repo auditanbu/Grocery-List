@@ -57,3 +57,15 @@ export function formatIsoDate(iso: string): string {
   const shifted = new Date(ms + IST_OFFSET_MS);
   return `${shifted.getUTCDate()} ${MONTHS[shifted.getUTCMonth()]} ${shifted.getUTCFullYear()}`;
 }
+
+/** "2026-09-14T19:10:00.000Z" -> "15 Sep 2026, 12:40 am", always read in IST. */
+export function formatIsoDateTime(iso: string): string {
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return "";
+  const shifted = new Date(ms + IST_OFFSET_MS);
+  const hours24 = shifted.getUTCHours();
+  const period = hours24 >= 12 ? "pm" : "am";
+  const hours12 = hours24 % 12 || 12;
+  const minutes = String(shifted.getUTCMinutes()).padStart(2, "0");
+  return `${formatIsoDate(iso)}, ${hours12}:${minutes} ${period}`;
+}

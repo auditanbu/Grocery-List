@@ -10,6 +10,7 @@ import {
   upsertExpenseCategory,
   type SplitInput,
 } from "@/lib/expenses/actions";
+import { formatIsoDateTime } from "@/lib/dates";
 import { formatPrice } from "@/lib/units";
 import { allocateByShares, allocateEqually, toPaise, toRupees } from "@/lib/expenses/balances";
 import type {
@@ -91,18 +92,25 @@ export function EntrySheet({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  // The amount is the first thing you type on every entry, so the caret
-  // should already be sitting there when the sheet finishes its slide-in —
-  // an effect + ref outlasts the entrance animation more reliably than the
-  // plain `autoFocus` attribute does on its own.
+  // An existing entry opens read-only — tapping it from a list shouldn't put
+  // you one stray field-edit away from changing it. New entries have nothing
+  // to view, so they go straight to the form.
+  const [mode, setMode] = useState<"view" | "edit">(entry ? "view" : "edit");
+
+  // The amount is the first thing you type once the form is up, so the caret
+  // should already be sitting there when it appears — an effect + ref
+  // outlasts the sheet's entrance animation more reliably than the plain
+  // `autoFocus` attribute does on its own. Re-fires when switching from view
+  // into edit, too.
   const amountInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
+    if (mode !== "edit") return;
     const frame = requestAnimationFrame(() => {
       amountInputRef.current?.focus();
       amountInputRef.current?.select();
     });
     return () => cancelAnimationFrame(frame);
-  }, []);
+  }, [mode]);
 
   const [kind, setKind] = useState<EntryKind>(entry?.kind ?? "EXPENSE");
   const [amount, setAmount] = useState(entry ? String(entry.amount) : "");
@@ -281,30 +289,74 @@ export function EntrySheet({
     <Sheet
       open
       onClose={onClose}
-      title={entry ? "Edit entry" : kind === "INCOME" ? "Money in" : "New entry"}
-      footer={
-        <div className="space-y-2">
+      title={
+        mode === "view" && entry
+          ? entry.note?.trim() || entry.categoryNameEn
+          : entry
+            ? "Edit entry"
+            : kind === "INCOME"
+              ? "Money in"
+              : "New entry"
+      }
+      headerAction={
+        mode === "view" ? (
           <button
             type="button"
-            onClick={save}
-            disabled={pending}
-            className="flex h-12 w-full items-center justify-center rounded-ios bg-ios-blue text-[17px] font-semibold text-white active:scale-[0.98] disabled:opacity-50"
+            onClick={() => setMode("edit")}
+            aria-label="Edit entry"
+            title="Edit entry"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-ios-surface-2 text-ios-blue active:scale-95"
           >
-            {pending ? "Saving…" : entry ? "Save changes" : "Add entry"}
+            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+              <path
+                d="M4 20l.9-4.2L15.6 5.1a1.6 1.6 0 0 1 2.3 0l1 1a1.6 1.6 0 0 1 0 2.3L8.2 19.1 4 20zM14.8 6l3.2 3.2"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </button>
-          {onDelete ? (
+        ) : undefined
+      }
+      footer={
+        mode === "edit" ? (
+          <div className="space-y-2">
             <button
               type="button"
-              onClick={onDelete}
+              onClick={save}
               disabled={pending}
-              className="h-11 w-full text-[16px] font-medium text-ios-red active:opacity-60"
+              className="flex h-12 w-full items-center justify-center rounded-ios bg-ios-blue text-[17px] font-semibold text-white active:scale-[0.98] disabled:opacity-50"
             >
-              Delete entry
+              {pending ? "Saving…" : entry ? "Save changes" : "Add entry"}
             </button>
-          ) : null}
-        </div>
+            {onDelete ? (
+              <button
+                type="button"
+                onClick={onDelete}
+                disabled={pending}
+                className="h-11 w-full text-[16px] font-medium text-ios-red active:opacity-60"
+              >
+                Delete entry
+              </button>
+            ) : null}
+          </div>
+        ) : onDelete ? (
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={pending}
+            className="h-11 w-full text-[16px] font-medium text-ios-red active:opacity-60"
+          >
+            Delete entry
+          </button>
+        ) : undefined
       }
     >
+      {mode === "view" && entry ? (
+        <ViewEntry entry={entry} />
+      ) : (
       <div className="space-y-4 pb-3">
         {error ? <p className="text-[14px] text-ios-red">{error}</p> : null}
 
@@ -432,7 +484,7 @@ export function EntrySheet({
             value={spentAt}
             onChange={(event) => setSpentAt(event.target.value)}
             aria-label="When"
-            className="h-12 w-full rounded-ios bg-ios-surface-2 px-4 text-[16px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
+            className="h-12 w-full min-w-0 max-w-full rounded-ios bg-ios-surface-2 px-4 text-[16px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue [&::-webkit-datetime-edit]:overflow-hidden"
           />
         </Field>
 
@@ -622,7 +674,74 @@ export function EntrySheet({
           </div>
         ) : null}
       </div>
+      )}
     </Sheet>
+  );
+}
+
+/** The at-a-glance summary an existing entry opens to — tap Edit to change anything. */
+function ViewEntry({ entry }: { entry: ExpenseDTO }) {
+  return (
+    <div className="space-y-4 pb-3">
+      <div className="flex items-center rounded-ios bg-ios-surface-2 px-3 py-4">
+        <span className="text-[22px] font-semibold text-ios-label-2">₹</span>
+        <span className="flex-1 px-2 text-[22px] font-semibold tabular-nums">
+          {entry.amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+        <span
+          className={`flex-none rounded-full px-2.5 py-1 text-[12px] font-medium ${
+            entry.kind === "INCOME" ? "bg-ios-green-soft text-ios-green" : "bg-ios-surface text-ios-label-2"
+          }`}
+        >
+          {entry.kind === "INCOME" ? "Money in" : "Money out"}
+        </span>
+      </div>
+
+      <Field label="Category">
+        <p className="text-[16px]">{entry.categoryNameEn}</p>
+      </Field>
+
+      <Field label="When">
+        <p className="text-[16px]">{formatIsoDateTime(entry.spentAt)}</p>
+      </Field>
+
+      {entry.paidByName ? (
+        <Field label={entry.kind === "INCOME" ? "Received by" : "Paid by"}>
+          <p className="text-[16px]">{entry.paidByName}</p>
+        </Field>
+      ) : null}
+
+      {entry.methodName ? (
+        <Field label="How">
+          <p className="text-[16px]">{entry.methodName}</p>
+        </Field>
+      ) : null}
+
+      {entry.tripName ? (
+        <Field label="Trip">
+          <p className="text-[16px]">{entry.tripName}</p>
+        </Field>
+      ) : null}
+
+      {entry.note?.trim() ? (
+        <Field label="Note">
+          <p className="text-[16px]">{entry.note}</p>
+        </Field>
+      ) : null}
+
+      {entry.shares.length > 0 ? (
+        <Field label="Split">
+          <ul className="divide-y divide-ios-separator overflow-hidden rounded-ios bg-ios-surface-2">
+            {entry.shares.map((share) => (
+              <li key={share.personId} className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-[15px]">
+                <span className="min-w-0 flex-1 truncate">{share.personName}</span>
+                <span className="flex-none font-semibold tabular-nums">{formatPrice(share.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        </Field>
+      ) : null}
+    </div>
   );
 }
 

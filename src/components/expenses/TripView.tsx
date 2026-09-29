@@ -38,6 +38,7 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
     entry: null,
   });
   const [editOpen, setEditOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [settling, setSettling] = useState<TransferDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -49,6 +50,22 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
       grouped.set(day, [...(grouped.get(day) ?? []), entry]);
     }
     return [...grouped.entries()];
+  }, [trip.entries]);
+
+  // What this trip cost, broken down by what it was for — the total on its
+  // own answers "how much", not "on what".
+  const categoryTotals = useMemo(() => {
+    const totals = new Map<number, { nameEn: string; total: number }>();
+    for (const entry of trip.entries) {
+      const current = totals.get(entry.categoryId);
+      totals.set(entry.categoryId, {
+        nameEn: entry.categoryNameEn,
+        total: (current?.total ?? 0) + entry.amount,
+      });
+    }
+    return [...totals.entries()]
+      .map(([categoryId, { nameEn, total }]) => ({ categoryId, nameEn, total }))
+      .sort((a, b) => b.total - a.total);
   }, [trip.entries]);
 
   // What EntrySheet needs, shaped as the one-trip ExpenseMonthDTO it expects
@@ -146,23 +163,20 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
         <div className="flex flex-none items-center gap-2">
           <button
             type="button"
-            onClick={() => setEditOpen(true)}
-            aria-label="Edit trip"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Trip options"
             className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-ios-surface text-ios-blue shadow-ios active:scale-95"
           >
             <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
               <path
-                d="M4 20l.9-4.2L15.6 5.1a1.6 1.6 0 0 1 2.3 0l1 1a1.6 1.6 0 0 1 0 2.3L8.2 19.1 4 20zM14.8 6l3.2 3.2"
+                d="M4 7h16M4 12h16M4 17h16"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="1.7"
+                strokeWidth="1.8"
                 strokeLinecap="round"
-                strokeLinejoin="round"
               />
             </svg>
           </button>
-          <AdminLoginButton />
-          <ThemeToggle />
         </div>
       </header>
 
@@ -179,6 +193,22 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
           Every expense here defaults to an equal split across everyone on the trip.
         </p>
       </section>
+
+      {categoryTotals.length > 0 ? (
+        <section>
+          <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">By category</h2>
+          <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
+            {categoryTotals.map((total) => (
+              <li key={total.categoryId} className="ios-row">
+                <span className="min-w-0 flex-1 truncate text-[16px] font-medium">{total.nameEn}</span>
+                <span className="flex-none text-[15px] font-semibold tabular-nums">
+                  {formatPrice(total.total)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section>
         <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">Balance</h2>
@@ -215,17 +245,32 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
                     key={`${transfer.fromPersonId}-${transfer.toPersonId}`}
                     className="ios-card flex items-center gap-3 px-4 py-3"
                   >
-                    <span className="min-w-0 flex-1 text-[15px]">
-                      {transfer.fromName} → {transfer.toName}{" "}
-                      <span className="font-semibold tabular-nums">{formatPrice(transfer.amount)}</span>
+                    <span className="flex min-w-0 flex-1 items-center gap-2 text-[15px]">
+                      <button
+                        type="button"
+                        onClick={() => setSettling(transfer)}
+                        aria-label={`Settle up: ${transfer.fromName} pays ${transfer.toName}`}
+                        title="Settle up"
+                        className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-ios-blue text-white active:scale-95"
+                      >
+                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" aria-hidden>
+                          <path
+                            d="M5 12.5l4.5 4.5L19 7"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
+                      <span className="min-w-0 truncate">
+                        {transfer.fromName} → {transfer.toName}
+                      </span>
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setSettling(transfer)}
-                      className="h-9 flex-none rounded-full bg-ios-blue px-4 text-[14px] font-semibold text-white active:scale-95"
-                    >
-                      Settle up
-                    </button>
+                    <span className="flex-none font-semibold tabular-nums text-[15px]">
+                      {formatPrice(transfer.amount)}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -235,18 +280,16 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
       </section>
 
       <section>
-        <div className="flex items-center justify-between px-1 pb-2">
-          <h2 className="text-[20px] font-semibold tracking-tight">Expenses</h2>
-          {trip.closedAt === null ? (
-            <button
-              type="button"
-              onClick={() => setEntrySheet({ open: true, entry: null })}
-              className="text-[14px] font-medium text-ios-blue active:opacity-60"
-            >
-              + Add expense
-            </button>
-          ) : null}
-        </div>
+        <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">Expenses</h2>
+        {trip.closedAt === null ? (
+          <button
+            type="button"
+            onClick={() => setEntrySheet({ open: true, entry: null })}
+            className="mb-3 h-11 w-full rounded-ios bg-ios-blue text-[15px] font-semibold text-white active:scale-[0.99]"
+          >
+            + Add expense
+          </button>
+        ) : null}
         {days.length === 0 ? (
           <p className="ios-card p-6 text-center text-[15px] text-ios-label-2">
             Nothing logged for this trip yet.
@@ -311,27 +354,6 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
         </section>
       ) : null}
 
-      <div className="space-y-2">
-        <button
-          type="button"
-          onClick={toggleClosed}
-          disabled={pending}
-          className="h-11 w-full rounded-ios bg-ios-surface-2 text-[15px] font-medium text-ios-blue ring-1 ring-inset ring-ios-separator active:scale-[0.99] disabled:opacity-50"
-        >
-          {trip.closedAt ? "Reopen trip" : "Close trip"}
-        </button>
-        {isAdmin ? (
-          <button
-            type="button"
-            onClick={removeTrip}
-            disabled={pending}
-            className="h-11 w-full text-[15px] font-medium text-ios-red active:opacity-60 disabled:opacity-50"
-          >
-            Delete trip
-          </button>
-        ) : null}
-      </div>
-
       {entrySheet.open ? (
         <EntrySheet
           entry={entrySheet.entry}
@@ -341,6 +363,23 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
           onDelete={isAdmin && entrySheet.entry ? () => remove(entrySheet.entry as ExpenseDTO) : undefined}
         />
       ) : null}
+
+      <TripMenuSheet
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        isAdmin={isAdmin}
+        closed={trip.closedAt !== null}
+        pending={pending}
+        onEdit={() => {
+          setMenuOpen(false);
+          setEditOpen(true);
+        }}
+        onToggleClosed={() => {
+          setMenuOpen(false);
+          toggleClosed();
+        }}
+        onDelete={removeTrip}
+      />
 
       <EditTripSheet open={editOpen} trip={trip} onClose={() => setEditOpen(false)} />
 
@@ -369,6 +408,82 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
         }}
       />
     </div>
+  );
+}
+
+/**
+ * Everything about the trip itself, rather than its expenses: editing it,
+ * closing or deleting it, plus the app-wide dark mode and admin controls —
+ * one burger button instead of a header full of icons.
+ */
+function TripMenuSheet({
+  open,
+  onClose,
+  isAdmin,
+  closed,
+  pending,
+  onEdit,
+  onToggleClosed,
+  onDelete,
+}: {
+  open: boolean;
+  onClose: () => void;
+  isAdmin: boolean;
+  closed: boolean;
+  pending: boolean;
+  onEdit: () => void;
+  onToggleClosed: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <Sheet open={open} onClose={onClose} title="Trip options">
+      <div className="space-y-4 pb-3">
+        <ul className="divide-y divide-ios-separator overflow-hidden rounded-ios bg-ios-surface-2">
+          <li>
+            <button
+              type="button"
+              onClick={onEdit}
+              className="flex h-12 w-full items-center px-4 text-left text-[15px] font-medium text-ios-blue active:bg-ios-surface"
+            >
+              Edit trip
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              onClick={onToggleClosed}
+              disabled={pending}
+              className="flex h-12 w-full items-center px-4 text-left text-[15px] font-medium text-ios-blue active:bg-ios-surface disabled:opacity-50"
+            >
+              {closed ? "Reopen trip" : "Close trip"}
+            </button>
+          </li>
+          {isAdmin ? (
+            <li>
+              <button
+                type="button"
+                onClick={onDelete}
+                disabled={pending}
+                className="flex h-12 w-full items-center px-4 text-left text-[15px] font-medium text-ios-red active:bg-ios-surface disabled:opacity-50"
+              >
+                Delete trip
+              </button>
+            </li>
+          ) : null}
+        </ul>
+
+        <ul className="divide-y divide-ios-separator overflow-hidden rounded-ios bg-ios-surface-2">
+          <li className="flex items-center justify-between gap-3 px-4 py-2.5">
+            <span className="text-[15px] font-medium">Dark mode</span>
+            <ThemeToggle />
+          </li>
+          <li className="flex items-center justify-between gap-3 px-4 py-2.5">
+            <span className="text-[15px] font-medium">Admin</span>
+            <AdminLoginButton />
+          </li>
+        </ul>
+      </div>
+    </Sheet>
   );
 }
 
