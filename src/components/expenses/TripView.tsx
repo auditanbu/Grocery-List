@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 import { AdminLoginButton } from "@/components/AdminLoginButton";
+import { FilterSheet, selectedOption, type FilterOption } from "@/components/FilterSheet";
 import { Sheet } from "@/components/Sheet";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { EntrySheet } from "@/components/expenses/EntrySheet";
@@ -46,17 +47,32 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
   // Same idea for the category breakdown — its own toggle, independent of
   // whichever balance row is open.
   const [expandedCategoryId, setExpandedCategoryId] = useState<number | null>(null);
+  // Narrows the Expenses list only — the totals above it still cover the
+  // whole trip, so a filter can't be mistaken for having changed them.
+  const [friendFilter, setFriendFilter] = useState<number | undefined>(undefined);
+  const [categoryFilter, setCategoryFilter] = useState<number | undefined>(undefined);
+  const [openFilter, setOpenFilter] = useState<"friend" | "category" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const filteredEntries = useMemo(
+    () =>
+      trip.entries.filter(
+        (entry) =>
+          (friendFilter === undefined || entry.paidById === friendFilter) &&
+          (categoryFilter === undefined || entry.categoryId === categoryFilter),
+      ),
+    [trip.entries, friendFilter, categoryFilter],
+  );
+
   const days = useMemo(() => {
     const grouped = new Map<string, ExpenseDTO[]>();
-    for (const entry of trip.entries) {
+    for (const entry of filteredEntries) {
       const day = entry.spentAt.slice(0, 10);
       grouped.set(day, [...(grouped.get(day) ?? []), entry]);
     }
     return [...grouped.entries()];
-  }, [trip.entries]);
+  }, [filteredEntries]);
 
   // What this trip cost, broken down by what it was for — the total on its
   // own answers "how much", not "on what".
@@ -73,6 +89,26 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
       .map(([categoryId, { nameEn, total }]) => ({ categoryId, nameEn, total }))
       .sort((a, b) => b.total - a.total);
   }, [trip.entries]);
+
+  const friendFilterOptions: FilterOption<number | undefined>[] = [
+    { key: "all", label: "All friends", value: undefined, count: trip.entries.length },
+    ...trip.participants.map((person) => ({
+      key: String(person.id),
+      label: person.name,
+      value: person.id,
+      count: trip.entries.filter((entry) => entry.paidById === person.id).length,
+    })),
+  ];
+
+  const categoryFilterOptions: FilterOption<number | undefined>[] = [
+    { key: "all", label: "All categories", value: undefined, count: trip.entries.length },
+    ...categoryTotals.map((total) => ({
+      key: String(total.categoryId),
+      label: total.nameEn,
+      value: total.categoryId,
+      count: trip.entries.filter((entry) => entry.categoryId === total.categoryId).length,
+    })),
+  ];
 
   // What EntrySheet needs, shaped as the one-trip ExpenseMonthDTO it expects
   // — the trip page's "Add expense" opens the same sheet already in this
@@ -343,9 +379,37 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
 
       <section>
         <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">Expenses</h2>
+        {trip.entries.length > 0 ? (
+          <div className="flex gap-2 pb-2">
+            <button
+              type="button"
+              onClick={() => setOpenFilter("friend")}
+              className={`h-9 flex-1 truncate rounded-full px-3.5 text-[13px] font-medium transition active:scale-95 ${
+                friendFilter !== undefined
+                  ? "bg-ios-blue text-white"
+                  : "bg-ios-surface-2 text-ios-label-2 ring-1 ring-inset ring-ios-separator"
+              }`}
+            >
+              {selectedOption(friendFilterOptions, friendFilter)?.label ?? "Friend"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpenFilter("category")}
+              className={`h-9 flex-1 truncate rounded-full px-3.5 text-[13px] font-medium transition active:scale-95 ${
+                categoryFilter !== undefined
+                  ? "bg-ios-blue text-white"
+                  : "bg-ios-surface-2 text-ios-label-2 ring-1 ring-inset ring-ios-separator"
+              }`}
+            >
+              {selectedOption(categoryFilterOptions, categoryFilter)?.label ?? "Category"}
+            </button>
+          </div>
+        ) : null}
         {days.length === 0 ? (
           <p className="ios-card p-6 text-center text-[15px] text-ios-label-2">
-            Nothing logged for this trip yet.
+            {friendFilter !== undefined || categoryFilter !== undefined
+              ? "No expenses match this filter."
+              : "Nothing logged for this trip yet."}
           </p>
         ) : (
           <div className="space-y-4">
@@ -432,6 +496,24 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
           toggleClosed();
         }}
         onDelete={removeTrip}
+      />
+
+      <FilterSheet
+        open={openFilter === "friend"}
+        onClose={() => setOpenFilter(null)}
+        label="Filter by friend"
+        options={friendFilterOptions}
+        value={friendFilter}
+        onChange={setFriendFilter}
+      />
+
+      <FilterSheet
+        open={openFilter === "category"}
+        onClose={() => setOpenFilter(null)}
+        label="Filter by category"
+        options={categoryFilterOptions}
+        value={categoryFilter}
+        onChange={setCategoryFilter}
       />
 
       <EditTripSheet open={editOpen} trip={trip} onClose={() => setEditOpen(false)} />
