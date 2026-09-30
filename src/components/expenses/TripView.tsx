@@ -100,9 +100,10 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
       lines.push("*Expenses*");
       const chronological = [...trip.entries].sort((a, b) => a.spentAt.localeCompare(b.spentAt));
       for (const entry of chronological) {
-        const label = entry.note?.trim() || entry.categoryNameEn;
         const paidBy = entry.paidByName ? ` (${entry.paidByName})` : "";
-        lines.push(`- ${label}: ${formatPrice(entry.amount)}${paidBy}`);
+        const note = entry.note?.trim();
+        const noteSuffix = note ? ` - ${note}` : "";
+        lines.push(`- ${entry.categoryNameEn}: ${formatPrice(entry.amount)}${paidBy}${noteSuffix}`);
       }
       lines.push("");
     }
