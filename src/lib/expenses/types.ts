@@ -136,4 +136,6 @@ export type ExpenseMonthDTO = {
   methods: PaymentMethodDTO[];
   /** Open trips only — closed ones don't clutter the "add to a trip" picker. */
   openTrips: TripSummaryDTO[];
+  /** Closed trips, newest first — otherwise a closed trip has no page that lists it. */
+  closedTrips: TripSummaryDTO[];
 };

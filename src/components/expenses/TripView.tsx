@@ -183,6 +183,7 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
         settled: trip.balances.length === 0,
       },
     ],
+    closedTrips: [],
   };
 
   const remove = (entry: ExpenseDTO) => {

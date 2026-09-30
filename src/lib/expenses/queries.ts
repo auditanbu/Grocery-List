@@ -148,7 +148,7 @@ export async function getExpenseMonth(monthKey: string): Promise<ExpenseMonthDTO
   const { start, end } = monthRange(monthKey);
   await ensureExpenseDefaults();
 
-  const [rows, settlementRows, categories, people, methods, openTrips] = await Promise.all([
+  const [rows, settlementRows, categories, people, methods, allTrips] = await Promise.all([
     prisma.expense.findMany({
       where: { spentAt: { gte: start, lt: end } },
       orderBy: [{ spentAt: "desc" }, { id: "desc" }],
@@ -168,8 +168,13 @@ export async function getExpenseMonth(monthKey: string): Promise<ExpenseMonthDTO
     getExpenseCategories(),
     getPeople(),
     getPaymentMethods(),
-    getTrips({ openOnly: true }),
+    getTrips(),
   ]);
+
+  const openTrips = allTrips.filter((trip) => trip.closedAt === null);
+  const closedTrips = allTrips
+    .filter((trip) => trip.closedAt !== null)
+    .sort((a, b) => (b.closedAt as string).localeCompare(a.closedAt as string));
 
   const entries: ExpenseDTO[] = rows.map((row) => ({
     id: row.id,
@@ -247,6 +252,7 @@ export async function getExpenseMonth(monthKey: string): Promise<ExpenseMonthDTO
     people,
     methods,
     openTrips,
+    closedTrips,
   };
 }
 

@@ -21,6 +21,9 @@ export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
   const [entrySheet, setEntrySheet] = useState<{ entry: ExpenseDTO | null } | null>(null);
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [newTripOpen, setNewTripOpen] = useState(false);
+  // Shut by default — a closed trip is done with, so it shouldn't compete
+  // with the open ones for space every time this page loads.
+  const [closedTripsOpen, setClosedTripsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -171,6 +174,61 @@ export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
           </ul>
         )}
       </section>
+
+      {month.closedTrips.length > 0 ? (
+        <section>
+          <button
+            type="button"
+            onClick={() => setClosedTripsOpen((open) => !open)}
+            aria-expanded={closedTripsOpen}
+            className="flex w-full items-center justify-between gap-3 px-1 pb-2"
+          >
+            <h2 className="text-[20px] font-semibold tracking-tight">Closed trips</h2>
+            <svg
+              viewBox="0 0 24 24"
+              className={`h-4 w-4 flex-none text-ios-label-3 transition-transform ${
+                closedTripsOpen ? "rotate-180" : ""
+              }`}
+              aria-hidden
+            >
+              <path
+                d="M6 9l6 6 6-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          {closedTripsOpen ? (
+            <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
+              {month.closedTrips.map((trip) => (
+                <li key={trip.id}>
+                  <Link href={`/expenses/trips/${trip.id}`} className="ios-row active:bg-ios-surface-2">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[16px] font-medium">{trip.name}</span>
+                      <span className="block truncate text-[13px] text-ios-label-2">
+                        {trip.participantNames.join(", ")}
+                      </span>
+                    </span>
+                    <span className="flex-none text-right">
+                      <span className="block text-[15px] font-semibold tabular-nums">
+                        {formatPrice(trip.total)}
+                      </span>
+                      <span
+                        className={`block text-[12px] ${trip.settled ? "text-ios-green" : "text-ios-label-3"}`}
+                      >
+                        {trip.settled ? "Settled" : "Unsettled"}
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
 
       <section>
         <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">Entries</h2>
