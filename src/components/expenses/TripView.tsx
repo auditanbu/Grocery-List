@@ -90,6 +90,52 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
       .sort((a, b) => b.total - a.total);
   }, [trip.entries]);
 
+  // The whole trip as one message: what was spent, who fronted the money,
+  // and the fewest payments that clear it — everything a group chat needs
+  // to actually settle up, without anyone opening the app.
+  const whatsappHref = useMemo(() => {
+    const lines = [`*${trip.name}*`, `Total: ${formatPrice(trip.total)}`, ""];
+
+    if (trip.entries.length > 0) {
+      lines.push("*Expenses*");
+      const chronological = [...trip.entries].sort((a, b) => a.spentAt.localeCompare(b.spentAt));
+      for (const entry of chronological) {
+        const label = entry.note?.trim() || entry.categoryNameEn;
+        const paidBy = entry.paidByName ? ` (${entry.paidByName})` : "";
+        lines.push(`- ${label}: ${formatPrice(entry.amount)}${paidBy}`);
+      }
+      lines.push("");
+    }
+
+    const paidTotals = new Map<number, { name: string; total: number }>();
+    for (const entry of trip.entries) {
+      if (entry.paidById === null) continue;
+      const current = paidTotals.get(entry.paidById);
+      paidTotals.set(entry.paidById, {
+        name: entry.paidByName ?? "Someone",
+        total: (current?.total ?? 0) + entry.amount,
+      });
+    }
+    if (paidTotals.size > 0) {
+      lines.push("*Paid by*");
+      for (const { name, total } of paidTotals.values()) {
+        lines.push(`- ${name}: ${formatPrice(total)}`);
+      }
+      lines.push("");
+    }
+
+    if (trip.transfers.length > 0) {
+      lines.push("*Who owes whom*");
+      for (const transfer of trip.transfers) {
+        lines.push(`- ${transfer.fromName} owes ${transfer.toName}: ${formatPrice(transfer.amount)}`);
+      }
+    } else {
+      lines.push("Fully settled — nobody owes anybody.");
+    }
+
+    return `https://wa.me/?text=${encodeURIComponent(lines.join("\n"))}`;
+  }, [trip]);
+
   const friendFilterOptions: FilterOption<number | undefined>[] = [
     { key: "all", label: "All friends", value: undefined, count: trip.entries.length },
     ...trip.participants.map((person) => ({
@@ -218,6 +264,18 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
             </p>
           </div>
           <div className="flex flex-none items-center gap-2">
+            <a
+              href={whatsappHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Share trip on WhatsApp"
+              title="Share trip on WhatsApp"
+              className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-[#25D366] text-white shadow-ios active:scale-95"
+            >
+              <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="currentColor" aria-hidden>
+                <path d="M12 2.5c-5.25 0-9.5 4.25-9.5 9.5 0 1.68.44 3.3 1.28 4.72L2.5 21.5l4.9-1.26a9.46 9.46 0 0 0 4.6 1.18h.01c5.24 0 9.5-4.25 9.5-9.5S17.25 2.5 12 2.5zm0 17.32h-.01a7.86 7.86 0 0 1-4-1.1l-.29-.17-2.99.78.8-2.9-.19-.3a7.85 7.85 0 0 1-1.21-4.13c0-4.34 3.55-7.88 7.9-7.88 2.11 0 4.09.82 5.58 2.32a7.83 7.83 0 0 1 2.31 5.57c0 4.35-3.55 7.9-7.9 7.9zm4.33-5.92c-.24-.12-1.41-.7-1.63-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.94-.14.16-.28.18-.52.06-.24-.12-1.01-.37-1.92-1.18-.71-.63-1.19-1.42-1.33-1.66-.14-.24-.02-.37.1-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.3-.74-1.78-.19-.46-.39-.4-.54-.41-.14-.01-.3-.01-.46-.01a.9.9 0 0 0-.64.3c-.22.24-.84.82-.84 2s.86 2.32.98 2.48c.12.16 1.7 2.6 4.13 3.64.58.25 1.03.4 1.38.51.58.18 1.11.16 1.53.1.47-.07 1.41-.58 1.61-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28z" />
+              </svg>
+            </a>
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
