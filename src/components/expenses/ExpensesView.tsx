@@ -1,67 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useState } from "react";
 
 import { AdminLoginButton } from "@/components/AdminLoginButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { EntrySheet } from "@/components/expenses/EntrySheet";
 import { NewTripSheet } from "@/components/expenses/NewTripSheet";
 import { PeopleSheet } from "@/components/expenses/PeopleSheet";
-import { deleteExpense } from "@/lib/expenses/actions";
-import { useAdmin } from "@/lib/admin-context";
-import { formatIsoDate, monthKeyToLabel, shiftMonthKey } from "@/lib/dates";
 import { formatPrice } from "@/lib/units";
-import type { ExpenseDTO, ExpenseMonthDTO } from "@/lib/expenses/types";
+import type { ExpenseMonthDTO } from "@/lib/expenses/types";
 
+/**
+ * The Trips list, and nothing else — the day-to-day ledger, this month's
+ * total, and settlements all belong to a trip's own page now, so this one
+ * doesn't duplicate them in a second shape.
+ */
 export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
-  const router = useRouter();
-  const { isAdmin } = useAdmin();
-  const [entrySheet, setEntrySheet] = useState<{ entry: ExpenseDTO | null } | null>(null);
+  const [addEntryOpen, setAddEntryOpen] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(false);
   const [newTripOpen, setNewTripOpen] = useState(false);
   // Shut by default — a closed trip is done with, so it shouldn't compete
   // with the open ones for space every time this page loads.
   const [closedTripsOpen, setClosedTripsOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  // Days, newest first — a ledger reads as "what happened on the 28th", not
-  // as one undifferentiated column of rows.
-  const days = useMemo(() => {
-    const grouped = new Map<string, ExpenseDTO[]>();
-    for (const entry of month.entries) {
-      const day = entry.spentAt.slice(0, 10);
-      grouped.set(day, [...(grouped.get(day) ?? []), entry]);
-    }
-    return [...grouped.entries()];
-  }, [month.entries]);
-
-  const remove = (entry: ExpenseDTO) => {
-    if (!window.confirm(`Delete ${formatPrice(entry.amount)} from this month? This can't be undone.`)) {
-      return;
-    }
-    startTransition(async () => {
-      const result = await deleteExpense(entry.id);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      setEntrySheet(null);
-      router.refresh();
-    });
-  };
 
   return (
     <div className="space-y-6 pb-4">
       <header className="flex items-end justify-between gap-3 pt-2">
-        <div className="min-w-0">
-          <p className="text-[13px] font-medium uppercase tracking-wide text-ios-label-2">
-            {monthKeyToLabel(month.monthKey)}
-          </p>
-          <h1 className="truncate text-[34px] font-bold leading-tight tracking-tight">Expenses</h1>
-        </div>
+        <h1 className="truncate text-[34px] font-bold leading-tight tracking-tight">Expenses</h1>
         <div className="flex flex-none items-center gap-2">
           <button
             type="button"
@@ -74,7 +40,7 @@ export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
           </button>
           <button
             type="button"
-            onClick={() => setEntrySheet({ entry: null })}
+            onClick={() => setAddEntryOpen(true)}
             aria-label="Add an entry"
             title="Add an entry"
             className="flex h-9 w-9 items-center justify-center rounded-full bg-ios-blue text-white shadow-ios active:scale-95"
@@ -87,49 +53,6 @@ export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
           <ThemeToggle />
         </div>
       </header>
-
-      <div className="flex items-center justify-between px-1">
-        <Link
-          href={`/expenses?month=${shiftMonthKey(month.monthKey, -1)}`}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-ios-surface text-ios-blue shadow-ios active:scale-95"
-          aria-label="Previous month"
-        >
-          <Chevron direction="left" />
-        </Link>
-        <p className="text-[15px] font-medium text-ios-label-2">{monthKeyToLabel(month.monthKey)}</p>
-        <Link
-          href={`/expenses?month=${shiftMonthKey(month.monthKey, 1)}`}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-ios-surface text-ios-blue shadow-ios active:scale-95"
-          aria-label="Next month"
-        >
-          <Chevron direction="right" />
-        </Link>
-      </div>
-
-      {error ? (
-        <p className="rounded-ios bg-ios-red-soft px-4 py-3 text-[14px] text-ios-red">{error}</p>
-      ) : null}
-
-      <section className="ios-card p-5">
-        <p className="text-[13px] text-ios-label-2">Spent this month</p>
-        <p className="text-[32px] font-bold leading-none tabular-nums tracking-tight">
-          {formatPrice(month.spent)}
-        </p>
-        {month.income > 0 ? (
-          <p className="mt-2 text-[13px] text-ios-label-2">
-            <span className="font-semibold tabular-nums text-ios-green">
-              {formatPrice(month.income)}
-            </span>{" "}
-            in · net{" "}
-            <span className="font-semibold tabular-nums">
-              {formatPrice(month.income - month.spent)}
-            </span>
-          </p>
-        ) : null}
-        <p className="mt-2 text-[12px] text-ios-label-3">
-          Groceries and petrol are tracked in their own modules and are not counted here.
-        </p>
-      </section>
 
       <section>
         <div className="flex items-center justify-between px-1 pb-2">
@@ -230,113 +153,14 @@ export function ExpensesView({ month }: { month: ExpenseMonthDTO }) {
         </section>
       ) : null}
 
-      <section>
-        <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">Entries</h2>
-        {days.length === 0 ? (
-          <p className="ios-card p-6 text-center text-[15px] text-ios-label-2">
-            Nothing recorded for {monthKeyToLabel(month.monthKey)} yet.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {days.map(([day, entries]) => (
-              <div key={day}>
-                <p className="px-1 pb-1.5 text-[13px] font-semibold uppercase tracking-wide text-ios-label-3">
-                  {formatIsoDate(`${day}T12:00:00.000Z`)}
-                </p>
-                <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
-                  {entries.map((entry) => (
-                    <li key={entry.id}>
-                      <button
-                        type="button"
-                        onClick={() => setEntrySheet({ entry })}
-                        className="ios-row w-full text-left active:bg-ios-surface-2"
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[16px] font-medium">
-                            {entry.note?.trim() || entry.categoryNameEn}
-                          </span>
-                          <span className="block truncate text-[13px] text-ios-label-2">
-                            {entry.tripName ? `${entry.tripName} · ` : ""}
-                            {entry.categoryNameEn}
-                            {entry.paidByName ? ` · ${entry.paidByName} paid` : ""}
-                            {entry.methodName ? ` · ${entry.methodName}` : ""}
-                          </span>
-                        </span>
-                        {entry.shares.length > 0 ? (
-                          <span className="flex-none rounded-full bg-ios-surface-2 px-2 py-0.5 text-[11px] font-medium text-ios-label-2 ring-1 ring-inset ring-ios-separator">
-                            split {entry.shares.length}
-                          </span>
-                        ) : null}
-                        <span
-                          className={`flex-none text-[15px] font-semibold tabular-nums ${
-                            entry.kind === "INCOME" ? "text-ios-green" : ""
-                          }`}
-                        >
-                          {entry.kind === "INCOME" ? "+" : ""}
-                          {formatPrice(entry.amount)}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {month.settlements.length > 0 ? (
-        <section>
-          <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">Settled this month</h2>
-          <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
-            {month.settlements.map((settlement) => (
-              <li key={settlement.id} className="ios-row">
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px]">
-                    {settlement.fromName} paid {settlement.toName}
-                  </span>
-                  <span className="block text-[12px] text-ios-label-3">
-                    {formatIsoDate(settlement.settledAt)}
-                    {settlement.note ? ` · ${settlement.note}` : ""}
-                  </span>
-                </span>
-                <span className="flex-none text-[15px] font-semibold tabular-nums">
-                  {formatPrice(settlement.amount)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {entrySheet ? (
-        <EntrySheet
-          entry={entrySheet.entry}
-          month={month}
-          onClose={() => setEntrySheet(null)}
-          onDelete={isAdmin && entrySheet.entry ? () => remove(entrySheet.entry as ExpenseDTO) : undefined}
-        />
+      {addEntryOpen ? (
+        <EntrySheet entry={null} month={month} onClose={() => setAddEntryOpen(false)} />
       ) : null}
 
       <PeopleSheet open={peopleOpen} month={month} onClose={() => setPeopleOpen(false)} />
 
       <NewTripSheet open={newTripOpen} people={month.people} onClose={() => setNewTripOpen(false)} />
     </div>
-  );
-}
-
-function Chevron({ direction }: { direction: "left" | "right" }) {
-  return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-      <path
-        d={direction === "left" ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7"}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }
 
