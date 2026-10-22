@@ -54,7 +54,7 @@ Useful scripts (see `package.json`):
 
 ### Seeing a change without deploying
 
-Production runs on Coolify off `main`, so "merge and look at the live site"
+Production runs on Railway off `main`, so "merge and look at the live site"
 is the slowest possible way to review a change — and it reviews it after it
 is already live. `scripts/preview.sh` brings the whole thing up from nothing
 and photographs it instead:
@@ -68,7 +68,7 @@ It writes `shots/<screen>-phone.png` and `shots/<screen>-desktop.png` (both
 gitignored), starting a local MariaDB and installing dependencies only if
 they are missing, so re-running it after an edit just re-takes the pictures.
 It refuses to run unless `DATABASE_URL` points at localhost — the demo lists
-it seeds must never reach the Coolify database.
+it seeds must never reach the Railway database.
 
 This is what makes a cloud coding session reviewable: there is no browser
 pointed at `localhost:3000` in one, so the screenshots are the only way to
@@ -392,10 +392,11 @@ traditional print sheet with `jspdf-autotable`:
   (jsPDF cannot shape Tamil); English *and* Tanglish are both Latin script,
   so they take the crisp vector `jspdf-autotable` path.
 
-## 7. Deploying to Coolify
+## 7. Deploying to Railway
 
-The app ships a `Dockerfile`, so Coolify builds and runs it the same way on
-any host. Three files do the work:
+Production runs on Railway, deployed from `main`. The app ships a
+`Dockerfile` at the repo root, which Railway detects and builds instead of
+its own Nixpacks/Railpack build. Three files do the work:
 
 | File | Role |
 |---|---|
@@ -405,59 +406,44 @@ any host. Three files do the work:
 
 The image keeps the full `node_modules` rather than using Next's
 `output: "standalone"`, because the container needs the `prisma` CLI to run
-migrations on boot and `tsx` to run `db:import` / `db:seed` from Coolify's
-terminal. See the comment at the top of the `Dockerfile`.
+migrations on boot and `tsx` to run `db:import` / `db:seed` against the live
+database. See the comment at the top of the `Dockerfile`.
 
 ### Steps
 
-1. **Create the database** — New Resource → **MySQL** (not Postgres; the
-   schema's `datasource` provider is `mysql`). Note the generated user,
-   password, database name, and the **internal** hostname.
-2. **Create the application** — New Resource → Public/Private Repository,
-   point it at this repo, and set **Build Pack: Dockerfile**. Coolify picks
-   up the `Dockerfile` at the repo root; leave the port at `3000`.
-3. **Environment variables** on the application:
+1. **Create the database** — in the Railway project, add a **MySQL**
+   service (not Postgres; the schema's `datasource` provider is `mysql`).
+2. **Create the app service** from this GitHub repo, and set its deploy
+   branch to `main` (Settings → Source). Railway rebuilds and redeploys on
+   every push to that branch — so merging a PR into `main` is a release.
+3. **Environment variables** on the app service:
 
    | Variable | Value |
    |---|---|
-   | `DATABASE_URL` | `mysql://<user>:<pass>@<internal-host>:3306/<db>` |
+   | `DATABASE_URL` | `${{MySQL.MYSQL_URL}}` — a reference to the MySQL service's private URL |
 
    It is read at request time, so it is never baked into the image and
-   changing it only needs a restart, not a rebuild.
-4. **Domain** — set it in Coolify (Configuration → Domains) and point an `A`
-   record at the host. Coolify's proxy issues the Let's Encrypt certificate.
-   Because the manifest's `start_url` is relative, "Add to Home Screen"
-   works on the new domain with no further config.
-5. **Health check** — path `/api/health`, port `3000`. The endpoint returns
-   200 whenever the process is alive and reports the database separately in
-   its body; see the comment in the route for why it does not fail on a
-   database outage.
+   changing it only needs a redeploy, not a code change. Railway also sets
+   `PORT`, which `next start` listens on.
+4. **Domain** — Settings → Networking: generate a `*.up.railway.app` domain,
+   or add a custom one and point a `CNAME` at the target Railway gives you.
+   Railway issues the certificate. Because the manifest's `start_url` is
+   relative, "Add to Home Screen" works on the new domain with no further
+   config.
+5. **Health check** — Settings → Deploy → Healthcheck Path: `/api/health`.
+   The endpoint returns 200 whenever the process is alive and reports the
+   database separately in its body; see the comment in the route for why it
+   does not fail on a database outage.
 6. **Deploy.** Migrations apply automatically — `docker-entrypoint.sh` runs
    `prisma migrate deploy` before the server starts, and aborts the boot if
    the database is unreachable, so a bad `DATABASE_URL` fails the deploy
-   instead of going live broken. There is no separate release command to
-   configure.
-7. **Seed master data** from the application's terminal in Coolify:
+   instead of going live broken. No pre-deploy (release) command is needed;
+   one that also runs `prisma migrate deploy` is harmless, since it only
+   applies what is missing.
+7. **Seed master data** inside the running service (`railway ssh`):
    `npm run db:seed`, or `npm run db:import -- "./Grocery database.csv"`
    for the real spreadsheet.
 
-### Migrating an existing Railway deployment
-
-1. Dump from Railway and restore into the Coolify database *before* the
-   first deploy, so `prisma migrate deploy` sees the schema as current:
-
-   ```bash
-   mysqldump --single-transaction --no-tablespaces <railway-url> > grocery.sql
-   mysql <coolify-url> < grocery.sql
-   ```
-
-2. Verify the restore: `_prisma_migrations` should list every directory in
-   `prisma/migrations`, and row counts on `Item`, `GroceryList`,
-   `PriceHistory` and `FuelEntry` should match the old database. On the
-   first boot the entrypoint then finds nothing to apply.
-3. There is no dual-write, so anything entered on Railway after the dump is
-   lost — do the cutover in a quiet window and keep Railway running for a
-   day or two as a fallback.
 Local MySQL alternative for development, if you don't want to depend on a
 remote database while iterating:
 

@@ -2,7 +2,7 @@
 #
 # Applies any pending database migrations, then starts the server.
 #
-# This replaces Railway's "Release Command". `prisma migrate deploy` is
+# Doing it here means no release command has to be set up on Railway. `prisma migrate deploy` is
 # idempotent — it applies only migrations missing from the _prisma_migrations
 # table — so it is safe on every boot, restart and redeploy. Because `set -e`
 # aborts on failure, a container that cannot reach the database never starts
@@ -15,5 +15,5 @@ npx prisma migrate deploy
 
 echo "==> Starting Next.js on ${HOSTNAME:-0.0.0.0}:${PORT:-3000}"
 # exec so the server becomes PID 1 and receives Docker's SIGTERM directly,
-# which lets Coolify stop and redeploy the container cleanly.
+# which lets Railway stop and redeploy the container cleanly.
 exec npm run start

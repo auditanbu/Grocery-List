@@ -11,7 +11,7 @@
 # code change just re-takes the screenshots.
 #
 # It refuses to touch anything but a local database — the seed below writes
-# demo lists, which must never land in the Coolify one.
+# demo lists, which must never land in the Railway one.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."

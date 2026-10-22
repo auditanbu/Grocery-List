@@ -12,7 +12,7 @@ src/generated
 .git
 .gitignore
 
-# Never bake secrets into an image layer. Every value comes from Coolify's
+# Never bake secrets into an image layer. Every value comes from Railway's
 # environment variables at runtime instead.
 .env
 .env.*

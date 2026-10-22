@@ -1,14 +1,13 @@
-# Production image for Coolify (or any Docker host).
+# Production image for Railway (or any Docker host).
 #
 # Deliberately NOT using Next's `output: "standalone"`. Standalone prunes
 # node_modules down to what the server traces, which drops two things this
 # app genuinely needs on the box:
 #
 #   * the `prisma` CLI, used by docker-entrypoint.sh to apply migrations on
-#     every boot (Railway did this with a Release Command; Coolify has no
-#     direct equivalent, so the container does it itself);
+#     every boot, so no separate release command has to be configured;
 #   * `tsx`, so `npm run db:import -- "./Grocery database.csv"` and
-#     `npm run db:seed` can be run from Coolify's terminal against the live
+#     `npm run db:seed` can be run inside the service (`railway ssh`) against the live
 #     database when the master spreadsheet changes.
 #
 # The image is ~1 GB rather than ~250 MB. It is built on the host that runs
