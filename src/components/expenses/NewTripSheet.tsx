@@ -8,9 +8,12 @@ import { createTrip } from "@/lib/expenses/actions";
 import type { ExpensePersonDTO } from "@/lib/expenses/types";
 
 /**
- * Starts a trip: a name and a fixed roster. The roster is what every
- * expense logged under the trip defaults to splitting equally across — see
- * EntrySheet — so it is asked up front rather than per expense.
+ * Starts a trip: a name and a fixed roster, picked from the friends list
+ * kept on the Expenses screen. The roster is what every expense logged under
+ * the trip defaults to splitting equally across — and the only friends its
+ * entry sheet offers, see EntrySheet — so it is asked up front rather than
+ * per expense. Nobody starts ticked: with a long friends list, picking the
+ * three who are going beats unticking everyone who isn't.
  */
 export function NewTripSheet({
   open,
@@ -23,9 +26,10 @@ export function NewTripSheet({
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [participantIds, setParticipantIds] = useState<number[]>(
-    people.filter((person) => person.isActive).map((person) => person.id),
-  );
+  const [participantIds, setParticipantIds] = useState<number[]>([]);
+  // Someone removed from the friends list is hidden, not gone — they stay
+  // out of a new trip's picker.
+  const friends = people.filter((person) => person.isActive);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -37,6 +41,7 @@ export function NewTripSheet({
         return;
       }
       setName("");
+      setParticipantIds([]);
       onClose();
       router.refresh();
     });
@@ -47,7 +52,7 @@ export function NewTripSheet({
       open={open}
       onClose={onClose}
       title="New trip"
-      subtitle="A named pot of expenses, split equally across whoever's on it."
+      subtitle="Pick the friends who are going — only they show up on its expenses."
       footer={
         <button
           type="button"
@@ -76,13 +81,13 @@ export function NewTripSheet({
 
         <div>
           <span className="block pb-1.5 text-[13px] font-medium text-ios-label-2">Who&apos;s on it</span>
-          {people.length === 0 ? (
+          {friends.length === 0 ? (
             <p className="text-[13px] text-ios-label-2">
               Add people first, from the people icon on the Expenses screen.
             </p>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {people.map((person) => {
+              {friends.map((person) => {
                 const active = participantIds.includes(person.id);
                 return (
                   <button

@@ -773,6 +773,11 @@ function EditTripSheet({
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Friends hidden from the list don't come back as trip options — unless
+  // they are already on this trip, so they can still be taken off it.
+  const pickable = trip.people.filter(
+    (person) => person.isActive || trip.participants.some((participant) => participant.id === person.id),
+  );
 
   const save = () => {
     startTransition(async () => {
@@ -816,7 +821,7 @@ function EditTripSheet({
         <div>
           <span className="block pb-1.5 text-[13px] font-medium text-ios-label-2">Who&apos;s on it</span>
           <div className="flex flex-wrap gap-2">
-            {trip.people.map((person) => {
+            {pickable.map((person) => {
               const active = participantIds.includes(person.id);
               return (
                 <button
