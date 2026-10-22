@@ -443,7 +443,10 @@ export async function getTripDetail(tripId: number): Promise<TripDetailDTO | nul
     isActive: participant.person.isActive,
   }));
 
-  const { balances, transfers } = await getTripBalances(tripId, participants);
+  // Names come from the whole friends list, not just the roster: an older
+  // expense can share with a friend who was never added to the trip, and
+  // they should read by name rather than "Someone".
+  const { balances, transfers } = await getTripBalances(tripId, people);
 
   return {
     id: trip.id,
