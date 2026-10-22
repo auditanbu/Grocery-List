@@ -454,7 +454,10 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
                   : "bg-ios-surface-2 text-ios-label-2 ring-1 ring-inset ring-ios-separator"
               }`}
             >
-              {selectedOption(friendFilterOptions, friendFilter)?.label ?? "Friend"}
+              {/* Unfiltered, the pill says how many friends are on the trip. */}
+              {friendFilter === undefined
+                ? `All friends - ${trip.participants.length}`
+                : (selectedOption(friendFilterOptions, friendFilter)?.label ?? "Friend")}
             </button>
             <button
               type="button"
