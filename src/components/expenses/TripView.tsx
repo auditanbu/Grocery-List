@@ -266,18 +266,22 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
             </p>
           </div>
           <div className="flex flex-none items-center gap-2">
-            <a
-              href={whatsappHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Share trip on WhatsApp"
-              title="Share trip on WhatsApp"
-              className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-[#25D366] text-white shadow-ios active:scale-95"
-            >
-              <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="currentColor" aria-hidden>
-                <path d="M12 2.5c-5.25 0-9.5 4.25-9.5 9.5 0 1.68.44 3.3 1.28 4.72L2.5 21.5l4.9-1.26a9.46 9.46 0 0 0 4.6 1.18h.01c5.24 0 9.5-4.25 9.5-9.5S17.25 2.5 12 2.5zm0 17.32h-.01a7.86 7.86 0 0 1-4-1.1l-.29-.17-2.99.78.8-2.9-.19-.3a7.85 7.85 0 0 1-1.21-4.13c0-4.34 3.55-7.88 7.9-7.88 2.11 0 4.09.82 5.58 2.32a7.83 7.83 0 0 1 2.31 5.57c0 4.35-3.55 7.9-7.9 7.9zm4.33-5.92c-.24-.12-1.41-.7-1.63-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.94-.14.16-.28.18-.52.06-.24-.12-1.01-.37-1.92-1.18-.71-.63-1.19-1.42-1.33-1.66-.14-.24-.02-.37.1-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.3-.74-1.78-.19-.46-.39-.4-.54-.41-.14-.01-.3-.01-.46-.01a.9.9 0 0 0-.64.3c-.22.24-.84.82-.84 2s.86 2.32.98 2.48c.12.16 1.7 2.6 4.13 3.64.58.25 1.03.4 1.38.51.58.18 1.11.16 1.53.1.47-.07 1.41-.58 1.61-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28z" />
-              </svg>
-            </a>
+            {/* Only once the trip is closed — a summary shared mid-trip goes
+                stale with the next expense, and the group settles at the end. */}
+            {trip.closedAt !== null ? (
+              <a
+                href={whatsappHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Share trip on WhatsApp"
+                title="Share trip on WhatsApp"
+                className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-[#25D366] text-white shadow-ios active:scale-95"
+              >
+                <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="currentColor" aria-hidden>
+                  <path d="M12 2.5c-5.25 0-9.5 4.25-9.5 9.5 0 1.68.44 3.3 1.28 4.72L2.5 21.5l4.9-1.26a9.46 9.46 0 0 0 4.6 1.18h.01c5.24 0 9.5-4.25 9.5-9.5S17.25 2.5 12 2.5zm0 17.32h-.01a7.86 7.86 0 0 1-4-1.1l-.29-.17-2.99.78.8-2.9-.19-.3a7.85 7.85 0 0 1-1.21-4.13c0-4.34 3.55-7.88 7.9-7.88 2.11 0 4.09.82 5.58 2.32a7.83 7.83 0 0 1 2.31 5.57c0 4.35-3.55 7.9-7.9 7.9zm4.33-5.92c-.24-.12-1.41-.7-1.63-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.94-.14.16-.28.18-.52.06-.24-.12-1.01-.37-1.92-1.18-.71-.63-1.19-1.42-1.33-1.66-.14-.24-.02-.37.1-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.3-.74-1.78-.19-.46-.39-.4-.54-.41-.14-.01-.3-.01-.46-.01a.9.9 0 0 0-.64.3c-.22.24-.84.82-.84 2s.86 2.32.98 2.48c.12.16 1.7 2.6 4.13 3.64.58.25 1.03.4 1.38.51.58.18 1.11.16 1.53.1.47-.07 1.41-.58 1.61-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28z" />
+                </svg>
+              </a>
+            ) : null}
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
@@ -450,7 +454,10 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
                   : "bg-ios-surface-2 text-ios-label-2 ring-1 ring-inset ring-ios-separator"
               }`}
             >
-              {selectedOption(friendFilterOptions, friendFilter)?.label ?? "Friend"}
+              {/* Unfiltered, the pill says how many friends are on the trip. */}
+              {friendFilter === undefined
+                ? `All friends - ${trip.participants.length}`
+                : (selectedOption(friendFilterOptions, friendFilter)?.label ?? "Friend")}
             </button>
             <button
               type="button"
@@ -773,6 +780,11 @@ function EditTripSheet({
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Friends hidden from the list don't come back as trip options — unless
+  // they are already on this trip, so they can still be taken off it.
+  const pickable = trip.people.filter(
+    (person) => person.isActive || trip.participants.some((participant) => participant.id === person.id),
+  );
 
   const save = () => {
     startTransition(async () => {
@@ -816,7 +828,7 @@ function EditTripSheet({
         <div>
           <span className="block pb-1.5 text-[13px] font-medium text-ios-label-2">Who&apos;s on it</span>
           <div className="flex flex-wrap gap-2">
-            {trip.people.map((person) => {
+            {pickable.map((person) => {
               const active = participantIds.includes(person.id);
               return (
                 <button

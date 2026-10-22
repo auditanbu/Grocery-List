@@ -155,7 +155,21 @@ export function EntrySheet({
     ...month.categories,
     ...addedCategories.filter((added) => !month.categories.some((c) => c.id === added.id)),
   ].filter((category) => category.kind === kind);
-  const people = month.people.filter((person) => person.isActive || splitWith.includes(person.id));
+  // Inside a trip, only the friends on its roster can pay or share — the
+  // rest of the friends list has nothing to do with this trip. Anyone the
+  // entry already names stays, so editing an older entry never silently
+  // drops a payer or a share.
+  const selectedTrip = kind === "EXPENSE" && tripId !== null
+    ? month.openTrips.find((trip) => trip.id === tripId)
+    : undefined;
+  const people = selectedTrip
+    ? month.people.filter(
+        (person) =>
+          selectedTrip.participantIds.includes(person.id) ||
+          person.id === entry?.paidById ||
+          (entry?.shares ?? []).some((share) => share.personId === person.id),
+      )
+    : month.people.filter((person) => person.isActive || splitWith.includes(person.id));
 
   // Recently used categories lead the row, so the ones you actually pick
   // most weeks don't hide behind a scroll or an alphabetical accident.
@@ -209,6 +223,8 @@ export function EntrySheet({
     setSplitOpen(true);
     setSplitMethod("EQUAL");
     setSplitWith(trip.participantIds);
+    // A payer who isn't on this trip can't have paid for it.
+    setPaidById((current) => (current !== null && trip.participantIds.includes(current) ? current : null));
   };
   // What each person would owe as it stands — the same functions the server
   // will use, so what is shown is what gets stored.
