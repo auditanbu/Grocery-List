@@ -43,6 +43,8 @@ export type ExpenseInput = {
   paidById?: number | null;
   methodId?: number | null;
   note?: string | null;
+  /** Money in only — who gave it. Dropped for an expense. */
+  receivedFrom?: string | null;
   split: SplitInput;
   tripId?: number | null;
 };
@@ -119,6 +121,10 @@ function resolveShares(
   return { ok: true, shares };
 }
 
+function receivedFromOf(input: ExpenseInput): string | null {
+  return input.kind === "INCOME" ? input.receivedFrom?.trim() || null : null;
+}
+
 function validate(input: ExpenseInput): string | null {
   if (!Number.isFinite(input.amount) || input.amount <= 0) return "Enter an amount.";
   if (!Number.isFinite(input.categoryId)) return "Choose a category.";
@@ -144,6 +150,7 @@ export async function createExpense(input: ExpenseInput): Promise<ActionResult<{
       paidById: input.paidById ?? null,
       methodId: input.methodId ?? null,
       note: input.note?.trim() || null,
+      receivedFrom: receivedFromOf(input),
       splitMethod: resolved.shares.length > 0 ? input.split?.method ?? null : null,
       tripId: input.tripId ?? null,
       shares: { create: resolved.shares },
@@ -178,6 +185,7 @@ export async function updateExpense(id: number, input: ExpenseInput): Promise<Ac
         paidById: input.paidById ?? null,
         methodId: input.methodId ?? null,
         note: input.note?.trim() || null,
+        receivedFrom: receivedFromOf(input),
         splitMethod: resolved.shares.length > 0 ? input.split?.method ?? null : null,
         tripId: input.tripId ?? null,
         shares: { create: resolved.shares },

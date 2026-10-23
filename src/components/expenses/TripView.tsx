@@ -19,6 +19,7 @@ import {
 import { useAdmin } from "@/lib/admin-context";
 import { formatIsoDate } from "@/lib/dates";
 import { tripPersonTotals } from "@/lib/expenses/trip-summary";
+import { primeKeyboard } from "@/lib/focus-keyboard";
 import { formatPrice } from "@/lib/units";
 import type {
   ExpenseDTO,
@@ -48,6 +49,11 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
   // Same idea for the category breakdown — its own toggle, independent of
   // whichever balance row is open.
   const [expandedCategoryId, setExpandedCategoryId] = useState<number | null>(null);
+  // And for the By person rows: what that person paid, and their share.
+  const [expandedSpenderId, setExpandedSpenderId] = useState<number | null>(null);
+  // Folded by default — the totals above usually answer the question, and
+  // the debts are a tap away when it is time to settle.
+  const [balanceOpen, setBalanceOpen] = useState(false);
   // Narrows the Expenses list only — the totals above it still cover the
   // whole trip, so a filter can't be mistaken for having changed them.
   const [friendFilter, setFriendFilter] = useState<number | undefined>(undefined);
@@ -365,7 +371,10 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
       {trip.closedAt === null ? (
         <button
           type="button"
-          onClick={() => setEntrySheet({ open: true, entry: null })}
+          onClick={() => {
+            primeKeyboard();
+            setEntrySheet({ open: true, entry: null });
+          }}
           className="h-11 w-full rounded-ios bg-ios-blue text-[15px] font-semibold text-white active:scale-[0.99]"
         >
           + Add expense
@@ -406,19 +415,42 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
         <section>
           <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">By person</h2>
           <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
-            {personTotals.map((person) => (
-              <li key={person.personId} className="flex min-h-[3.25rem] items-center gap-3 px-4 py-2.5">
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[16px] font-medium">{person.name}</span>
-                  <span className="block truncate text-[13px] text-ios-label-2">
-                    Paid {formatPrice(person.paid)}
-                  </span>
-                </span>
-                <span className="flex-none text-[15px] font-semibold tabular-nums">
-                  {formatPrice(person.spent)}
-                </span>
-              </li>
-            ))}
+            {personTotals.map((person) => {
+              const expanded = expandedSpenderId === person.personId;
+              return (
+                <li key={person.personId}>
+                  <div className="flex min-h-[3.25rem] items-center gap-3 px-4 py-2.5">
+                    <span className="min-w-0 flex-1">
+                      <NameToggle
+                        name={person.name}
+                        expanded={expanded}
+                        onClick={() => setExpandedSpenderId(expanded ? null : person.personId)}
+                      />
+                      <span className="block truncate text-[13px] text-ios-label-2">
+                        Paid {formatPrice(person.paid)}
+                      </span>
+                    </span>
+                    <span className="flex-none text-[15px] font-semibold tabular-nums">
+                      {formatPrice(person.spent)}
+                    </span>
+                  </div>
+                  {expanded ? (
+                    <>
+                      <p className="px-4 pb-1 text-[11px] font-semibold uppercase tracking-wide text-ios-label-3">
+                        Paid
+                      </p>
+                      <PersonEntries
+                        entries={trip.entries.filter((entry) => entry.paidById === person.personId)}
+                      />
+                      <p className="px-4 pb-1 text-[11px] font-semibold uppercase tracking-wide text-ios-label-3">
+                        Their share
+                      </p>
+                      <PersonShares entries={trip.entries} personId={person.personId} />
+                    </>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
           <p className="px-1 pt-1.5 text-[12px] text-ios-label-3">
             Spent is each person&apos;s own share of the trip; paid is what they handed over.
@@ -427,8 +459,41 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
       ) : null}
 
       <section>
-        <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">Balance</h2>
-        {trip.balances.length === 0 ? (
+        <button
+          type="button"
+          onClick={() => setBalanceOpen((open) => !open)}
+          aria-expanded={balanceOpen}
+          className="flex w-full items-center justify-between gap-3 px-1 pb-2"
+        >
+          <h2 className="text-[20px] font-semibold tracking-tight">Balance</h2>
+          <span className="flex flex-none items-center gap-1.5">
+            {/* Says whether anything is owed, so the folded section isn't a blank. */}
+            <span
+              className={`text-[13px] font-medium ${trip.transfers.length === 0 ? "text-ios-green" : "text-ios-red"}`}
+            >
+              {trip.transfers.length === 0
+                ? trip.entries.length === 0
+                  ? ""
+                  : "Settled"
+                : `${trip.transfers.length} to settle`}
+            </span>
+            <svg
+              viewBox="0 0 24 24"
+              className={`h-4 w-4 flex-none text-ios-label-3 transition-transform ${balanceOpen ? "rotate-180" : ""}`}
+              aria-hidden
+            >
+              <path
+                d="M6 9l6 6 6-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+        </button>
+        {!balanceOpen ? null : trip.balances.length === 0 ? (
           <p className="ios-card p-5 text-[15px] text-ios-label-2">
             {trip.entries.length === 0
               ? "Add an expense to get started."
@@ -808,6 +873,33 @@ function PersonEntries({ entries }: { entries: ExpenseDTO[] }) {
         <li key={entry.id} className="flex items-center justify-between gap-3 text-[13px] text-ios-label-2">
           <span className="min-w-0 truncate">{entry.note?.trim() || entry.categoryNameEn}</span>
           <span className="flex-none tabular-nums">{formatPrice(entry.amount)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * A By person row's second list — every expense this person was part of, at
+ * their own share of it. An unsplit entry is wholly its payer's, the same rule
+ * tripPersonTotals uses, so these add up to the row's spent figure.
+ */
+function PersonShares({ entries, personId }: { entries: ExpenseDTO[]; personId: number }) {
+  const rows = entries.flatMap((entry) => {
+    const share = entry.shares.find((candidate) => candidate.personId === personId);
+    if (share) return [{ entry, amount: share.amount }];
+    if (entry.shares.length === 0 && entry.paidById === personId) return [{ entry, amount: entry.amount }];
+    return [];
+  });
+  if (rows.length === 0) {
+    return <p className="px-4 pb-3 text-[13px] text-ios-label-3">No share in any expense on this trip.</p>;
+  }
+  return (
+    <ul className="space-y-1 px-4 pb-3">
+      {rows.map(({ entry, amount }) => (
+        <li key={entry.id} className="flex items-center justify-between gap-3 text-[13px] text-ios-label-2">
+          <span className="min-w-0 truncate">{entry.note?.trim() || entry.categoryNameEn}</span>
+          <span className="flex-none tabular-nums">{formatPrice(amount)}</span>
         </li>
       ))}
     </ul>

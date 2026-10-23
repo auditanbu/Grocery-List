@@ -11,6 +11,7 @@ import {
   type SplitInput,
 } from "@/lib/expenses/actions";
 import { formatIsoDateTime } from "@/lib/dates";
+import { primeKeyboard, releaseKeyboardProxy } from "@/lib/focus-keyboard";
 import { formatPrice } from "@/lib/units";
 import { allocateByShares, allocateEqually, toPaise, toRupees } from "@/lib/expenses/balances";
 import type {
@@ -108,8 +109,14 @@ export function EntrySheet({
     const frame = requestAnimationFrame(() => {
       amountInputRef.current?.focus();
       amountInputRef.current?.select();
+      // The opening tap may have parked focus on a stand-in to get the
+      // phone's keyboard up — see primeKeyboard. The amount has it now.
+      releaseKeyboardProxy();
     });
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      releaseKeyboardProxy();
+    };
   }, [mode]);
 
   const [kind, setKind] = useState<EntryKind>(entry?.kind ?? "EXPENSE");
@@ -127,6 +134,7 @@ export function EntrySheet({
       null,
   );
   const [note, setNote] = useState(entry?.note ?? "");
+  const [receivedFrom, setReceivedFrom] = useState(entry?.receivedFrom ?? "");
   const [tripId, setTripId] = useState<number | null>(entry?.tripId ?? defaultTripId ?? null);
 
   const defaultTrip = !entry && defaultTripId !== undefined
@@ -286,6 +294,7 @@ export function EntrySheet({
       paidById,
       methodId,
       note,
+      receivedFrom: kind === "INCOME" ? receivedFrom : null,
       split,
       tripId: kind === "EXPENSE" ? tripId : null,
     };
@@ -318,7 +327,10 @@ export function EntrySheet({
         mode === "view" ? (
           <button
             type="button"
-            onClick={() => setMode("edit")}
+            onClick={() => {
+              primeKeyboard();
+              setMode("edit");
+            }}
             aria-label="Edit entry"
             title="Edit entry"
             className="flex h-9 w-9 items-center justify-center rounded-full bg-ios-surface-2 text-ios-blue active:scale-95"
@@ -504,8 +516,20 @@ export function EntrySheet({
           />
         </Field>
 
+        {kind === "INCOME" ? (
+          <Field label="From (who gave it)">
+            <input
+              value={receivedFrom}
+              onChange={(event) => setReceivedFrom(event.target.value)}
+              placeholder="e.g. Office, Tenant, Ravi"
+              aria-label="Received from"
+              className="h-12 w-full rounded-ios bg-ios-surface-2 px-4 text-[16px] outline-none ring-1 ring-inset ring-ios-separator focus:ring-2 focus:ring-ios-blue"
+            />
+          </Field>
+        ) : null}
+
         {people.length > 0 ? (
-          <Field label={kind === "INCOME" ? "Received by" : "Paid by"}>
+          <Field label={kind === "INCOME" ? "Received by (who got it)" : "Paid by"}>
             <div className="flex flex-wrap gap-2">
               {people.map((person) => (
                 <Chip
@@ -721,8 +745,14 @@ function ViewEntry({ entry }: { entry: ExpenseDTO }) {
         <p className="text-[16px]">{formatIsoDateTime(entry.spentAt)}</p>
       </Field>
 
+      {entry.kind === "INCOME" && entry.receivedFrom ? (
+        <Field label="From (who gave it)">
+          <p className="text-[16px]">{entry.receivedFrom}</p>
+        </Field>
+      ) : null}
+
       {entry.paidByName ? (
-        <Field label={entry.kind === "INCOME" ? "Received by" : "Paid by"}>
+        <Field label={entry.kind === "INCOME" ? "Received by (who got it)" : "Paid by"}>
           <p className="text-[16px]">{entry.paidByName}</p>
         </Field>
       ) : null}
