@@ -18,6 +18,7 @@ import {
 } from "@/lib/expenses/actions";
 import { useAdmin } from "@/lib/admin-context";
 import { formatIsoDate } from "@/lib/dates";
+import { tripPersonTotals } from "@/lib/expenses/trip-summary";
 import { formatPrice } from "@/lib/units";
 import type {
   ExpenseDTO,
@@ -137,6 +138,25 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
     return `https://wa.me/?text=${encodeURIComponent(lines.join("\n"))}`;
   }, [trip]);
 
+  // What the trip cost each person, and what each of them fronted — the
+  // total split by people rather than by category.
+  const personTotals = useMemo(() => tripPersonTotals(trip), [trip]);
+
+  const [pdfBusy, setPdfBusy] = useState(false);
+  // jsPDF is imported lazily so it stays out of the trip page's bundle.
+  const exportPdf = async () => {
+    setPdfBusy(true);
+    setError(null);
+    try {
+      const { downloadTripPdf } = await import("@/lib/trip-pdf");
+      downloadTripPdf(trip);
+    } catch {
+      setError("Could not generate the PDF. Please try again.");
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
   const friendFilterOptions: FilterOption<number | undefined>[] = [
     { key: "all", label: "All friends", value: undefined, count: trip.entries.length },
     ...trip.participants.map((person) => ({
@@ -243,22 +263,27 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
           paddingTop: "calc(env(safe-area-inset-top) + 1rem)",
         }}
       >
-        <Link href="/expenses" className="inline-flex items-center gap-1 text-[15px] text-ios-blue">
-          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-            <path
-              d="M15 5l-7 7 7 7"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          Expenses
-        </Link>
-
-        <header className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+        <header className="flex items-start justify-between gap-2">
+          {/* Just the chevron — the name is what the row is about, so the
+              back link gives it the width rather than spelling out "Expenses". */}
+          <Link
+            href="/expenses"
+            aria-label="Back to expenses"
+            title="Back to expenses"
+            className="-ml-2 flex h-9 w-8 flex-none items-center justify-center text-ios-blue active:opacity-60"
+          >
+            <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden>
+              <path
+                d="M15 5l-7 7 7 7"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </Link>
+          <div className="min-w-0 flex-1">
             <h1 className="truncate text-[30px] font-bold leading-tight tracking-tight">{trip.name}</h1>
             <p className="truncate text-[15px] text-ios-label-2">
               {trip.participants.map((person) => person.name).join(", ")}
@@ -268,6 +293,27 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
           <div className="flex flex-none items-center gap-2">
             {/* Only once the trip is closed — a summary shared mid-trip goes
                 stale with the next expense, and the group settles at the end. */}
+            {trip.closedAt !== null ? (
+              <button
+                type="button"
+                onClick={exportPdf}
+                disabled={pdfBusy}
+                aria-label={pdfBusy ? "Preparing PDF…" : "Download trip statement (PDF)"}
+                title={pdfBusy ? "Preparing PDF…" : "Download trip statement (PDF)"}
+                className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-ios-surface text-ios-blue shadow-ios active:scale-95 disabled:opacity-40"
+              >
+                <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" aria-hidden>
+                  <path
+                    d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            ) : null}
             {trip.closedAt !== null ? (
               <a
                 href={whatsappHref}
@@ -353,6 +399,30 @@ export function TripView({ trip }: { trip: TripDetailDTO }) {
               );
             })}
           </ul>
+        </section>
+      ) : null}
+
+      {trip.entries.length > 0 ? (
+        <section>
+          <h2 className="px-1 pb-2 text-[20px] font-semibold tracking-tight">By person</h2>
+          <ul className="ios-card divide-y divide-ios-separator overflow-hidden">
+            {personTotals.map((person) => (
+              <li key={person.personId} className="flex min-h-[3.25rem] items-center gap-3 px-4 py-2.5">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[16px] font-medium">{person.name}</span>
+                  <span className="block truncate text-[13px] text-ios-label-2">
+                    Paid {formatPrice(person.paid)}
+                  </span>
+                </span>
+                <span className="flex-none text-[15px] font-semibold tabular-nums">
+                  {formatPrice(person.spent)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="px-1 pt-1.5 text-[12px] text-ios-label-3">
+            Spent is each person&apos;s own share of the trip; paid is what they handed over.
+          </p>
         </section>
       ) : null}
 
