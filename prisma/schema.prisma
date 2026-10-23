@@ -418,23 +418,26 @@ model PaymentMethod {
 
 /// One entry in the ledger: money out (EXPENSE) or money in (INCOME).
 model Expense {
-  id          Int          @id @default(autoincrement())
-  kind        EntryKind    @default(EXPENSE)
-  amount      Decimal      @db.Decimal(10, 2)
-  spentAt     DateTime
+  id           Int          @id @default(autoincrement())
+  kind         EntryKind    @default(EXPENSE)
+  amount       Decimal      @db.Decimal(10, 2)
+  spentAt      DateTime
   /// Sortable "YYYY-MM" derived from spentAt, so a month's entries are one
   /// indexed lookup — the same key GroceryList sorts by.
-  monthKey    String
-  categoryId  Int
+  monthKey     String
+  categoryId   Int
   /// Who actually paid. Null when nobody has said — an entry still counts
   /// towards the month's total, it just cannot take part in a balance.
-  paidById    Int?
-  methodId    Int?
-  note        String?
+  paidById     Int?
+  methodId     Int?
+  note         String?
+  /// Money in only: who gave it — an employer, a tenant, a friend. Free text,
+  /// because the giver is usually someone outside the people list.
+  receivedFrom String?
   /// Null when the entry is one person's alone; set when shares exist.
-  splitMethod SplitMethod?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  splitMethod  SplitMethod?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
   category ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   paidBy   ExpensePerson?  @relation(fields: [paidById], references: [id], onDelete: SetNull)

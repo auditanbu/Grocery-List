@@ -45,6 +45,8 @@ export type ExpenseDTO = {
   methodId: number | null;
   methodName: string | null;
   note: string | null;
+  /** Money in only: who gave it. */
+  receivedFrom: string | null;
   splitMethod: SplitMethod | null;
   shares: ExpenseShareDTO[];
   tripId: number | null;
